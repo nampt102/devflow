@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull, notExists, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, notExists, sql } from "drizzle-orm";
 import {
   agents,
   assets,
@@ -14,7 +14,7 @@ import { HttpError } from "../../errors.js";
 import { logActivity } from "../../services/activity-log.js";
 import { logger } from "../../middleware/logger.js";
 import { z } from "zod";
-import { PROMPT_HASH, PROMPT_ROLE, PROMPT_VERSION, SYSTEM_PROMPT, buildUserMessage, newBoundary } from "../prompts/triage.v2.js";
+import { PROMPT_HASH, PROMPT_ROLE, PROMPT_VERSION, SYSTEM_PROMPT, buildUserMessage, newBoundary } from "../prompts/triage.v3.js";
 import { chatJson, LlmError, type LlmConfig, type LlmErrorKind } from "./llm-client.js";
 import { contentHash, dedupeService, loadDedupeConfig, type DedupeConfig } from "./dedupe.js";
 import { embedText, type EmbedConfig } from "./embed-client.js";
@@ -135,6 +135,27 @@ export function triageService(
     return done;
   }
 
+  /** After request_changes: the reviewer's reason and the proposal that was sent back, as data for the next pass. */
+  async function loadFeedback(companyId: string, caseId: string): Promise<{ previousProposal: string; text: string } | null> {
+    const [ev] = (await db.execute(sql`
+      select payload->>'reason' as reason from pipeline_case_events
+      where company_id = ${companyId} and case_id = ${caseId} and type = 'review_decided' and payload->>'decision' = 'request_changes'
+      order by created_at desc, id desc limit 1`)) as unknown as Array<{ reason: string | null }>;
+    if (!ev?.reason?.trim()) return null;
+    const [prev] = await db
+      .select({ data: drAgentOutputs.data })
+      .from(drAgentOutputs)
+      .where(and(eq(drAgentOutputs.caseId, caseId), eq(drAgentOutputs.stageKey, "triage"), eq(drAgentOutputs.status, "superseded")))
+      .orderBy(desc(drAgentOutputs.createdAt))
+      .limit(1);
+    const d = (prev?.data ?? {}) as Record<string, unknown>;
+    const pick = (k: string) => (typeof d[k] === "string" ? sanitizeUntrusted(String(d[k]), 40) : "?");
+    return {
+      previousProposal: `classification=${pick("classification")}, priority=${pick("priority")}, difficulty=${pick("difficulty")}`,
+      text: sanitizeUntrusted(ev.reason, 1000).replace(/\s+/g, " "),
+    };
+  }
+
   /** Cases waiting in `triage` with no live proposal (also re-picks cases sent back by request_changes). */
   async function findPending(limit: number) {
     return db
@@ -214,6 +235,7 @@ export function triageService(
     }
     const candidateCaseKeys = found.candidates.map((c) => c.caseKey);
 
+    const feedback = await loadFeedback(companyId, caseId);
     const messages: Array<{ role: "system" | "user"; content: string }> = [
       { role: "system", content: SYSTEM_PROMPT },
       {
@@ -224,6 +246,7 @@ export function triageService(
           description: sanitizeUntrusted(row.description, caps.description),
           businessImpact: row.businessImpact ? sanitizeUntrusted(row.businessImpact, caps.impact) : null,
           attachmentNames,
+          feedback,
           existing: found.candidates.map((c) => ({
             caseKey: c.caseKey,
             title: sanitizeUntrusted(c.title, 200),

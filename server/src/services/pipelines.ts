@@ -4904,6 +4904,9 @@ export function pipelineService(db: Db, deps: { heartbeat?: IssueAssignmentWakeu
       expectedVersion: number;
       leaseToken?: string | null;
       actor: PipelineActor;
+      // DevFlow: runs inside the review transaction after the transition, so domain records written here
+      // (overrides, final values) commit or roll back together with the decision. Not reachable from HTTP bodies.
+      beforeCommit?: (tx: PipelineDb, ctx: { stageKey: string; toStageId: string }) => Promise<void>;
     }) {
       const automationLedgers: Array<typeof pipelineAutomationExecutions.$inferSelect> = [];
       const result = await db.transaction(async (tx) => {
@@ -4965,6 +4968,7 @@ export function pipelineService(db: Db, deps: { heartbeat?: IssueAssignmentWakeu
             approvedTransitionVersion: input.decision === "approve" ? transitioned.case.version : null,
           },
         });
+        await input.beforeCommit?.(tx, { stageKey: detail.stage.key, toStageId: transitioned.case.stageId });
         return { ...transitioned, updateEvent, reviewEvent };
       });
       const automationExecutions = await executeAutomationLedgers(automationLedgers, { type: "system" });

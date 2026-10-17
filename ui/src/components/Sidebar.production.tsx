@@ -12,6 +12,7 @@ import {
   Boxes,
   Repeat,
   Layers,
+  ClipboardCheck,
   GitBranch,
   Package,
   Settings,
@@ -187,6 +188,9 @@ export function Sidebar() {
           <SidebarNavItem to="/routines" label="Routines" icon={Repeat} />
           {showPipelines ? (
             <SidebarNavItem to="/pipelines" label="Pipelines" icon={GitBranch} />
+          ) : null}
+          {showPipelines ? (
+            <SidebarNavItem to="/triage" label="Triage review" icon={ClipboardCheck} />
           ) : null}
           {showGoalsLink ? (
             <SidebarNavItem to="/goals" label="Goals" icon={Target} />

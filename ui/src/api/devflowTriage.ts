@@ -1,0 +1,96 @@
+import { api } from "./client";
+
+// Staff review of Triage proposals (DevFlow step 8, openspec/decisions/0017).
+
+export type TriageClassification = "bug" | "feature" | "request";
+export type TriagePriority = "urgent" | "high" | "medium" | "low";
+export type TriageDifficulty = "easy" | "medium" | "hard";
+export type TriageDecision = "approve" | "reject" | "request_changes";
+
+export interface TriageProposalSummary {
+  classification: TriageClassification;
+  priority: TriagePriority;
+  difficulty: TriageDifficulty;
+  requiresHuman: boolean;
+  requiresHumanReasons: string[];
+  ruleFlags: string[];
+  confidence: number | null;
+  summary: string;
+  duplicateCandidates: number;
+}
+
+export interface TriageQueueItem {
+  caseId: string;
+  caseKey: string;
+  requestNumber: number;
+  title: string;
+  requesterName: string;
+  attachments: number;
+  createdAt: string;
+  version: number;
+  outputId: string;
+  promptVersion: string;
+  proposal: TriageProposalSummary;
+}
+
+export interface TriageCandidate {
+  caseId: string;
+  caseKey: string;
+  requestNumber: number;
+  title: string;
+  statusLabel: string;
+  trigram: number | null;
+  vector: number | null;
+  modelReason: string | null;
+  namedByModel: boolean;
+}
+
+export interface TriageDetail {
+  caseId: string;
+  caseKey: string;
+  requestNumber: number;
+  title: string;
+  description: string;
+  businessImpact: string | null;
+  requesterName: string;
+  createdAt: string;
+  version: number;
+  attachments: Array<{ id: string; name: string | null; contentType: string | null; size: number | null; contentPath: string }>;
+  outputId: string;
+  promptVersion: string;
+  model: string | null;
+  proposal: TriageProposalSummary & {
+    classificationReason: string;
+    priorityReason: string;
+    difficultyReason: string;
+    assumptions: string[];
+    openQuestions: string[];
+    modelRequiresHumanReasons: string[];
+    dedupeMode: string | null;
+  };
+  candidates: TriageCandidate[];
+}
+
+export interface TriageFinalPatch {
+  classification?: TriageClassification;
+  priority?: TriagePriority;
+  difficulty?: TriageDifficulty;
+  requiresHuman?: boolean;
+  requiresHumanReasons?: string[];
+  duplicateOfCaseId?: string | null;
+}
+
+export interface TriageDecisionBody {
+  outputId: string;
+  expectedVersion: number;
+  decision: TriageDecision;
+  reason?: string;
+  final?: TriageFinalPatch;
+}
+
+export const devflowTriageApi = {
+  queue: (companyId: string) => api.get<{ items: TriageQueueItem[] }>(`/companies/${companyId}/devflow/triage-queue`),
+  detail: (companyId: string, caseId: string) => api.get<TriageDetail>(`/companies/${companyId}/devflow/triage-cases/${caseId}`),
+  decide: (companyId: string, caseId: string, body: TriageDecisionBody) =>
+    api.post<{ ok: true; decision: TriageDecision; overriddenFields: string[] }>(`/companies/${companyId}/devflow/triage-cases/${caseId}/decision`, body),
+};

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { PROMPT_HASH, SYSTEM_PROMPT, buildUserMessage, newBoundary } from "../devflow/prompts/triage.v1.js";
 import * as v2 from "../devflow/prompts/triage.v2.js";
+import * as v3 from "../devflow/prompts/triage.v3.js";
 import { contentHash, foldText, mergeCandidates } from "../devflow/triage/dedupe.js";
 import { embedText, loadEmbedConfig } from "../devflow/triage/embed-client.js";
 import { chatJson, LlmError, loadLlmConfig, stripThinking, type LlmConfig } from "../devflow/triage/llm-client.js";
@@ -276,5 +277,26 @@ describe("embed client", () => {
     } finally {
       await fake.close();
     }
+  });
+});
+
+describe("triage prompt v3", () => {
+  it("is pinned: edit nothing, create triage.v4.ts instead", () => {
+    expect(v3.PROMPT_HASH).toBe("2640f0ece3eefa37b586eba2e6f0526bc17189f7e0e2c85dcf0bfe7f158b2337");
+    expect(v3.PROMPT_HASH).not.toBe(v2.PROMPT_HASH);
+    expect(v3.PROMPT_VERSION).toBe("v3");
+    expect(v3.SYSTEM_PROMPT).toContain("TEMPORARY");
+    expect(v3.SYSTEM_PROMPT).toContain("reviewer feedback");
+  });
+
+  it("puts reviewer feedback in its own boundary block, before the request, and only when given", () => {
+    const b = v3.newBoundary();
+    const base = { boundary: b, title: "t", description: "d", businessImpact: null, attachmentNames: [], existing: [] };
+    const withFeedback = v3.buildUserMessage({ ...base, feedback: { previousProposal: "priority=low", text: "Ưu tiên cao hơn" } });
+    expect(withFeedback.indexOf(`${b} START REVIEWER FEEDBACK`)).toBeLessThan(withFeedback.indexOf("Feedback: Ưu tiên cao hơn"));
+    expect(withFeedback.indexOf(`${b} END REVIEWER FEEDBACK`)).toBeLessThan(withFeedback.indexOf(`${b} START REQUEST DATA`));
+    expect(withFeedback).toContain("Previous proposal: priority=low");
+    expect(v3.buildUserMessage(base)).not.toContain("REVIEWER FEEDBACK");
+    expect(v3.buildUserMessage({ ...base, feedback: null })).not.toContain("REVIEWER FEEDBACK");
   });
 });

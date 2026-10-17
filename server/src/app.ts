@@ -104,9 +104,11 @@ import { caseRoutes } from "./routes/cases.js";
 import { fileResourceRoutes } from "./routes/file-resources.js";
 import { routineRoutes } from "./routes/routines.js";
 import { pipelineRoutes } from "./routes/pipelines.js";
+import { pipelineService } from "./services/pipelines.js";
 import { portalRoutes } from "./devflow/portal/routes.js";
 import { portalStaticRouter } from "./devflow/portal/static.js";
 import { adminAccountRoutes } from "./devflow/admin-accounts.js";
+import { triageReviewRoutes } from "./devflow/triage-review/routes.js";
 import { environmentRoutes } from "./routes/environments.js";
 import { executionWorkspaceRoutes } from "./routes/execution-workspaces.js";
 import { goalRoutes } from "./routes/goals.js";
@@ -855,6 +857,7 @@ export async function createApp(
   api.use(pipelineRoutes(db));
   api.use(portalRoutes(db, opts.storageService));
   api.use(adminAccountRoutes(db));
+  api.use(triageReviewRoutes(db, { reviewCase: (input) => pipelineService(db).reviewCase(input) }));
   api.use(
     environmentRoutes(db, {
       pluginWorkerManager: workerManager,

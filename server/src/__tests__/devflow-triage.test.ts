@@ -18,7 +18,7 @@ import {
 import { getEmbeddedPostgresTestSupport, startEmbeddedPostgresTestDatabase } from "./helpers/embedded-postgres.js";
 import { costService } from "../services/costs.js";
 import { pipelineService } from "../services/pipelines.js";
-import { PROMPT_HASH } from "../devflow/prompts/triage.v2.js";
+import { PROMPT_HASH } from "../devflow/prompts/triage.v3.js";
 import { startFakeLlm, VALID_TRIAGE_REPLY, type FakeLlm } from "../devflow/triage/fake-llm.js";
 import type { LlmConfig } from "../devflow/triage/llm-client.js";
 import { triageService, TriageFailure } from "../devflow/triage/triage-service.js";
@@ -128,7 +128,7 @@ describeEmbeddedPostgres("devflow triage", () => {
 
     expect(await stageOf(caseId)).toBe("triage_review");
     const [out] = await outputsOf(caseId);
-    expect(out).toMatchObject({ status: "proposed", stageKey: "triage", promptRole: "triage", promptVersion: "v2", promptHash: PROMPT_HASH });
+    expect(out).toMatchObject({ status: "proposed", stageKey: "triage", promptRole: "triage", promptVersion: "v3", promptHash: PROMPT_HASH });
     expect((out.data as any).classification).toBe("feature");
     expect((out.data as any).inputTokens).toBe(120);
     expect(out.agentId).toBeTruthy();

@@ -463,6 +463,10 @@ export const queryKeys = {
     list: (companyId: string, kind: string) =>
       ["folders", companyId, kind] as const,
   },
+  devflowTriage: {
+    queue: (companyId: string) => ["devflow-triage", companyId, "queue"] as const,
+    detail: (companyId: string, caseId: string) => ["devflow-triage", companyId, "detail", caseId] as const,
+  },
   pipelines: {
     list: (companyId: string) => ["pipelines", companyId] as const,
     detail: (pipelineId: string) =>
