@@ -120,3 +120,9 @@ Dẫn xuất từ `pipeline_case_events` (thời điểm vào/ra stage) cho dash
 ## Migration #2a (`0356_devflow_requester_invites`, 2026-10-17)
 - `dr_requester_invites`: `id`, `company_id`, `token_hash` (unique, SHA-256), `label`, `created_by_user_id`, `expires_at`, `accepted_at`, `accepted_by_user_id` (FK `user`, set null), `revoked_at`, `created_at`. Không có FK tới `dr_requesters` và không có CHECK: DDL đã trình có `accepted_requester_id` và CHECK `accepted_at => accepted_by_user_id`, nhưng chúng xung đột với `ON DELETE SET NULL` và sẽ chặn việc xóa user/requester nên đã bỏ.
 - Kiểm chứng: `server/src/__tests__/devflow-portal-invites.test.ts`.
+
+## Migration #2: phát hiện trước khi thiết kế (2026-10-17, chưa có migration)
+- **Postgres nhúng không có pgvector.** Trong image không có `vector.control` ở đâu cả; gói `@embedded-postgres/linux-x64` chỉ có các extension contrib. Postgres nhúng là DB của mọi test và của `pnpm dev` khi không đặt `DATABASE_URL`. Một `CREATE EXTENSION vector` không điều kiện trong migration sẽ làm hỏng mọi test và cài đặt mặc định. DB Docker (`pgvector/pgvector:pg17`) có extension nhưng chưa được tạo (chỉ có plpgsql, pg_trgm, fuzzystrmatch).
+- **Phiên bản prompt không có sẵn trong Paperclip.** `agent_instruction_revisions` là di sản, đã bị thay bằng "persistent agent files" (`doc/agent-instruction-revisions.md`): chỉnh sửa mới không tạo bản ghi revision.
+- `pipeline-case-outputs` của Paperclip chỉ là read model gom tài liệu, tệp và work product của issue liên kết; không phải đầu ra có cấu trúc theo stage, nên `dr_agent_outputs` không trùng.
+- drizzle-orm có kiểu `vector` nhưng bắt buộc khai báo số chiều; muốn không cố định số chiều phải dùng `customType`.
