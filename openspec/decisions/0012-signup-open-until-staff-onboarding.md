@@ -15,4 +15,5 @@ Muốn đóng đăng ký công khai (`PAPERCLIP_AUTH_DISABLE_SIGN_UP=true`) đ�
 ## Lý do và hệ quả
 - Đóng ngay sẽ chặn nhân viên mới; mở thì chỉ sinh tài khoản rác. Tách thành hai bước để không phụ thuộc nhau.
 - Điều kiện trước khi đóng: (1) đã có instance admin; (2) có đường tạo tài khoản nhân viên; (3) kiểm lại bằng test HTTP trên stack thật rằng nhận lời mời board và nhận lời mời portal đều chạy khi đóng.
+- Cập nhật 2026-10-17: điều kiện (2) và kiểm chứng HTTP đã xong (task 3.5, 15/15 pass khi đóng; xem `kb/admin-accounts.md`). Còn lại là quyết định vận hành bật cờ ở môi trường thật; bootstrap admin đầu tiên và lời mời board khi đóng chưa được thử.
 - Rủi ro còn mở: người cầm link hợp lệ có thể dò email nào đã có tài khoản (có giới hạn tần suất 10/phút/IP, trong bộ nhớ nên không chia sẻ giữa nhiều instance); `user.email` không có unique index nên tính duy nhất dựa vào khóa advisory trong `register` và kiểm tra của better-auth.

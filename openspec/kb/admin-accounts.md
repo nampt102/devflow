@@ -28,4 +28,9 @@ Agent, thành viên công ty (kể cả admin công ty) và người chưa đăn
 ## Chưa làm / hạn chế
 - Chưa có màn hình quản trị (chỉ API); chưa gửi email; chưa buộc đổi mật khẩu lần đầu. Endpoint `change-password` của better-auth có tồn tại hay không và có an toàn để bật hay không: chưa xác nhận; giao diện cũng chưa có nên người dùng chưa tự đổi được mật khẩu.
 - Chưa giới hạn tần suất riêng cho các route admin (chỉ instance admin gọi được).
-- Chưa kiểm chứng ở mức HTTP trên stack chạy thật khi đóng đăng ký (xem status).
+- Chưa kiểm chứng: lời mời **board** (không phải portal) cho người đã có tài khoản khi đăng ký đóng; chưa kiểm chứng bootstrap admin đầu tiên khi đóng (theo thiết kế phải để mở cho tới khi có admin).
+
+## Kiểm chứng HTTP trên stack Docker thật khi `PAPERCLIP_AUTH_DISABLE_SIGN_UP=true` (2026-10-17, 15/15 pass)
+Đăng ký công khai bị từ chối; admin cũ vẫn đăng nhập; admin tạo nhân viên kèm công ty (mật khẩu 24 ký tự, `no-store`); nhân viên đăng nhập và dùng được board của công ty được cấp; nhân viên không tạo được tài khoản (403); reset làm phiên cũ mất hiệu lực, mật khẩu cũ bị từ chối, mật khẩu mới dùng được; requester đăng ký qua lời mời, đăng nhập, là requester của công ty nhưng không đọc được board. Sau đó stack được trả về trạng thái mở (`PAPERCLIP_AUTH_DISABLE_SIGN_UP=false`).
+
+**Lưu ý vận hành:** better-auth có giới hạn tần suất đăng nhập theo IP (cỡ vài lần mỗi 10 giây, bật ở chế độ authenticated). Kịch bản kiểm chứng phải giãn các lần đăng nhập (11 giây) mới hết 429. Nhiều nhân viên cùng đăng nhập từ một địa chỉ chung (NAT văn phòng) có thể gặp 429; cần theo dõi khi triển khai thật.

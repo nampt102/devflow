@@ -23,7 +23,7 @@ Trình duyệt tích hợp, tài khoản test cục bộ (biến `DEVFLOW_TEST_P
 - **Lỗi tìm ra ở lần thử đầu:** đăng ký thành công nhưng màn hình báo "lời mời đã được sử dụng" vì giao diện gọi `accept` sau `register` và link đã bị dùng. Đã sửa ở server (accept idempotent cho đúng người dùng link, commit `3afb73947`); mở lại link đã dùng bằng đúng tài khoản giờ ra "Đã xác nhận lời mời". Test tự động không bắt được lỗi này khi chưa có ca "accept ngay sau register"; ca đó đã được thêm.
 
 ## Chưa làm / hạn chế
-- Đăng ký công khai vẫn mở; chỉ nên đóng sau task 3.5 (ADR 0012). Màn hình đăng nhập không còn nút "Tạo tài khoản" khi không có link mời; với link mời, form mặc định là "Tạo tài khoản và nhận lời mời" (gọi `register` rồi đăng nhập), email đã có tài khoản thì tự chuyển sang đăng nhập.
+- Đăng ký công khai vẫn mở; có thể đóng vì task 3.5 đã xong (ADR 0012, `kb/admin-accounts.md`). Màn hình đăng nhập không còn nút "Tạo tài khoản" khi không có link mời; với link mời, form mặc định là "Tạo tài khoản và nhận lời mời" (gọi `register` rồi đăng nhập), email đã có tài khoản thì tự chuyển sang đăng nhập.
 - Chưa có màn hình cho nhân viên tạo link mời (hiện dùng API `POST /api/companies/:id/portal/invites`).
 - Chưa kiểm chứng trên Safari/Firefox và trình đọc màn hình; chưa có test thành phần React (chỉ test logic thuần).
 - User là requester của nhiều công ty chưa chọn được công ty trên giao diện (API cần `companyId`).

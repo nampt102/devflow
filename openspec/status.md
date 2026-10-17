@@ -8,10 +8,10 @@
 **P1**: Intake Portal + Workflow Core + Triage agent, pilot 1 công ty. P0 (khám phá Paperclip/Plane, docs, khung project-kit) đã xong.
 
 ## Bước đang làm
-Bước 4 (Intake Portal) đang triển khai theo change OpenSpec `add-intake-portal` (đã duyệt A1+B1+C1, ADR 0011). Các nhóm 1–5 đã xong: API requester, file đính kèm, lời mời một lần (migration 0355 và 0356 đã áp dụng vào DB của stack Docker), web `portal/` tiếng Việt phục vụ ở `/portal`. Kiểm chứng: 36 test server DevFlow và 12 test portal pass, đã chạy luồng thật trong trình duyệt (mời, đăng ký, nhận lời mời, gửi yêu cầu kèm tệp, xem chi tiết). Task 3.4 (đăng ký qua lời mời, chạy cả khi đăng ký công khai đóng) đã xong và kiểm chứng bằng test. Còn lại của change: task 3.5 (tài khoản nhân viên khi đóng đăng ký, đề xuất) và màn hình cho nhân viên tạo link (hiện dùng API); change chưa archive.
+Bước 4 (Intake Portal) đang triển khai theo change OpenSpec `add-intake-portal` (đã duyệt A1+B1+C1, ADR 0011). Các nhóm 1–5 đã xong: API requester, file đính kèm, lời mời một lần (migration 0355 và 0356 đã áp dụng vào DB của stack Docker), web `portal/` tiếng Việt phục vụ ở `/portal`. Kiểm chứng: 36 test server DevFlow và 12 test portal pass, đã chạy luồng thật trong trình duyệt (mời, đăng ký, nhận lời mời, gửi yêu cầu kèm tệp, xem chi tiết). Task 3.4 (đăng ký qua lời mời, chạy cả khi đăng ký công khai đóng) đã xong và kiểm chứng bằng test. Task 3.5 (instance admin tạo tài khoản và đặt lại mật khẩu) đã xong và kiểm chứng ở mức HTTP khi đăng ký đóng (15/15). Còn lại: màn hình quản trị cho admin và nhân viên tạo link (hiện chỉ có API) và quyết định bật `PAPERCLIP_AUTH_DISABLE_SIGN_UP=true` cho môi trường thật; change chưa archive.
 
 ## Bước tiếp theo
-1. Chủ dự án quyết định có làm task 3.5 (tạo tài khoản nhân viên khi đóng đăng ký) và màn hình nhân viên tạo link mời hay không; đăng ký công khai vẫn mở cho tới lúc đó (ADR 0012).
+1. Chủ dự án quyết định: có bật `PAPERCLIP_AUTH_DISABLE_SIGN_UP=true` cho môi trường thật không (điều kiện trong `kb/admin-accounts.md`), và có cần màn hình quản trị / màn hình nhân viên tạo link mời hay không.
 2. Bước 5: migration #2 (`dr_agent_outputs`, `dr_overrides`, `dr_prompts`, `dr_embeddings`): cần duyệt schema, số chiều vector và model embedding (còn thiếu).
 3. Bước 6 cần endpoint/model vLLM và model embedding; bước 7b cần thông tin SMTP.
 
@@ -29,7 +29,7 @@ Bước 4 (Intake Portal) đang triển khai theo change OpenSpec `add-intake-po
 | 1 | Spike Pipelines: approver theo role, quyền agent key, event field-level, request_changes, test hiện có | done: đọc code + smoke API thật (tạo công ty, pipeline 4 stage, case, transition, review approve → done đều 200) | | Pipelines đang experimental; kết quả chốt lại D1 |
 | 2 | Seed pipeline `dev-request` (12 stage; P1 dùng `triage`, `triage_review`, `done`, `cancelled`) + test state machine/gate | done: định nghĩa JSON + 8 test (pass, đột biến bị bắt) + script seed/verify 7/7 pass trên stack thật | | |
 | 3 | Migration #1: `dr_requests`, `dr_requesters`, `dr_attachments` (+ `dr_request_counters`) | done: `0355_devflow_requests.sql`, 11 test cách ly công ty pass trên Postgres nhúng; chưa áp dụng vào stack Docker | | Chủ dự án duyệt schema trước |
-| 4 | Intake Portal tiếng Việt, tách khỏi board: đăng nhập requester, form, upload, trạng thái ticket | done (change `add-intake-portal`, trừ task 3.5 đề xuất): API, tệp, lời mời, web `portal/`; smoke trên Docker và trình duyệt pass | `add-intake-portal` | Chưa có màn hình nhân viên tạo link; đăng ký công khai vẫn mở (ADR 0012) |
+| 4 | Intake Portal tiếng Việt, tách khỏi board: đăng nhập requester, form, upload, trạng thái ticket | done (change `add-intake-portal`, gồm task 3.5): API, tệp, lời mời, web `portal/`; smoke trên Docker và trình duyệt pass | `add-intake-portal` | Chưa có màn hình nhân viên tạo link; đăng ký công khai vẫn mở (ADR 0012) |
 | 5 | Migration #2: `dr_agent_outputs`, `dr_overrides`, `dr_prompts` (hoặc dùng skills Paperclip) + `dr_embeddings` (pgvector) | todo | | Phụ thuộc kết quả spike |
 | 6 | Triage agent: prompt v1 có version, output JSON (Zod) + comment, `pendingSuggestion`; provider API/local theo config | todo | | Cần endpoint vLLM; chưa có adapter vLLM chuẩn |
 | 7 | Dedupe bằng pgvector + LLM xếp hạng (embedding API/local theo config) | todo | | Đổi provider = re-index |
@@ -70,6 +70,7 @@ Kết luận: **cần vá, không phải viết lại state machine**. Chưa th�
 P1 (đang chuẩn bị) → P2 BA Spec + Planner agent, gate còn lại, email mở rộng → P3 Dev agent (worktree/PR), QA agent, dashboard → P4 Governance đầy đủ, SSO, mở rộng toàn group.
 
 ## Gần đây
+- 2026-10-17: Task 3.5 xong (phương án X): `POST /api/admin/users` và `reset-password` cho instance admin (mật khẩu sinh một lần, reset xóa phiên); 8 test mới, 8 đột biến bị bắt; kiểm chứng HTTP trên stack thật khi đóng đăng ký: 15/15 pass (đăng ký công khai bị từ chối, admin tạo nhân viên có quyền board, reset, requester đăng ký qua lời mời); đã trả stack về trạng thái mở. Lưu ý: giới hạn đăng nhập có sẵn của better-auth làm kịch bản kiểm chứng gặp 429.
 - 2026-10-17: Kiểm tra task 3.4 trên trình duyệt thật: tìm ra lỗi "đăng ký xong vẫn báo link đã dùng", sửa bằng accept idempotent cho đúng người dùng link (30 test server pass, đột biến bị bắt), kiểm tra lại: đăng ký mới, email có sẵn, mở lại link, cách ly giữa user đều đúng.
 - 2026-10-17: Task 3.4 xong (phương án A, ADR 0012): `POST /api/portal/invites/:token/register` tạo tài khoản + requester trong một giao dịch, 409 khi email có sẵn, giới hạn 10 lần/phút/IP; 9 test mới và 6 đột biến bị bắt; giao diện nhận lời mời tạo tài khoản qua endpoint này; đăng ký công khai vẫn mở.
 - 2026-10-17: Portal nhóm 4 xong: package `portal/` (React+Vite, tiếng Việt), phục vụ ở `/portal`, lockfile chỉ thêm một khối importer; image build lại, migration 0355/0356 áp dụng vào DB thật; luồng mời → đăng ký → gửi yêu cầu kèm tệp chạy trong trình duyệt; 36 test server + 12 test portal pass. Xem `kb/intake-portal-web.md`.

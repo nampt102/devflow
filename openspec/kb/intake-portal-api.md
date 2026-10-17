@@ -39,4 +39,4 @@ Nhiều công ty: client gửi `?companyId=` (hoặc trong body); guard đối c
 ## Chưa làm / hạn chế
 - Chưa quét virus; chưa rate limit riêng cho upload thêm (chỉ giới hạn 5 file/yêu cầu và 10 yêu cầu/giờ).
 - Object file không bị xóa khi case bị xóa ở nơi khác (chỉ bù trừ lúc gửi lỗi).
-- Chưa có cách tạo tài khoản cho nhân viên mới khi đăng ký công khai đã đóng (task 3.5, ADR 0012); đăng ký công khai vẫn mở.
+- Nhân viên mới khi đăng ký công khai đóng: dùng `POST /api/admin/users` (xem `kb/admin-accounts.md`); đăng ký công khai vẫn mở cho tới khi vận hành quyết định đóng.
