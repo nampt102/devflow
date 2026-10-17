@@ -1,6 +1,6 @@
 # Data model mở rộng cho Workflow Core
 
-> **ĐỀ XUẤT, chưa duyệt, chưa có migration.** Khi bắt đầu plan-p1 bước 3 sẽ chuyển thành `design.md` của một change OpenSpec.
+> **Migration #1 (`0355_devflow_requests`) đã làm 2026-10-17**: `dr_requesters`, `dr_requests`, `dr_attachments`, `dr_request_counters`, có điều chỉnh so với bản đề xuất (xem mục cuối và ADR 0010). Các bảng còn lại (`dr_agent_outputs`, `dr_overrides`, `dr_prompts`, `dr_embeddings`) vẫn là đề xuất, chưa duyệt.
 
 **Trạng thái: ĐỀ XUẤT, chưa duyệt, chưa có migration.** Mọi thay đổi schema đi qua `pnpm db:generate` / `pnpm db:migrate` (Drizzle, `packages/db`).
 
@@ -109,3 +109,10 @@ Dẫn xuất từ `pipeline_case_events` (thời điểm vào/ra stage) cho dash
 - `pipeline_case_events` đã ghi field-level diff chưa (nếu chưa, port ý tưởng activity diff từ Plane).
 - Bảng mới nên nằm trong core `packages/db` hay trong plugin DB namespace (Paperclip hỗ trợ). Đề xuất core vì sở hữu source lâu dài.
 - Approver theo role: `config.reviewerKind` hiện thấy `human`; cần đọc `pipelines.ts` để biết có mở rộng sang role được không.
+
+## Migration #1: khác với đề xuất ở trên (đã áp dụng)
+- `dr_requesters`: có `user_id` trỏ bảng `user` của better-auth (không còn `email/display_name/auth_subject`), thêm `deactivated_at`; không có `company_memberships`.
+- `dr_requests`: thêm `request_number` (unique theo công ty) + bảng `dr_request_counters`; CHECK cho `classification`, `priority`, `difficulty` (easy/medium/hard), `source` (portal/email/manual), `duplicate_of != case`; khóa ngoại kép `(case_id|requester_id|duplicate_of_case_id, company_id)`.
+- `dr_attachments`: `asset_id` → `assets` (unique), không lưu storage_key/filename/mime/size; thêm `uploaded_by_requester_id`, `uploaded_by_user_id`.
+- Thêm unique index `pipeline_cases_id_company_uq` vào `pipeline_cases`.
+- Kiểm chứng: `packages/db/src/dr-requests-migration.test.ts` (11 test trên Postgres nhúng); `check:migrations`, `tsc --noEmit` và các test schema liên quan của db đều pass.

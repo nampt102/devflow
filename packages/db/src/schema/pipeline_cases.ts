@@ -72,6 +72,7 @@ export const pipelineCases = pgTable(
   },
   (table) => ({
     pipelineCaseKeyUq: uniqueIndex("pipeline_cases_pipeline_case_key_uq").on(table.pipelineId, table.caseKey),
+    idCompanyUq: uniqueIndex("pipeline_cases_id_company_uq").on(table.id, table.companyId),
     parentRequestKeyUq: uniqueIndex("pipeline_cases_parent_request_key_uq")
       .on(table.parentCaseId, table.requestKey)
       .where(sql`${table.requestKey} is not null and ${table.retiredAt} is null`),
