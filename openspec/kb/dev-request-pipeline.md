@@ -15,7 +15,7 @@ Quy tắc đã kiểm chứng: lối ra duy nhất của stage working là sang 
 
 ## Chạy
 - Test định nghĩa (không cần DB): `pnpm --filter @paperclipai/server exec vitest run src/__tests__/devflow-dev-request-pipeline.test.ts`. Trên máy này chưa cài node_modules ở host; chạy trong image: xem `kb/tech-stack.md`. Đã kiểm tra 8/8 pass và 2 đột biến (agent approver, lối tắt `dev → done`) bị bắt.
-- Seed + kiểm tra cổng trên instance đang chạy: `node scripts/devflow/seed-dev-request-pipeline.mjs --company <id> --verify` (cần `DEVFLOW_TEST_ADMIN_EMAIL/PASSWORD`, đọc từ env). Idempotent. 7/7 kiểm tra pass (xem log trong `status.md`).
+- Seed + kiểm tra cổng trên instance đang chạy: `node scripts/devflow/setup-dev-request-pipeline.mjs --company <id> --verify` (cần `DEVFLOW_TEST_ADMIN_EMAIL/PASSWORD`, đọc từ env). Idempotent. 7/7 kiểm tra pass (xem log trong `status.md`).
 
 ## Chưa được kiểm chứng / còn hạn chế
 - Approver theo **role** (BA, Tech Lead) chưa có: hiện mọi người dùng (board user) duyệt được mọi review. Cần bản vá ở spike (M).

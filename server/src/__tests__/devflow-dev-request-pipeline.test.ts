@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createPipelineSchema, replaceTransitionsSchema } from "../routes/pipelines-schemas.ts";
 
 // DevFlow seed definition (openspec/decisions/0003). Pure checks of the stage graph and gate
-// configuration; runtime behavior is covered by scripts/devflow/seed-dev-request-pipeline.mjs --verify.
+// configuration; runtime behavior is covered by scripts/devflow/setup-dev-request-pipeline.mjs --verify.
 const definition = JSON.parse(
   readFileSync(new URL("../devflow/dev-request-pipeline.json", import.meta.url), "utf8"),
 ) as {
