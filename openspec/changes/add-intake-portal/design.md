@@ -15,7 +15,7 @@
 4. **DTO allowlist:** handler trả DTO tường minh, không bao giờ trả đối tượng case. Có test khẳng định không có `pendingSuggestion`, `fields`, events.
 5. **File:** route upload riêng của portal gọi storage service trực tiếp (route assets của board cần company access); kiểm size/MIME/số lượng ở server; kiểm `asset.company_id == case.company_id` ở service vì DB chưa ép (ADR 0010).
 6. **Mời requester:** bảng riêng `dr_requester_invites`, không tái dùng invite công ty của Paperclip vì chấp nhận invite đó có thể cấp membership, tức quyền đọc board (chưa đọc `access.ts` để xác nhận). Token băm như agent key, một lần, hết hạn, gắn với session user khi chấp nhận. Email không phải căn cứ bảo mật vì đăng ký chưa xác minh.
-7. **Web:** `portal/` workspace package (React + Vite, chỉ `vi`), phục vụ tĩnh ở `/portal`, mount trước fallback UI board trong `app.ts` (khoảng dòng 1107–1155).
+7. **Web:** `portal/` workspace package `@devflow/portal` (React + Vite, chỉ tiếng Việt, không thêm thư viện router/i18n/UI, dependency trùng phiên bản với `ui/` nên lockfile chỉ thêm một khối importer). Phục vụ tĩnh ở `/portal` qua `server/src/devflow/portal/static.ts`, mount trong `app.ts` trước `app.use(staticUi)` của board (catch-all của board sẽ nuốt mọi đường dẫn nếu mount sau). Đã triển khai và kiểm chứng; xem `kb/intake-portal-web.md`.
 8. **Nhãn trạng thái:** ánh xạ stage key sang nhãn tiếng Việt ở server (một nơi); client không tự suy từ stage.
 
 ## Risks / Trade-offs

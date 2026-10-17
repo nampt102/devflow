@@ -28,7 +28,11 @@ describe("portal static serving", () => {
   });
 
   it("serves the shell at the base and for client-side routes, never the board shell", async () => {
-    for (const path of ["/portal", "/portal/", "/portal/requests/12", "/portal/invite/" + "A".repeat(43), "/portal/new"]) {
+    // the bare base is redirected to the slash form, which then serves the shell
+    const bare = await request(app).get("/portal");
+    expect(bare.status).toBe(301);
+    expect(bare.headers.location).toBe("/portal/");
+    for (const path of ["/portal/", "/portal/requests/12", "/portal/invite/" + "A".repeat(43), "/portal/new"]) {
       const res = await request(app).get(path);
       expect(res.status, path).toBe(200);
       expect(res.text, path).toContain("portal-shell");

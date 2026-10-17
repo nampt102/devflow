@@ -36,5 +36,8 @@ curl http://localhost:3100/api/health
 ```
 - Cần `docker/.env` (gitignore; mẫu `docker/.env.example`): `BETTER_AUTH_SECRET`, `PAPERCLIP_TOOL_ACTION_SIGNING_SECRET`.
 - Instance mới ở `bootstrap_pending`: đăng ký (`POST /api/auth/sign-up/email`) rồi `POST /api/bootstrap/claim` (hoặc "Claim this instance" trên UI). Tài khoản test cục bộ dùng `DEVFLOW_TEST_ADMIN_EMAIL/PASSWORD` trong `docker/.env`.
+- Portal web: `portal/` (xem `kb/intake-portal-web.md`) được build trong Dockerfile và phục vụ ở `http://localhost:3100/portal/`. Thử nhanh: tạo link mời bằng `POST /api/companies/:id/portal/invites` (tài khoản admin), mở `/portal/invite/<token>`.
+- Biến test cục bộ trong `docker/.env` (gitignore): `DEVFLOW_TEST_ADMIN_EMAIL/PASSWORD`, `DEVFLOW_TEST_REQUESTER_*`, `DEVFLOW_TEST_PORTAL_*`; chỉ dùng trên instance localhost.
+- Stack đang chạy dùng image build từ `git archive HEAD` nên chỉ chứa code đã commit; sau khi đổi code phải commit rồi build lại image và `docker compose ... up -d` (migration tự áp dụng khi server khởi động).
 - `git archive HEAD` không gồm thay đổi chưa commit; dùng `git archive $(git stash create)` để gồm cả thay đổi.
 - Postgres `pgvector/pgvector:pg17` có extension `vector` 0.8.7 (chưa `CREATE EXTENSION`; sẽ làm trong migration).

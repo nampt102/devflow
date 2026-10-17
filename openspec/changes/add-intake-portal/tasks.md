@@ -19,10 +19,10 @@
 
 ## 4. Web portal
 
-- [ ] 4.1 Workspace `portal/` (React + Vite, i18n vi), cập nhật lockfile trong container, Dockerfile
-- [ ] 4.2 Màn hình: đăng nhập/chấp nhận lời mời, gửi yêu cầu, danh sách, chi tiết
-- [ ] 4.3 Phục vụ tĩnh `/portal` trong `app.ts` trước fallback board
+- [x] 4.1 Workspace `portal/` (React + Vite, chỉ tiếng Việt), lockfile sinh trong container (chỉ thêm khối importer), Dockerfile
+- [x] 4.2 Màn hình: đăng nhập/chấp nhận lời mời, gửi yêu cầu, danh sách, chi tiết
+- [x] 4.3 Phục vụ tĩnh `/portal` trong `app.ts` trước fallback board
 
 ## 5. Hoàn tất
 
-- [ ] 5.1 Smoke test end-to-end trên stack Docker; cập nhật KB/status; ADR 0011
+- [x] 5.1 Smoke test end-to-end trên stack Docker (trình duyệt); KB `kb/intake-portal-web.md`; status; ADR 0011

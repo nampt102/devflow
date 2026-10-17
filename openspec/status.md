@@ -8,12 +8,12 @@
 **P1**: Intake Portal + Workflow Core + Triage agent, pilot 1 công ty. P0 (khám phá Paperclip/Plane, docs, khung project-kit) đã xong.
 
 ## Bước đang làm
-Bước 4 (Intake Portal) đang triển khai theo change OpenSpec `add-intake-portal` (đã duyệt A1+B1+C1, ADR 0011). Nhóm 1, 2, 3 đã xong: API requester, file đính kèm, lời mời một lần (migration 0356). 20 test portal pass trên Postgres nhúng, kiểm chứng đột biến; chưa áp dụng vào stack Docker đang chạy (cần build lại image). Còn nhóm 4 (web `portal/` tiếng Việt) và 5.1 (smoke trên stack Docker).
+Bước 4 (Intake Portal) đang triển khai theo change OpenSpec `add-intake-portal` (đã duyệt A1+B1+C1, ADR 0011). Các nhóm 1–5 đã xong: API requester, file đính kèm, lời mời một lần (migration 0355 và 0356 đã áp dụng vào DB của stack Docker), web `portal/` tiếng Việt phục vụ ở `/portal`. Kiểm chứng: 36 test server DevFlow và 12 test portal pass, đã chạy luồng thật trong trình duyệt (mời, đăng ký, nhận lời mời, gửi yêu cầu kèm tệp, xem chi tiết). Còn lại của change: task 3.4 (đăng ký qua lời mời, đang đề xuất, chưa duyệt) và màn hình cho nhân viên tạo link (hiện dùng API); change chưa archive.
 
 ## Bước tiếp theo
-1. Hoàn tất nhóm 1 và 2 trong `openspec/changes/add-intake-portal/tasks.md`.
-2. Trình DDL `dr_requester_invites` để duyệt, rồi làm nhóm 3 và 4.
-3. Bước 5 (migration #2: agent outputs, overrides, prompts, embeddings) sau khi portal chạy được.
+1. Chủ dự án quyết định task 3.4 (đăng ký qua lời mời để đóng đăng ký công khai) và có cần màn hình nhân viên tạo link mời hay không.
+2. Bước 5: migration #2 (`dr_agent_outputs`, `dr_overrides`, `dr_prompts`, `dr_embeddings`): cần duyệt schema, số chiều vector và model embedding (còn thiếu).
+3. Bước 6 cần endpoint/model vLLM và model embedding; bước 7b cần thông tin SMTP.
 
 ## Việc bị chặn / chờ quyết định
 - Còn thiếu (chưa chặn bước 0–2): model embedding, endpoint/model vLLM, thông tin SMTP (chủ dự án tự tạo/cập nhật env khi test).
@@ -29,7 +29,7 @@ Bước 4 (Intake Portal) đang triển khai theo change OpenSpec `add-intake-po
 | 1 | Spike Pipelines: approver theo role, quyền agent key, event field-level, request_changes, test hiện có | done: đọc code + smoke API thật (tạo công ty, pipeline 4 stage, case, transition, review approve → done đều 200) | | Pipelines đang experimental; kết quả chốt lại D1 |
 | 2 | Seed pipeline `dev-request` (12 stage; P1 dùng `triage`, `triage_review`, `done`, `cancelled`) + test state machine/gate | done: định nghĩa JSON + 8 test (pass, đột biến bị bắt) + script seed/verify 7/7 pass trên stack thật | | |
 | 3 | Migration #1: `dr_requests`, `dr_requesters`, `dr_attachments` (+ `dr_request_counters`) | done: `0355_devflow_requests.sql`, 11 test cách ly công ty pass trên Postgres nhúng; chưa áp dụng vào stack Docker | | Chủ dự án duyệt schema trước |
-| 4 | Intake Portal tiếng Việt, tách khỏi board: đăng nhập requester, form, upload, trạng thái ticket | doing (change `add-intake-portal`; nhóm 1–3 xong; còn web `portal/` và smoke Docker) | | UI board gần như chưa có i18n |
+| 4 | Intake Portal tiếng Việt, tách khỏi board: đăng nhập requester, form, upload, trạng thái ticket | done (change `add-intake-portal`, trừ task 3.4 đề xuất): API, tệp, lời mời, web `portal/`; smoke trên Docker và trình duyệt pass | `add-intake-portal` | Chưa có màn hình nhân viên tạo link; đăng ký công khai vẫn mở |
 | 5 | Migration #2: `dr_agent_outputs`, `dr_overrides`, `dr_prompts` (hoặc dùng skills Paperclip) + `dr_embeddings` (pgvector) | todo | | Phụ thuộc kết quả spike |
 | 6 | Triage agent: prompt v1 có version, output JSON (Zod) + comment, `pendingSuggestion`; provider API/local theo config | todo | | Cần endpoint vLLM; chưa có adapter vLLM chuẩn |
 | 7 | Dedupe bằng pgvector + LLM xếp hạng (embedding API/local theo config) | todo | | Đổi provider = re-index |
@@ -70,6 +70,7 @@ Kết luận: **cần vá, không phải viết lại state machine**. Chưa th�
 P1 (đang chuẩn bị) → P2 BA Spec + Planner agent, gate còn lại, email mở rộng → P3 Dev agent (worktree/PR), QA agent, dashboard → P4 Governance đầy đủ, SSO, mở rộng toàn group.
 
 ## Gần đây
+- 2026-10-17: Portal nhóm 4 xong: package `portal/` (React+Vite, tiếng Việt), phục vụ ở `/portal`, lockfile chỉ thêm một khối importer; image build lại, migration 0355/0356 áp dụng vào DB thật; luồng mời → đăng ký → gửi yêu cầu kèm tệp chạy trong trình duyệt; 36 test server + 12 test portal pass. Xem `kb/intake-portal-web.md`.
 - 2026-10-17: Portal nhóm 3 xong: migration 0356 `dr_requester_invites` (bỏ `accepted_requester_id`/CHECK so với DDL trình duyệt vì xung đột với xóa user), API mời/thu hồi/nhận link, 7 test + 4 test đăng ký đóng; đăng ký đóng vẫn tạo được tài khoản qua server (task 3.4 đề xuất).
 - 2026-10-17: Portal nhóm 2 xong: upload file (multipart, tối đa 5 file, 10 MB, ảnh/PDF/Office/txt/csv, kiểm tra nội dung khớp loại, chỉ chủ sở hữu tải được); 13 test pass, đột biến bị bắt.
 - 2026-10-17: Áp dụng project-kit vào DevFlow; chuyển docs vào `openspec/kb/`; ghi D1–D8 thành ADR 0003–0009.
