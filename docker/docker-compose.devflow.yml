@@ -11,3 +11,6 @@ services:
     image: devflow-paperclip:local
     pull_policy: never
     build: !reset null
+    environment:
+      # Close public sign-up only after the instance has an admin (ADR 0012, kb/admin-accounts.md).
+      PAPERCLIP_AUTH_DISABLE_SIGN_UP: "${PAPERCLIP_AUTH_DISABLE_SIGN_UP:-false}"

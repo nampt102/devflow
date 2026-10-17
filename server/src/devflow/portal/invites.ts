@@ -1,10 +1,11 @@
 import { createHash, randomBytes } from "node:crypto";
-import { and, desc, eq, gt, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNull } from "drizzle-orm";
 import { hashPassword } from "better-auth/crypto";
 import type { Db } from "@paperclipai/db";
-import { authAccounts, authUsers, drRequesterInvites, drRequesters } from "@paperclipai/db";
+import { drRequesterInvites, drRequesters } from "@paperclipai/db";
 import { HttpError, conflict, notFound } from "../../errors.js";
 import { logActivity } from "../../services/activity-log.js";
+import { assertEmailFree, insertCredentialAccount, newAccountId, normalizeEmail } from "../accounts.js";
 
 export const INVITE_TTL_DAYS = 7;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -198,32 +199,14 @@ export function portalInvites(db: Db, deps: { hashPassword: (password: string) =
       if (!invite) throw notFound("Invalid invitation link");
       assertUsable(invite);
 
-      const email = input.email.trim().toLowerCase();
+      const email = normalizeEmail(input.email);
       const name = input.name.trim();
       const passwordHash = await deps.hashPassword(input.password);
-      const userId = randomBytes(24).toString("base64url");
+      const userId = newAccountId();
 
       return db.transaction(async (tx) => {
-        await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`dr-register:${email}`}))`);
-        const [taken] = await tx
-          .select({ id: authUsers.id })
-          .from(authUsers)
-          .where(sql`lower(${authUsers.email}) = ${email}`)
-          .limit(1);
-        if (taken) throw conflict("An account with this email already exists", { code: "account_exists" });
-
-        const now = new Date();
-        await tx.insert(authUsers).values({ id: userId, name, email, emailVerified: false, createdAt: now, updatedAt: now });
-        await tx.insert(authAccounts).values({
-          id: randomBytes(24).toString("base64url"),
-          issuer: "local:credential",
-          accountId: userId,
-          providerId: "credential",
-          userId,
-          password: passwordHash,
-          createdAt: now,
-          updatedAt: now,
-        });
+        await assertEmailFree(tx as unknown as Db, email);
+        await insertCredentialAccount(tx as unknown as Db, { userId, name, email, passwordHash });
         // losing the race rolls the whole transaction back, including the new user
         const [claimed] = await claim(tx as unknown as Db, invite.id, userId);
         if (!claimed) throw gone("This invitation is no longer valid", "invite_unavailable");

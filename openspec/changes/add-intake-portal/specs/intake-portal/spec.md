@@ -78,3 +78,26 @@ Hệ thống SHALL cho phép người có link mời hợp lệ tạo tài kho�
 #### Scenario: Người đã dùng link mở lại link
 - **WHEN** chính người đã dùng một link (kể cả vừa đăng ký xong) gọi nhận lời mời lại với link đó và vẫn còn là requester hoạt động
 - **THEN** hệ thống trả kết quả requester của họ, không tạo thêm bản ghi, còn người khác vẫn bị từ chối
+
+### Requirement: Instance admin account administration
+Hệ thống SHALL cho phép chỉ instance admin tạo tài khoản đăng nhập bằng mật khẩu và đặt lại mật khẩu, kể cả khi đăng ký công khai đã đóng. Khi không nhận mật khẩu, hệ thống SHALL sinh mật khẩu ngẫu nhiên và chỉ trả trong đúng một phản hồi không được cache. Hệ thống MUST NOT ghi mật khẩu hay email vào log. Đặt lại mật khẩu SHALL đăng xuất người đó khỏi mọi phiên.
+
+#### Scenario: Chỉ instance admin được gọi
+- **WHEN** một thành viên công ty (kể cả admin công ty hoặc viewer), một agent hoặc người chưa đăng nhập gọi tạo tài khoản hoặc đặt lại mật khẩu
+- **THEN** hệ thống từ chối với 401 hoặc 403 và không thay đổi gì
+
+#### Scenario: Tạo tài khoản khi đăng ký công khai đã đóng
+- **WHEN** instance admin tạo tài khoản với tên và email hợp lệ
+- **THEN** hệ thống tạo tài khoản, trả mật khẩu sinh ngẫu nhiên một lần và người đó đăng nhập được
+
+#### Scenario: Cấp quyền công ty cùng lúc
+- **WHEN** instance admin tạo tài khoản kèm danh sách công ty
+- **THEN** hệ thống cấp membership đang hoạt động cho từng công ty trong cùng một giao dịch, và nếu một công ty không tồn tại thì không tạo tài khoản nào
+
+#### Scenario: Email đã tồn tại
+- **WHEN** email (không phân biệt hoa thường) đã có tài khoản, kể cả hai yêu cầu đồng thời
+- **THEN** đúng một tài khoản tồn tại và yêu cầu còn lại nhận 409
+
+#### Scenario: Đặt lại mật khẩu
+- **WHEN** instance admin đặt lại mật khẩu của một tài khoản có đăng nhập bằng mật khẩu
+- **THEN** mật khẩu cũ và mọi phiên cũ mất hiệu lực, mật khẩu mới đăng nhập được, và tài khoản không có mật khẩu nhận 409

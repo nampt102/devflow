@@ -16,7 +16,7 @@
 - [x] 3.2 Migration 0356 + API tạo/liệt kê/thu hồi link (nhân viên), chấp nhận link (requester) + test token một lần, hết hạn, thu hồi, vai trò, race
 - [x] 3.3 Kiểm chứng đăng ký khi `PAPERCLIP_AUTH_DISABLE_SIGN_UP=true` (xem `kb/requester-access.md`)
 - [x] 3.4 Đăng ký tài khoản qua lời mời (`POST /api/portal/invites/:token/register`, phương án A đã duyệt 2026-10-17): một giao dịch, 409 khi email có sẵn, giới hạn 10 lần/phút/IP; **chưa đóng đăng ký công khai**
-- [ ] 3.5 (đề xuất, chưa làm) Cách tạo tài khoản cho nhân viên mới khi đăng ký công khai đã đóng (endpoint hoặc CLI do admin dùng); cần có trước khi bật `PAPERCLIP_AUTH_DISABLE_SIGN_UP=true`
+- [x] 3.5 Phương án X đã duyệt 2026-10-17: `POST /api/admin/users` (tạo tài khoản, tùy chọn `companyIds`) và `POST /api/admin/users/:userId/reset-password` cho instance admin; mật khẩu do server sinh, trả một lần; reset xóa mọi phiên
 
 ## 4. Web portal
 
