@@ -12,7 +12,7 @@ Bước 4 (Intake Portal) đang triển khai theo change OpenSpec `add-intake-po
 
 ## Bước tiếp theo
 1. Chủ dự án quyết định: có bật `PAPERCLIP_AUTH_DISABLE_SIGN_UP=true` cho môi trường thật không (điều kiện trong `kb/admin-accounts.md`), và có cần màn hình quản trị / màn hình nhân viên tạo link mời hay không.
-2. Bước 6 (Triage agent): cần endpoint/model vLLM hoặc API và model embedding (chưa có). Làm được trước phần không phụ thuộc model: file prompt có version (`server/src/devflow/prompts/`), schema đầu ra (Zod), LLM giả để test, coi nội dung yêu cầu là dữ liệu không tin cậy (xem `kb/ref-autonomous-company.md`).
+2. Bước 6: chạy thử với model thật khi có endpoint/model (đặt `DEVFLOW_LLM_BASE_URL`, `DEVFLOW_LLM_MODEL` trong `docker/.env`, xem `kb/triage-agent.md`), cần ~20 yêu cầu mẫu để đo; chủ dự án xác nhận định nghĩa mức ưu tiên/độ khó để chuyển prompt sang v2. Model embedding vẫn chưa có.
 3. Bước 7 (dedupe) dùng `dr_embeddings` nên phải kiểm bảng tồn tại và lùi về pg_trgm khi thiếu pgvector; bước 7b cần thông tin SMTP.
 
 ## Việc bị chặn / chờ quyết định
@@ -31,7 +31,7 @@ Bước 4 (Intake Portal) đang triển khai theo change OpenSpec `add-intake-po
 | 3 | Migration #1: `dr_requests`, `dr_requesters`, `dr_attachments` (+ `dr_request_counters`) | done: `0355_devflow_requests.sql`, 11 test cách ly công ty pass trên Postgres nhúng; chưa áp dụng vào stack Docker | | Chủ dự án duyệt schema trước |
 | 4 | Intake Portal tiếng Việt, tách khỏi board: đăng nhập requester, form, upload, trạng thái ticket | done (change `add-intake-portal`, gồm task 3.5): API, tệp, lời mời, web `portal/`; smoke trên Docker và trình duyệt pass | `add-intake-portal` | Chưa có màn hình nhân viên tạo link; đăng ký công khai vẫn mở (ADR 0012) |
 | 5 | Migration #2 (`0357_devflow_agent_outputs`): `dr_agent_outputs`, `dr_overrides`, `dr_embeddings` (tạo có điều kiện khi có pgvector); bỏ `dr_prompts` (prompt là file có version) | done: 47 test trên Postgres nhúng và 5 test trên pgvector thật pass; 6 đột biến bị bắt; ADR 0013 | | Đã áp dụng vào stack Docker qua server khởi động (extension vector 0.8.7 được tạo, 3 bảng có mặt) |
-| 6 | Triage agent: prompt v1 có version, output JSON (Zod) + comment, `pendingSuggestion`; provider API/local theo config | todo | | Cần endpoint vLLM; chưa có adapter vLLM chuẩn |
+| 6 | Triage agent: prompt v1 có version, output JSON (Zod) + comment; provider API/local theo config | phần không phụ thuộc model done: client LLM, prompt v1 (hash ghim), schema strict, cờ quy tắc, worker (backoff, breaker, khóa advisory), agent idle để ghi chi phí; 44 test pass, 5 đột biến bị bắt; ADR 0014. **Chưa chạy với model thật** | | Cần endpoint/model; định nghĩa ưu tiên/độ khó là tạm thời; không dùng `pendingSuggestion` ở P1 |
 | 7 | Dedupe bằng pgvector + LLM xếp hạng (embedding API/local theo config) | todo | | Đổi provider = re-index |
 | 7b | Email requester khi đổi trạng thái (SMTP qua env) | todo | | SMTP giả khi test tự động |
 | 8 | Màn hình duyệt triage cho Lead/BA (hàng chờ, sửa field, approve/reject/request_changes, snooze/duplicate), ghi override; port ngữ nghĩa/UI intake từ Plane | todo | | Port từ Plane ở mức M–L |
@@ -52,6 +52,9 @@ Thứ tự: 0 → 1 → 2 → 3 → {4, 5} → 6 → 7 → 7b → 8 → 9 → 10
 - 0009 Dev bằng Docker (D8)
 - 0010 Cách ly công ty bằng khóa ngoại kép (id, company_id)
 - 0011 Intake Portal: link mời một lần, /api/portal/*, app portal/ riêng
+- 0012 Đăng ký công khai mở cho đến khi có cách tạo tài khoản nhân viên
+- 0013 Đầu ra agent, override, embedding: prompt dạng file, embedding tạo có điều kiện
+- 0014 Triage agent: client LLM mỏng, worker quét định kỳ, không dùng pendingSuggestion ở P1
 - D7 (không phải ADR): chủ dự án tự chọn công ty pilot và tự chạy test; Claude bàn giao code, test tự động, hướng dẫn chạy.
 
 ## Kết quả spike Pipelines (đọc code + smoke API; chi tiết `kb/spike-pipelines.md`)
@@ -70,6 +73,7 @@ Kết luận: **cần vá, không phải viết lại state machine**. Chưa th�
 P1 (đang chuẩn bị) → P2 BA Spec + Planner agent, gate còn lại, email mở rộng → P3 Dev agent (worktree/PR), QA agent, dashboard → P4 Governance đầy đủ, SSO, mở rộng toàn group.
 
 ## Gần đây
+- 2026-10-17: Bước 6 (phần không phụ thuộc model) xong: `server/src/devflow/prompts/triage.v1.ts`, `devflow/triage/` (schema Zod strict, quy tắc cờ, client, LLM giả, service, worker), 44 test (25 đơn vị + 19 trên Postgres nhúng) pass, 5 đột biến bị bắt. Phát hiện khi làm: unique index một `proposed` mỗi stage là cơ chế chống đua (supersede trong giao dịch sẽ làm mất cả hai output khi hai worker chạy song song). Agent idle xác nhận bằng đọc code, chưa chạy scheduler thật. Chưa chạy với model thật; chưa build lại image Docker (ADR 0014, `kb/triage-agent.md`).
 - 2026-10-17: Bước 5 xong: migration 0357 (`dr_agent_outputs`, `dr_overrides`, `dr_embeddings`); Postgres nhúng không có pgvector nên embeddings tạo trong khối `DO` có điều kiện; bỏ `dr_prompts`; kiểm chứng trên Postgres nhúng (migration áp dụng sạch khi không có pgvector) và trên DB pgvector thật; 6 đột biến bị bắt (ADR 0013).
 - 2026-10-17: Đọc sâu repo tham khảo Autonomous-Company (MIT, chỉ lấy ý tưởng): ghi chú ở `kb/ref-autonomous-company.md`. Đáng áp dụng nhất cho bước 6: khung prompt có cấu trúc kèm bước tự phản biện, coi nội dung yêu cầu là dữ liệu không tin cậy, LLM giả để test agent; không áp dụng triết lý tự trị.
 - 2026-10-17: Task 3.5 xong (phương án X): `POST /api/admin/users` và `reset-password` cho instance admin (mật khẩu sinh một lần, reset xóa phiên); 8 test mới, 8 đột biến bị bắt; kiểm chứng HTTP trên stack thật khi đóng đăng ký: 15/15 pass (đăng ký công khai bị từ chối, admin tạo nhân viên có quyền board, reset, requester đăng ký qua lời mời); đã trả stack về trạng thái mở. Lưu ý: giới hạn đăng nhập có sẵn của better-auth làm kịch bản kiểm chứng gặp 429.

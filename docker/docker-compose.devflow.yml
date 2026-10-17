@@ -14,3 +14,8 @@ services:
     environment:
       # Close public sign-up only after the instance has an admin (ADR 0012, kb/admin-accounts.md).
       PAPERCLIP_AUTH_DISABLE_SIGN_UP: "${PAPERCLIP_AUTH_DISABLE_SIGN_UP:-false}"
+      # Triage agent LLM (empty = worker off)
+      DEVFLOW_LLM_BASE_URL: "${DEVFLOW_LLM_BASE_URL:-}"
+      DEVFLOW_LLM_MODEL: "${DEVFLOW_LLM_MODEL:-}"
+      DEVFLOW_LLM_API_KEY: "${DEVFLOW_LLM_API_KEY:-}"
+      DEVFLOW_LLM_RESPONSE_FORMAT: "${DEVFLOW_LLM_RESPONSE_FORMAT:-json_object}"

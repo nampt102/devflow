@@ -77,6 +77,7 @@ import { getOperatorSettingDefaults } from "./services/setting-defaults.js";
 import { setupEnvironmentCustomImageTerminalWebSocketServer } from "./realtime/environment-custom-image-terminal-ws.js";
 import { setupLiveEventsWebSocketServer } from "./realtime/live-events-ws.js";
 import { cloudActorHeaderSourceFromHeaders, resolveCloudTenantActor } from "./middleware/auth.js";
+import { startDevflowTriageFromEnv } from "./devflow/triage/start.js";
 import {
   feedbackService,
   applyManagedEnvironments,
@@ -1231,6 +1232,8 @@ async function startServerWithDatabaseTeardown(
   const skillSourceSyncInterval = setInterval(sweepSkillSources, 5000);
   skillSourceSyncInterval.unref?.();
   sweepSkillSources();
+  // DevFlow Triage worker: runs only when DEVFLOW_LLM_BASE_URL and DEVFLOW_LLM_MODEL are set.
+  const devflowTriage = startDevflowTriageFromEnv(db as any, process.env, () => !isIdleTaskDrainActive() && !heartbeatSchedulerStopped && !isWarmStandby());
   // Materialized skill versions are disk caches of version rows. The sweep is
   // single-flight, bounded per tick, and stops between removals on shutdown or
   // idle drain. The first sweep runs after startup without delaying readiness.
@@ -2013,6 +2016,7 @@ async function startServerWithDatabaseTeardown(
   ) => {
     await systemdNotify(["--stopping", `--status=Stopping after ${signal}`]);
     heartbeatSchedulerStopped = true;
+    devflowTriage?.stop();
     clearInterval(skillSourceSyncInterval);
     clearInterval(skillVersionRetentionInterval);
     clearTimeout(skillVersionRetentionStartup);
