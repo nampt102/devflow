@@ -24,6 +24,8 @@ export interface LlmConfig {
   responseFormat: "none" | "json_object" | "json_schema";
   // merged into the request body, e.g. {"chat_template_kwargs":{"enable_thinking":false}} for Qwen3 on vLLM
   extraBody?: Record<string, unknown>;
+  // omitted unless set: some models (e.g. current Claude) reject `temperature`; for vLLM set 0 for repeatable output
+  temperature?: number;
 }
 
 export interface LlmResult {
@@ -49,8 +51,11 @@ export function loadLlmConfig(env: NodeJS.ProcessEnv): LlmConfig | null {
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("DEVFLOW_LLM_EXTRA_BODY must be a JSON object");
     extraBody = parsed;
   }
+  const temperature = env.DEVFLOW_LLM_TEMPERATURE?.trim() ? Number(env.DEVFLOW_LLM_TEMPERATURE) : undefined;
+  if (temperature !== undefined && !Number.isFinite(temperature)) throw new Error("DEVFLOW_LLM_TEMPERATURE must be a number");
   return {
     extraBody,
+    temperature,
     baseUrl: baseUrl.replace(/\/+$/, ""),
     apiKey: env.DEVFLOW_LLM_API_KEY?.trim() || undefined,
     model,
@@ -86,7 +91,7 @@ export async function chatJson(
     ...config.extraBody,
     model: config.model,
     messages,
-    temperature: 0,
+    ...(config.temperature !== undefined ? { temperature: config.temperature } : {}),
     max_tokens: config.maxOutputTokens,
   };
   if (config.responseFormat === "json_object") body.response_format = { type: "json_object" };

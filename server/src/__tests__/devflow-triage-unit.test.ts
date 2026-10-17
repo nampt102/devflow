@@ -225,6 +225,20 @@ describe("reasoning models and extra body", () => {
     }
   });
 
+  it("omits temperature unless configured", async () => {
+    const fake = await startFakeLlm();
+    try {
+      const base = { DEVFLOW_LLM_BASE_URL: fake.baseUrl, DEVFLOW_LLM_MODEL: "m" };
+      await chatJson(loadLlmConfig(base)!, [{ role: "user", content: "hi" }]);
+      expect("temperature" in fake.requests[0].body).toBe(false);
+      await chatJson(loadLlmConfig({ ...base, DEVFLOW_LLM_TEMPERATURE: "0" })!, [{ role: "user", content: "hi" }]);
+      expect(fake.requests[1].body.temperature).toBe(0);
+      expect(() => loadLlmConfig({ ...base, DEVFLOW_LLM_TEMPERATURE: "hot" })).toThrow();
+    } finally {
+      await fake.close();
+    }
+  });
+
   it("rejects a non-object DEVFLOW_LLM_EXTRA_BODY", () => {
     expect(() => loadLlmConfig({ DEVFLOW_LLM_BASE_URL: "http://x", DEVFLOW_LLM_MODEL: "m", DEVFLOW_LLM_EXTRA_BODY: "[1]" })).toThrow();
   });
