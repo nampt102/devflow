@@ -1,0 +1,13 @@
+# DevFlow override: Postgres with pgvector (ADR 0005, 0009) and a locally built image.
+# Build the image from git (LF endings), see openspec/kb/tech-stack.md:
+#   git archive HEAD | docker build -t devflow-paperclip:local -f Dockerfile -
+# Run:
+#   docker compose -f docker-compose.yml -f docker-compose.devflow.yml up -d
+# Secrets come from docker/.env (gitignored); see .env.example.
+services:
+  db:
+    image: pgvector/pgvector:pg17
+  server:
+    image: devflow-paperclip:local
+    pull_policy: never
+    build: !reset null

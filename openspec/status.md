@@ -8,23 +8,25 @@
 **P1**: Intake Portal + Workflow Core + Triage agent, pilot 1 công ty. P0 (khám phá Paperclip/Plane, docs, khung project-kit) đã xong.
 
 ## Bước đang làm
-Chưa bắt đầu bước nào của P1. Chờ chủ dự án cho phép bắt đầu bước 0–1.
+Bước 0 và 1 **đã xong** (xem bảng). Chờ chủ dự án chốt D1 dựa trên `kb/spike-pipelines.md` và duyệt trước khi sửa schema (bước 2–3).
 
 ## Bước tiếp theo
-1. Bước 0: dựng Paperclip bằng Docker (Postgres có pgvector), bật `enablePipelines`, chạy tutorial `docs/pipelines-tutorial.md`.
-2. Bước 1: spike Pipelines (đọc `server/src/services/pipelines.ts`, chạy thử); ghi kết luận vào `kb/paperclip-architecture.md` và cập nhật `kb/data-model-proposed.md`. **Dừng chờ chủ dự án duyệt trước khi sửa schema.**
+1. Chủ dự án xác nhận D1 (dùng Pipelines + bản vá trong mục kết quả spike) và danh sách bản vá ưu tiên.
+2. Bước 2: seed pipeline `dev-request` + test state machine/gate (chưa đổi schema).
+3. Bước 3: migration #1 (`CREATE EXTENSION vector` ở migration #2) **cần chủ dự án duyệt schema trước**.
 
 ## Việc bị chặn / chờ quyết định
 - Còn thiếu (chưa chặn bước 0–2): model embedding, endpoint/model vLLM, thông tin SMTP (chủ dự án tự tạo/cập nhật env khi test).
 - Telemetry của Paperclip (mặc định bật, gửi về endpoint của Paperclip): **để mở**, chưa quyết định tắt hay giữ; cần tìm cách tắt trong code trước khi quyết.
+- Agent chưa được thử ở runtime (chưa có agent/adapter, chưa thử vLLM qua opencode_local/pi_local/http); quyền agent trên pipeline mới xác nhận qua code và test, chưa qua runtime.
 - Số chiều vector và model embedding: chốt khi làm migration (bước 3/5).
 
 ## Bảng tiến độ P1
 
 | # | Bước | Trạng thái | Change / PR | Ghi chú |
 |---|---|---|---|---|
-| 0 | Dựng môi trường Docker (Postgres + pgvector), chạy Paperclip, bật `enablePipelines`, chạy tutorial | todo | | Chưa rõ Docker của repo hỗ trợ pgvector; có thể cần compose riêng |
-| 1 | Spike Pipelines: approver theo role, quyền agent key, event field-level, request_changes, test hiện có | todo | | Pipelines đang experimental; kết quả chốt lại D1 |
+| 0 | Dựng môi trường Docker (Postgres + pgvector), chạy Paperclip, bật `enablePipelines`, chạy tutorial | done: stack chạy trên Docker Desktop (server :3100, migrations OK, pgvector 0.8.7 có sẵn; extension chưa tạo) | | Chưa rõ Docker của repo hỗ trợ pgvector; có thể cần compose riêng |
+| 1 | Spike Pipelines: approver theo role, quyền agent key, event field-level, request_changes, test hiện có | done: đọc code + smoke API thật (tạo công ty, pipeline 4 stage, case, transition, review approve → done đều 200) | | Pipelines đang experimental; kết quả chốt lại D1 |
 | 2 | Seed pipeline `dev-request` (12 stage; P1 dùng `triage`, `triage_review`, `done`, `cancelled`) + test state machine/gate | todo | | |
 | 3 | Migration #1: `dr_requests`, `dr_requesters`, `dr_attachments` | todo | | Chủ dự án duyệt schema trước |
 | 4 | Intake Portal tiếng Việt, tách khỏi board: đăng nhập requester, form, upload, trạng thái ticket | todo | | UI board gần như chưa có i18n |
@@ -50,7 +52,11 @@ Thứ tự: 0 → 1 → 2 → 3 → {4, 5} → 6 → 7 → 7b → 8 → 9 → 10
 - 0009 Dev bằng Docker (D8)
 - D7 (không phải ADR): chủ dự án tự chọn công ty pilot và tự chạy test; Claude bàn giao code, test tự động, hướng dẫn chạy.
 
+## Kết quả spike Pipelines (đọc code + smoke API; chi tiết `kb/spike-pipelines.md`)
+Kết luận: **cần vá, không phải viết lại state machine**. Chưa thấy lý do bỏ D1. Bản vá cần làm (đều thêm vào core): approver theo role BA/Tech Lead (M; hiện chỉ any_human/user/agent), diff field-level cho audit (M), output có cấu trúc theo stage (M), `case_key` dạng REQ-n (S, hiện là UUID), portal requester (M-L; hiện mọi member đọc được mọi case), chặn agent sửa config stage (S), gate cờ `enablePipelines` ở server (S). Agent không vượt được review stage (có test).
+
 ## Rủi ro mở
+0. File Pipelines rất lớn (service ~5k dòng, UI ~5k dòng): sửa khó, nhưng ta không theo upstream nên chấp nhận được.
 1. Pipelines experimental, có thể phải vá lõi.
 2. Chất lượng Triage agent: cần bộ mẫu thật; tỷ lệ override là thước đo.
 3. UI board gần như chưa có i18n (chỉ 5 key): portal tách riêng.
