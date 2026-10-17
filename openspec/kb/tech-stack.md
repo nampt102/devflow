@@ -45,3 +45,6 @@ curl http://localhost:3100/api/health
 
 ## Test cần pgvector
 Postgres nhúng của test không có pgvector. Test `packages/db/src/dr-embeddings-pgvector.test.ts` chỉ chạy khi đặt `DEVFLOW_PGVECTOR_URL` tới một server có pgvector (kết nối quản trị, ví dụ DB của compose: `postgres://paperclip:paperclip@docker-db-1:5432/postgres` khi chạy trong mạng `docker_default`, hoặc `localhost:5432` từ host). Test tạo một DB tạm, áp dụng toàn bộ migration rồi xóa DB; bỏ qua nếu thiếu biến.
+
+## Bật Pipelines trên instance (đã gặp 2026-10-18)
+UI Pipelines và trang Triage review bị cổng `enablePipelines` chặn, mặc định tắt và không có công tắc trong giao diện. Bật bằng API (admin instance): `PATCH /api/instance/settings/experimental` body `{"enablePipelines": true}`. API pipeline phía server không cần cờ này.
