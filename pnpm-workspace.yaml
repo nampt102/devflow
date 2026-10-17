@@ -11,6 +11,7 @@ packages:
   - "!packages/plugins/examples/plugin-orchestration-smoke-example"
   - server
   - ui
+  - portal
   - cli
 
 # Keep in sync with package.json#pnpm.patchedDependencies. Newer pnpm

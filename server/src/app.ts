@@ -105,6 +105,7 @@ import { fileResourceRoutes } from "./routes/file-resources.js";
 import { routineRoutes } from "./routes/routines.js";
 import { pipelineRoutes } from "./routes/pipelines.js";
 import { portalRoutes } from "./devflow/portal/routes.js";
+import { portalStaticRouter } from "./devflow/portal/static.js";
 import { environmentRoutes } from "./routes/environments.js";
 import { executionWorkspaceRoutes } from "./routes/execution-workspaces.js";
 import { goalRoutes } from "./routes/goals.js";
@@ -1098,6 +1099,10 @@ export async function createApp(
       localPluginDir: opts.localPluginDir ?? DEFAULT_LOCAL_PLUGIN_DIR,
     }),
   );
+
+  // The intake portal must be mounted before the board UI catch-all (app.use(staticUi) below).
+  const portalStatic = portalStaticRouter();
+  if (portalStatic) app.use("/portal", portalStatic);
 
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
   if (opts.uiMode === "static") {

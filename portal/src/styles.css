@@ -1,0 +1,134 @@
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --text: #1c2430;
+  --muted: #5b6678;
+  --border: #d9dee6;
+  --primary: #1f5eff;
+  --primary-text: #ffffff;
+  --primary-hover: #1749cc;
+  --danger-bg: #fdecec;
+  --danger-text: #8a1c1c;
+  --success-bg: #e8f6ec;
+  --success-text: #1b5e34;
+  --chip-active-bg: #e6eeff;
+  --chip-active-text: #1a3fa6;
+  --chip-done-bg: #e8f6ec;
+  --chip-done-text: #1b5e34;
+  --chip-closed-bg: #eceef2;
+  --chip-closed-text: #4a5365;
+  --radius: 10px;
+  --focus: 0 0 0 3px rgba(31, 94, 255, 0.35);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12161d;
+    --surface: #1a2029;
+    --text: #e6eaf1;
+    --muted: #9aa5b8;
+    --border: #2d3644;
+    --primary: #5b8cff;
+    --primary-text: #0b1220;
+    --primary-hover: #7aa0ff;
+    --danger-bg: #3a1c1f;
+    --danger-text: #ffb4b4;
+    --success-bg: #17301f;
+    --success-text: #9be0b2;
+    --chip-active-bg: #1e2c52;
+    --chip-active-text: #b8ccff;
+    --chip-done-bg: #17301f;
+    --chip-done-text: #9be0b2;
+    --chip-closed-bg: #272e3a;
+    --chip-closed-text: #aab3c5;
+    --focus: 0 0 0 3px rgba(91, 140, 255, 0.45);
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+h1 { font-size: 1.5rem; line-height: 1.3; margin: 0; }
+h2 { font-size: 1.05rem; margin: 1.6rem 0 0.4rem; }
+h3 { font-size: 1rem; margin: 0 0 0.5rem; }
+p { margin: 0.4rem 0; }
+a { color: var(--primary); }
+
+.topbar { background: var(--surface); border-bottom: 1px solid var(--border); }
+.topbar-inner { max-width: 760px; margin: 0 auto; padding: 0.75rem 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.brand { font-weight: 700; color: var(--text); text-decoration: none; font-size: 1.1rem; }
+.who { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.who-email { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40vw; }
+
+.container { max-width: 760px; margin: 0 auto; padding: 24px 16px 64px; }
+
+.page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 1rem; }
+.muted { color: var(--muted); font-size: 0.92rem; }
+.code { font-weight: 700; color: var(--muted); font-size: 0.9rem; letter-spacing: 0.02em; }
+.back-link { display: inline-block; margin-bottom: 0.75rem; color: var(--muted); text-decoration: none; font-size: 0.92rem; }
+.back-link:hover { text-decoration: underline; }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 18px; border-radius: 8px; border: 1px solid transparent; font: inherit; font-weight: 600; cursor: pointer; text-decoration: none; }
+.btn:focus-visible, .link-button:focus-visible, input:focus-visible, textarea:focus-visible, .card:focus-visible { outline: none; box-shadow: var(--focus); }
+.btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-primary { background: var(--primary); color: var(--primary-text); }
+.btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+.btn-secondary { background: var(--surface); color: var(--text); border-color: var(--border); }
+.btn-ghost { background: transparent; color: var(--muted); }
+.link-button { background: none; border: none; padding: 4px 0; font: inherit; color: var(--primary); cursor: pointer; text-decoration: underline; text-align: left; }
+
+.cards { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
+.card { display: block; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; color: inherit; text-decoration: none; }
+.card:hover { border-color: var(--primary); }
+.card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.card-title { font-weight: 600; margin-bottom: 2px; overflow-wrap: anywhere; }
+
+.chip { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.82rem; font-weight: 600; white-space: nowrap; }
+.chip-active { background: var(--chip-active-bg); color: var(--chip-active-text); }
+.chip-done { background: var(--chip-done-bg); color: var(--chip-done-text); }
+.chip-closed { background: var(--chip-closed-bg); color: var(--chip-closed-text); }
+
+.empty { background: var(--surface); border: 1px dashed var(--border); border-radius: var(--radius); padding: 28px 16px; text-align: center; }
+
+.alert { border-radius: 8px; padding: 10px 14px; margin: 0 0 14px; }
+.alert-error { background: var(--danger-bg); color: var(--danger-text); }
+.alert-success { background: var(--success-bg); color: var(--success-text); }
+
+.auth { max-width: 420px; margin: 24px auto 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; }
+.auth h1 { margin-bottom: 0.5rem; }
+.auth .form { margin-top: 1rem; }
+
+.form { display: grid; gap: 16px; }
+.form-inline { margin-top: 1.2rem; gap: 10px; }
+.field { display: grid; gap: 6px; }
+.label { font-weight: 600; }
+.hint { color: var(--muted); font-size: 0.85rem; }
+.field-error { color: var(--danger-text); font-size: 0.9rem; margin: 6px 0 0; }
+input, textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font: inherit; background: var(--surface); color: var(--text); }
+textarea { resize: vertical; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.files { display: grid; gap: 8px; justify-items: start; }
+.file-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; width: 100%; }
+.file-list li { display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; }
+.file-list-plain li { background: transparent; }
+.file-name { flex: 1; overflow-wrap: anywhere; }
+
+.meta { display: flex; gap: 24px; flex-wrap: wrap; margin: 0 0 0.5rem; }
+.meta dt { color: var(--muted); font-size: 0.82rem; }
+.meta dd { margin: 0; font-weight: 600; }
+.prose { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+@media (max-width: 480px) {
+  .who-email { display: none; }
+  .btn { width: 100%; }
+  .page-head .btn { width: auto; }
+}

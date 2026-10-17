@@ -26,6 +26,7 @@ export default defineConfig({
       "packages/plugins/sandbox-providers/daytona",
       "server",
       "ui",
+      "portal",
       "cli",
     ],
   },
