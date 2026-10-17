@@ -89,3 +89,25 @@ export function ageLabel(createdAt: string | Date, now: number = Date.now()): st
 }
 
 export const scoreLabel = (value: number | null) => (value === null ? "-" : value.toFixed(2));
+
+export const pct = (value: number | null) => (value === null ? "-" : `${Math.round(value * 100)}%`);
+
+/** 45 s, 12 min, 3.5 h, 2 d: the unit that reads best. */
+export function durationLabel(seconds: number | null): string {
+  if (seconds === null) return "-";
+  if (seconds < 90) return `${Math.round(seconds)} s`;
+  const minutes = seconds / 60;
+  if (minutes < 90) return `${Math.round(minutes)} min`;
+  const hours = minutes / 60;
+  if (hours < 48) return `${Math.round(hours * 10) / 10} h`;
+  return `${Math.round(hours / 24)} d`;
+}
+
+export const FIELD_LABELS: Record<string, string> = {
+  classification: "Type",
+  priority: "Priority",
+  difficulty: "Difficulty",
+  requiresHuman: "Needs a developer",
+  requiresHumanReasons: "Developer reasons",
+  duplicateOf: "Duplicate of",
+};

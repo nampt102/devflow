@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TriageDetail, TriageQueueItem } from "../api/devflowTriage";
-import { ageLabel, changedFields, decisionBlocker, draftFromDetail, filterQueue, finalPatch, scoreLabel } from "./triage-review";
+import { ageLabel, changedFields, decisionBlocker, draftFromDetail, durationLabel, filterQueue, finalPatch, pct, scoreLabel } from "./triage-review";
 
 const detail = (over: Partial<TriageDetail["proposal"]> = {}, candidates: TriageDetail["candidates"] = []): TriageDetail => ({
   caseId: "c1",
@@ -120,5 +120,18 @@ describe("queue helpers", () => {
     expect(ageLabel("2026-10-14T12:00:00Z", now)).toBe("3 d");
     expect(scoreLabel(null)).toBe("-");
     expect(scoreLabel(0.456)).toBe("0.46");
+  });
+});
+
+describe("metric formatting", () => {
+  it("formats rates and durations, with a dash when there is no data", () => {
+    expect(pct(null)).toBe("-");
+    expect(pct(0)).toBe("0%");
+    expect(pct(0.456)).toBe("46%");
+    expect(durationLabel(null)).toBe("-");
+    expect(durationLabel(45)).toBe("45 s");
+    expect(durationLabel(12 * 60)).toBe("12 min");
+    expect(durationLabel(3.5 * 3600)).toBe("3.5 h");
+    expect(durationLabel(3 * 86400)).toBe("3 d");
   });
 });

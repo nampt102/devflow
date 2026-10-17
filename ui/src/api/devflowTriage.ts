@@ -88,7 +88,20 @@ export interface TriageDecisionBody {
   final?: TriageFinalPatch;
 }
 
+export interface TriageMetrics {
+  windowDays: number;
+  approved: { total: number; overridden: number; overrideRate: number | null; byPromptVersion: Array<{ promptVersion: string; total: number; overridden: number; overrideRate: number | null }> };
+  fields: Array<{ field: string; overrides: number; rate: number | null }>;
+  commonCorrections: Array<{ field: string; agentValue: string | null; finalValue: string | null; count: number }>;
+  decisions: { approve: number; reject: number; requestChanges: number };
+  duplicates: { namedByAgent: number; addedByReviewer: number; closedAsDuplicate: number };
+  flow: { secondsToProposal: { p50: number | null; p90: number | null }; secondsInReview: { p50: number | null; p90: number | null }; secondsToApproval: { p50: number | null } };
+  queue: { waiting: number; oldestSince: string | null };
+  agent: { proposed: number; failed: number; gaveUp: number; embedFailed: number; emailFailed: number; calls: number; inputTokens: number; outputTokens: number };
+}
+
 export const devflowTriageApi = {
+  metrics: (companyId: string, days = 30) => api.get<TriageMetrics>(`/companies/${companyId}/devflow/triage-metrics?days=${days}`),
   queue: (companyId: string) => api.get<{ items: TriageQueueItem[] }>(`/companies/${companyId}/devflow/triage-queue`),
   detail: (companyId: string, caseId: string) => api.get<TriageDetail>(`/companies/${companyId}/devflow/triage-cases/${caseId}`),
   decide: (companyId: string, caseId: string, body: TriageDecisionBody) =>

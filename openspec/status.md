@@ -35,7 +35,7 @@ Bước 4 (Intake Portal) đang triển khai theo change OpenSpec `add-intake-po
 | 7 | Dedupe bằng pgvector + LLM xếp hạng (embedding API/local theo config) | done (chưa chạy với model/embedding thật): trigram luôn bật + vector khi có cấu hình, prompt v2, backfill; 65 test pass (gồm pgvector thật), 6 đột biến bị bắt; ADR 0015 | | Ngưỡng 0.3/0.65 chưa hiệu chỉnh; đổi provider = re-index |
 | 7b | Email requester khi đổi trạng thái (SMTP qua env) | done (chưa gửi thử qua SMTP thật): migration 0358 `dr_email_outbox`, worker xếp hàng + gửi bằng nodemailer, SMTP giả khi test; 18 test pass, 8 đột biến bị bắt; ADR 0016 | | Chủ dự án sẽ tạo SMTP Gmail (mật khẩu ứng dụng); chưa có giới hạn tần suất theo người nhận |
 | 8 | Màn hình duyệt triage cho Lead/BA (hàng chờ, sửa field, approve/reject/request_changes, đánh dấu trùng), ghi override | done (đã kiểm thủ công trên trình duyệt với stack thật): API `/devflow/triage-*`, hook `beforeCommit` ở core (nguyên tử), prompt v3 (lý do request_changes), trang Board UI `triage`; 198 test server + 7 test UI pass, 8 đột biến bị bắt; ADR 0017 | | Chưa có role BA/Tech Lead, snooze, duyệt hàng loạt; UI tiếng Anh |
-| 9 | Số liệu cơ bản: tỷ lệ override theo field, thời gian ở triage | todo | | |
+| 9 | Số liệu cơ bản: tỷ lệ override theo field, thời gian ở triage | done (chưa xem trên dữ liệu pilot thật): `GET /devflow/triage-metrics` + mục "Quality" trong trang Triage review; không có migration; 8 test server + test UI pass, 7 đột biến bị bắt; ADR 0018 | | Mẫu nhỏ, chưa có độ tin cậy thống kê hay biểu đồ theo thời gian |
 | 10 | Pilot hardening: log lỗi agent, ngân sách token, tài liệu vận hành | todo | | Chủ dự án tự chọn công ty và tự chạy test |
 
 Thứ tự: 0 → 1 → 2 → 3 → {4, 5} → 6 → 7 → 7b → 8 → 9 → 10.
@@ -58,6 +58,7 @@ Thứ tự: 0 → 1 → 2 → 3 → {4, 5} → 6 → 7 → 7b → 8 → 9 → 10
 - 0015 Dedupe: trigram luôn bật, vector khi có cấu hình, prompt v2
 - 0016 Email trạng thái: outbox theo sự kiện, nodemailer
 - 0017 Màn hình duyệt triage: trang Board UI, quyết định nguyên tử qua hook của core
+- 0018 Số liệu triage: tính từ dữ liệu có sẵn, tỷ lệ override trên đề xuất được duyệt
 - D7 (không phải ADR): chủ dự án tự chọn công ty pilot và tự chạy test; Claude bàn giao code, test tự động, hướng dẫn chạy.
 
 ## Kết quả spike Pipelines (đọc code + smoke API; chi tiết `kb/spike-pipelines.md`)
@@ -76,6 +77,7 @@ Kết luận: **cần vá, không phải viết lại state machine**. Chưa th�
 P1 (đang chuẩn bị) → P2 BA Spec + Planner agent, gate còn lại, email mở rộng → P3 Dev agent (worktree/PR), QA agent, dashboard → P4 Governance đầy đủ, SSO, mở rộng toàn group.
 
 ## Gần đây
+- 2026-10-18: Bước 9 xong: `triage-review/metrics.ts` (tỷ lệ override theo field và phiên bản prompt, sửa đổi hay gặp, quyết định, trùng, p50/p90 thời gian, hàng chờ, lỗi agent và token), route `triage-metrics`, mục Quality ở trang Triage review; 8 test server pass, 7 đột biến bị bắt (ADR 0018, `kb/triage-metrics.md`).
 - 2026-10-18: Bước 8 xong (đã duyệt thử REQ-8 trên trình duyệt thật: override, `dr_requests`, `ba_spec` đúng; cờ `enablePipelines` không có nút trong UI, bật bằng API, xem `kb/tech-stack.md`): `devflow/triage-review/` (hàng chờ, chi tiết, quyết định), vá `reviewCase` thêm `beforeCommit` (4 dòng), prompt v3, `ui/src/pages/TriageReview.tsx` + `lib/triage-review.ts`; 198 test server (gồm hồi quy `pipelines-*`) + 7 test UI pass, 8 đột biến bị bắt (ADR 0017, `kb/triage-review.md`).
 - 2026-10-17: Bước 7b xong: migration 0358 `dr_email_outbox`, `devflow/email/` (mailer nodemailer, soạn thư tiếng Việt, worker xếp hàng + gửi với backoff, SMTP giả), dependency `nodemailer@10.1.2` (lockfile +19 dòng); 18 test (12 server + 6 db) pass, 8 đột biến bị bắt. Chưa thử Gmail thật; image Docker chưa build lại (ADR 0016, `kb/email-notifications.md`).
 - 2026-10-17: Chạy thật Triage với claude-haiku-5-5 (20 yêu cầu mẫu tổng hợp): 21/21 đề xuất hợp lệ, dedupe trigram bắt đúng 3 cặp trùng, 3 mẫu injection bị bỏ qua. Lỗi tìm được và sửa: model từ chối `temperature` (nay tùy chọn), quy tắc cờ nhầm "sập"/SAP, "lượng"/"lương". Chi tiết cuối `kb/triage-agent.md`. Image chạy hiện tại chưa có bản sửa quy tắc cờ (cần build lại).

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Check, ClipboardCheck, Copy, Loader2, Paperclip, RotateCcw, X } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, ChevronRight, ClipboardCheck, Copy, Loader2, Paperclip, RotateCcw, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/EmptyState";
 import { PageSkeleton } from "@/components/PageSkeleton";
 import { ApiError } from "../api/client";
-import { devflowTriageApi, type TriageDecision, type TriageDetail } from "../api/devflowTriage";
+import { devflowTriageApi, type TriageDecision, type TriageDetail, type TriageMetrics } from "../api/devflowTriage";
 import { useBreadcrumbs } from "../context/BreadcrumbContext";
 import { useCompany } from "../context/CompanyContext";
 import { useToastActions } from "../context/ToastContext";
@@ -21,10 +21,13 @@ import {
   decisionBlocker,
   DIFFICULTIES,
   draftFromDetail,
+  durationLabel,
+  FIELD_LABELS,
   filterQueue,
   finalPatch,
   HUMAN_REASON_LABELS,
   HUMAN_REASONS,
+  pct,
   PRIORITIES,
   scoreLabel,
   type QueueFilter,
@@ -74,6 +77,8 @@ export function TriageReview() {
       </div>
 
       {queueQuery.error ? <p className="text-sm text-amber-700 dark:text-amber-300">The queue could not be loaded. Try again in a moment.</p> : null}
+
+      <MetricsPanel companyId={selectedCompanyId} />
 
       <div className="flex flex-wrap gap-2" role="group" aria-label="Queue filter">
         {FILTERS.map((f) => (
@@ -369,6 +374,95 @@ function Notes({ title, lines }: { title: string; lines: string[] }) {
           <li key={i}>{l}</li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+function MetricsPanel({ companyId }: { companyId: string }) {
+  const [open, setOpen] = useState(false);
+  const metricsQuery = useQuery({
+    queryKey: queryKeys.devflowTriage.metrics(companyId),
+    queryFn: () => devflowTriageApi.metrics(companyId, 30),
+    refetchInterval: 60_000,
+  });
+  const m = metricsQuery.data;
+  return (
+    <section className="border border-border">
+      <button type="button" className="flex w-full items-center gap-2 p-3 text-left text-sm font-medium text-foreground" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+        {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        Quality, last 30 days
+        {m ? (
+          <span className="font-normal text-muted-foreground">
+            {m.approved.total === 0 ? "no approved proposals yet" : `${pct(m.approved.overrideRate)} of ${m.approved.total} approved proposals were corrected`}
+          </span>
+        ) : null}
+      </button>
+      {open ? (m ? <MetricsBody m={m} /> : <p className="p-3 text-sm text-muted-foreground">{metricsQuery.isLoading ? "Loading..." : "Metrics are not available right now."}</p>) : null}
+    </section>
+  );
+}
+
+function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <div className="space-y-0.5">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="text-lg font-semibold text-foreground">{value}</p>
+      {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
+    </div>
+  );
+}
+
+function MetricsBody({ m }: { m: TriageMetrics }) {
+  const decided = m.decisions.approve + m.decisions.reject + m.decisions.requestChanges;
+  return (
+    <div className="space-y-4 border-t border-border p-3">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+        <Stat label="Waiting" value={String(m.queue.waiting)} hint={m.queue.oldestSince ? `oldest ${ageLabel(m.queue.oldestSince)}` : undefined} />
+        <Stat label="Corrected" value={pct(m.approved.overrideRate)} hint={`${m.approved.overridden} of ${m.approved.total} approved`} />
+        <Stat label="To first proposal" value={durationLabel(m.flow.secondsToProposal.p50)} hint={`p90 ${durationLabel(m.flow.secondsToProposal.p90)}`} />
+        <Stat label="Time in review" value={durationLabel(m.flow.secondsInReview.p50)} hint={`p90 ${durationLabel(m.flow.secondsInReview.p90)}`} />
+        <Stat label="Decisions" value={String(decided)} hint={`${m.decisions.approve} approved, ${m.decisions.reject} rejected, ${m.decisions.requestChanges} sent back`} />
+        <Stat label="Agent problems" value={String(m.agent.failed + m.agent.gaveUp)} hint={`${m.agent.proposed} proposals, ${m.agent.gaveUp} given up`} />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div>
+          <p className="mb-1 text-xs font-medium text-muted-foreground">Share of approved proposals corrected, by field</p>
+          <table className="w-full text-sm">
+            <tbody>
+              {m.fields.map((f) => (
+                <tr key={f.field} className="border-b border-border last:border-0">
+                  <td className="py-1 text-foreground">{FIELD_LABELS[f.field] ?? f.field}</td>
+                  <td className="py-1 text-right text-foreground">{pct(f.rate)}</td>
+                  <td className="py-1 text-right text-muted-foreground">{f.overrides}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {m.approved.byPromptVersion.length ? (
+            <p className="mt-2 text-xs text-muted-foreground">
+              By prompt: {m.approved.byPromptVersion.map((v) => `${v.promptVersion} ${pct(v.overrideRate)} of ${v.total}`).join(", ")}
+            </p>
+          ) : null}
+        </div>
+        <div>
+          <p className="mb-1 text-xs font-medium text-muted-foreground">Most common corrections</p>
+          {m.commonCorrections.length === 0 ? (
+            <p className="text-sm text-muted-foreground">None yet.</p>
+          ) : (
+            <ul className="space-y-1 text-sm text-foreground">
+              {m.commonCorrections.slice(0, 6).map((c, i) => (
+                <li key={i}>
+                  {FIELD_LABELS[c.field] ?? c.field}: {c.agentValue ?? "none"} to {c.finalValue ?? "none"} <span className="text-muted-foreground">x{c.count}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-2 text-xs text-muted-foreground">
+            Duplicates: agent named {m.duplicates.namedByAgent}, reviewers added {m.duplicates.addedByReviewer}, closed as duplicate {m.duplicates.closedAsDuplicate}. Tokens: {m.agent.inputTokens} in, {m.agent.outputTokens} out over {m.agent.calls} calls.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
