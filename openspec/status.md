@@ -8,12 +8,12 @@
 **P1**: Intake Portal + Workflow Core + Triage agent, pilot 1 công ty. P0 (khám phá Paperclip/Plane, docs, khung project-kit) đã xong.
 
 ## Bước đang làm
-Bước 3 **đã xong** (migration `0355_devflow_requests`, xem bảng và ADR 0010). Chờ chủ dự án chọn hướng cho bước 4 (portal) và 5 (migration #2).
+Bước 4 (Intake Portal) đang triển khai theo change OpenSpec `add-intake-portal` (đã duyệt A1+B1+C1, ADR 0011). Đang làm: nhóm 1 (guard, gửi yêu cầu, DTO, test cách ly; không đổi schema). Nhóm 3 (bảng `dr_requester_invites`) cần chủ dự án duyệt DDL trước khi tạo migration.
 
 ## Bước tiếp theo
-1. Bước 4: Intake Portal tiếng Việt (đăng nhập requester, form, upload, trạng thái ticket) và API cho `dr_requests`: cần quyết định cách cấp quyền requester tách khỏi board (kiểm chứng ở spike).
-2. Bước 5: migration #2 (`dr_agent_outputs`, `dr_overrides`, `dr_prompts`, `dr_embeddings`): cần duyệt schema, số chiều vector và model embedding.
-3. Migration chưa được áp dụng vào stack Docker đang chạy (image hiện tại chưa chứa 0355); cần build lại image để chạy migration trên DB pgvector thật.
+1. Hoàn tất nhóm 1 và 2 trong `openspec/changes/add-intake-portal/tasks.md`.
+2. Trình DDL `dr_requester_invites` để duyệt, rồi làm nhóm 3 và 4.
+3. Bước 5 (migration #2: agent outputs, overrides, prompts, embeddings) sau khi portal chạy được.
 
 ## Việc bị chặn / chờ quyết định
 - Còn thiếu (chưa chặn bước 0–2): model embedding, endpoint/model vLLM, thông tin SMTP (chủ dự án tự tạo/cập nhật env khi test).
@@ -29,7 +29,7 @@ Bước 3 **đã xong** (migration `0355_devflow_requests`, xem bảng và ADR 0
 | 1 | Spike Pipelines: approver theo role, quyền agent key, event field-level, request_changes, test hiện có | done: đọc code + smoke API thật (tạo công ty, pipeline 4 stage, case, transition, review approve → done đều 200) | | Pipelines đang experimental; kết quả chốt lại D1 |
 | 2 | Seed pipeline `dev-request` (12 stage; P1 dùng `triage`, `triage_review`, `done`, `cancelled`) + test state machine/gate | done: định nghĩa JSON + 8 test (pass, đột biến bị bắt) + script seed/verify 7/7 pass trên stack thật | | |
 | 3 | Migration #1: `dr_requests`, `dr_requesters`, `dr_attachments` (+ `dr_request_counters`) | done: `0355_devflow_requests.sql`, 11 test cách ly công ty pass trên Postgres nhúng; chưa áp dụng vào stack Docker | | Chủ dự án duyệt schema trước |
-| 4 | Intake Portal tiếng Việt, tách khỏi board: đăng nhập requester, form, upload, trạng thái ticket | todo | | UI board gần như chưa có i18n |
+| 4 | Intake Portal tiếng Việt, tách khỏi board: đăng nhập requester, form, upload, trạng thái ticket | doing (change `add-intake-portal`; nhóm 1 đang làm) | | UI board gần như chưa có i18n |
 | 5 | Migration #2: `dr_agent_outputs`, `dr_overrides`, `dr_prompts` (hoặc dùng skills Paperclip) + `dr_embeddings` (pgvector) | todo | | Phụ thuộc kết quả spike |
 | 6 | Triage agent: prompt v1 có version, output JSON (Zod) + comment, `pendingSuggestion`; provider API/local theo config | todo | | Cần endpoint vLLM; chưa có adapter vLLM chuẩn |
 | 7 | Dedupe bằng pgvector + LLM xếp hạng (embedding API/local theo config) | todo | | Đổi provider = re-index |
@@ -51,6 +51,7 @@ Thứ tự: 0 → 1 → 2 → 3 → {4, 5} → 6 → 7 → 7b → 8 → 9 → 10
 - 0008 LLM cho agent: API thương mại + local theo config (D6)
 - 0009 Dev bằng Docker (D8)
 - 0010 Cách ly công ty bằng khóa ngoại kép (id, company_id)
+- 0011 Intake Portal: link mời một lần, /api/portal/*, app portal/ riêng
 - D7 (không phải ADR): chủ dự án tự chọn công ty pilot và tự chạy test; Claude bàn giao code, test tự động, hướng dẫn chạy.
 
 ## Kết quả spike Pipelines (đọc code + smoke API; chi tiết `kb/spike-pipelines.md`)
