@@ -2,6 +2,8 @@ import { and, desc, eq, gte, sql } from "drizzle-orm";
 import type { Db } from "@paperclipai/db";
 import { drRequestCounters, drRequests, pipelineCases, pipelineStages, pipelines } from "@paperclipai/db";
 import { logActivity } from "../../services/activity-log.js";
+import type { StorageService } from "../../storage/types.js";
+import { checkFiles, portalAttachments, type AttachmentDto, type UploadedFile } from "./attachments.js";
 import { notFound, tooManyRequests, unprocessable } from "../../errors.js";
 import type { PipelineActor } from "../../services/pipelines.js";
 import type { RequesterContext } from "./requester-guard.js";
@@ -21,6 +23,7 @@ export type RequestDto = {
   statusLabel: string;
   createdAt: string;
   updatedAt: string;
+  attachments?: AttachmentDto[];
 };
 
 type IngestCase = (input: {
@@ -32,10 +35,12 @@ type IngestCase = (input: {
   actor: PipelineActor;
 }) => Promise<{ case: { id: string } }>;
 
-export function portalService(db: Db, deps: { ingestCase: IngestCase }) {
+export function portalService(db: Db, deps: { ingestCase: IngestCase; storage: StorageService }) {
+  const files = portalAttachments(db, deps.storage);
   const baseSelect = () =>
     db
       .select({
+        caseId: drRequests.caseId,
         number: drRequests.requestNumber,
         title: pipelineCases.title,
         description: drRequests.description,
@@ -66,7 +71,8 @@ export function portalService(db: Db, deps: { ingestCase: IngestCase }) {
     and(eq(drRequests.companyId, ctx.companyId), eq(drRequests.requesterId, ctx.requesterId));
 
   return {
-    async submit(ctx: RequesterContext, input: SubmitInput): Promise<RequestDto> {
+    async submit(ctx: RequesterContext, input: SubmitInput, uploads: UploadedFile[] = []): Promise<RequestDto> {
+      const checked = checkFiles(uploads); // refuse bad files before anything is created
       const since = new Date(Date.now() - 60 * 60 * 1000);
       const [{ recent }] = await db
         .select({ recent: sql<number>`count(*)::int` })
@@ -102,8 +108,10 @@ export function portalService(db: Db, deps: { ingestCase: IngestCase }) {
         actor: { type: "user", userId: ctx.userId },
       });
 
-      // (c) business row + activity; compensate by removing the case if this fails (ingestCase owns its transaction)
+      // (c) files, business row, activity; compensate by removing the case if this fails (ingestCase owns its transaction)
+      let assetIds: string[] = [];
       try {
+        assetIds = await files.storeFiles(ctx, checked);
         await db.transaction(async (tx) => {
           await tx.insert(drRequests).values({
             caseId: created.id,
@@ -114,6 +122,7 @@ export function portalService(db: Db, deps: { ingestCase: IngestCase }) {
             businessImpact: input.businessImpact ?? null,
             source: "portal",
           });
+          await files.attach(tx as unknown as Db, ctx, created.id, assetIds);
           await logActivity(tx as unknown as Db, {
             companyId: ctx.companyId,
             actorType: "user",
@@ -121,10 +130,11 @@ export function portalService(db: Db, deps: { ingestCase: IngestCase }) {
             action: "portal.request_submitted",
             entityType: "pipeline_case",
             entityId: created.id,
-            details: { requestNumber: n },
+            details: { requestNumber: n, attachments: assetIds.length },
           });
         });
       } catch (err) {
+        await files.discardAssets(ctx, assetIds);
         await db.delete(pipelineCases).where(eq(pipelineCases.id, created.id));
         throw err;
       }
@@ -146,7 +156,39 @@ export function portalService(db: Db, deps: { ingestCase: IngestCase }) {
         .where(and(own(ctx), eq(drRequests.requestNumber, number)))
         .limit(1);
       if (!row) throw notFound("Request not found");
-      return toDto(row);
+      return { ...toDto(row), attachments: await files.list(ctx, row.caseId) };
+    },
+
+    /** Adds files to one of the requester's own requests (5 files in total per request). */
+    async addAttachments(ctx: RequesterContext, number: number, uploads: UploadedFile[]): Promise<RequestDto> {
+      const [row] = await baseSelect().where(and(own(ctx), eq(drRequests.requestNumber, number))).limit(1);
+      if (!row) throw notFound("Request not found");
+      const checked = checkFiles(uploads, await files.countFor(ctx, row.caseId));
+      const assetIds = await files.storeFiles(ctx, checked);
+      try {
+        await db.transaction(async (tx) => {
+          await files.attach(tx as unknown as Db, ctx, row.caseId, assetIds);
+          await logActivity(tx as unknown as Db, {
+            companyId: ctx.companyId,
+            actorType: "user",
+            actorId: ctx.userId,
+            action: "portal.attachments_added",
+            entityType: "pipeline_case",
+            entityId: row.caseId,
+            details: { requestNumber: number, attachments: assetIds.length },
+          });
+        });
+      } catch (err) {
+        await files.discardAssets(ctx, assetIds);
+        throw err;
+      }
+      return this.get(ctx, number);
+    },
+
+    async openAttachment(ctx: RequesterContext, number: number, attachmentId: string) {
+      const [row] = await baseSelect().where(and(own(ctx), eq(drRequests.requestNumber, number))).limit(1);
+      if (!row) throw notFound("Request not found");
+      return files.open(ctx, row.caseId, attachmentId);
     },
   };
 }

@@ -1,7 +1,10 @@
-import { Router } from "express";
+import { Router, type Request, type RequestHandler } from "express";
+import multer from "multer";
 import { z } from "zod";
 import type { Db } from "@paperclipai/db";
-import { badRequest } from "../../errors.js";
+import { badRequest, unprocessable } from "../../errors.js";
+import type { StorageService } from "../../storage/types.js";
+import { MAX_FILES_PER_REQUEST, MAX_FILE_BYTES, cleanFilename, type UploadedFile } from "./attachments.js";
 import { pipelineService } from "../../services/pipelines.js";
 import { portalService } from "./portal-service.js";
 import { requireRequester } from "./requester-guard.js";
@@ -14,9 +17,21 @@ const submitSchema = z.object({
 });
 
 /** /api/portal/*: the only API surface for requesters (openspec/decisions/0011). */
-export function portalRoutes(db: Db) {
+export function portalRoutes(db: Db, storage: StorageService) {
   const router = Router();
-  const service = portalService(db, { ingestCase: (input) => pipelineService(db).ingestCase(input) });
+  const service = portalService(db, { ingestCase: (input) => pipelineService(db).ingestCase(input), storage });
+  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_FILE_BYTES, files: MAX_FILES_PER_REQUEST } });
+  // multipart only when the client sends it; JSON bodies are already parsed. Field name: "files".
+  const readFiles: RequestHandler = (req, res, next) => {
+    if (!req.is("multipart/form-data")) return next();
+    upload.array("files", MAX_FILES_PER_REQUEST)(req, res, (err: unknown) => {
+      if (!(err instanceof multer.MulterError)) return next(err as Error | undefined);
+      if (err.code === "LIMIT_FILE_SIZE") return next(unprocessable("File is larger than 10 MB", { code: "file_too_large" }));
+      if (err.code === "LIMIT_FILE_COUNT") return next(unprocessable("Too many files", { code: "too_many_files" }));
+      return next(badRequest(err.message));
+    });
+  };
+  const filesOf = (req: Request) => ((req as Request & { files?: UploadedFile[] }).files ?? []) as UploadedFile[];
   const guard = requireRequester(db);
 
   router.get("/portal/me", guard, (_req, res) => {
@@ -24,10 +39,10 @@ export function portalRoutes(db: Db) {
     res.json({ companyId, requesterId });
   });
 
-  router.post("/portal/requests", guard, async (req, res) => {
+  router.post("/portal/requests", guard, readFiles, async (req, res) => {
     const parsed = submitSchema.safeParse(req.body);
     if (!parsed.success) throw badRequest("Invalid request", parsed.error.flatten());
-    res.status(201).json(await service.submit(res.locals.requester!, parsed.data));
+    res.status(201).json(await service.submit(res.locals.requester!, parsed.data, filesOf(req)));
   });
 
   router.get("/portal/requests", guard, async (req, res) => {
@@ -45,6 +60,28 @@ export function portalRoutes(db: Db) {
     const number = Number(req.params.number);
     if (!Number.isInteger(number) || number < 1) throw badRequest("Invalid request number");
     res.json(await service.get(res.locals.requester!, number));
+  });
+
+  router.post("/portal/requests/:number/attachments", guard, readFiles, async (req, res) => {
+    const number = Number(req.params.number);
+    if (!Number.isInteger(number) || number < 1) throw badRequest("Invalid request number");
+    const uploads = filesOf(req);
+    if (uploads.length === 0) throw badRequest("Missing files");
+    res.status(201).json(await service.addAttachments(res.locals.requester!, number, uploads));
+  });
+
+  router.get("/portal/requests/:number/attachments/:attachmentId", guard, async (req, res) => {
+    const number = Number(req.params.number);
+    const attachmentId = String(req.params.attachmentId);
+    if (!Number.isInteger(number) || number < 1 || !/^[0-9a-f-]{36}$/i.test(attachmentId)) throw badRequest("Invalid id");
+    const file = await service.openAttachment(res.locals.requester!, number, attachmentId);
+    res.setHeader("Content-Type", file.contentType);
+    res.setHeader("Content-Length", String(file.byteSize));
+    res.setHeader("Content-Disposition", "attachment; filename*=UTF-8''" + encodeURIComponent(cleanFilename(file.filename)));
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Cache-Control", "private, no-store");
+    file.stream.on("error", () => res.destroy());
+    file.stream.pipe(res);
   });
 
   return router;

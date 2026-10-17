@@ -851,7 +851,7 @@ export async function createApp(
   api.use(fileResourceRoutes(db));
   api.use(routineRoutes(db, { pluginWorkerManager: workerManager }));
   api.use(pipelineRoutes(db));
-  api.use(portalRoutes(db));
+  api.use(portalRoutes(db, opts.storageService));
   api.use(
     environmentRoutes(db, {
       pluginWorkerManager: workerManager,

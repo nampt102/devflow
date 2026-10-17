@@ -1,12 +1,17 @@
 import { randomUUID } from "node:crypto";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { and, eq } from "drizzle-orm";
 import express from "express";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
+  assets,
   authUsers,
   companies,
   createDb,
+  drAttachments,
   drRequestCounters,
   drRequesters,
   drRequests,
@@ -20,6 +25,9 @@ import { errorHandler } from "../middleware/error-handler.js";
 import { pipelineRoutes } from "../routes/pipelines.js";
 import { portalRoutes } from "../devflow/portal/routes.js";
 import { MAX_REQUESTS_PER_HOUR } from "../devflow/portal/portal-service.js";
+import { portalAttachments } from "../devflow/portal/attachments.js";
+import { createLocalDiskStorageProvider } from "../storage/local-disk-provider.js";
+import { createStorageService } from "../storage/service.js";
 
 // Requester isolation and DTO allowlist for the intake portal (openspec/changes/add-intake-portal).
 const embeddedPostgresSupport = await getEmbeddedPostgresTestSupport();
@@ -28,6 +36,8 @@ const describeEmbeddedPostgres = embeddedPostgresSupport.supported ? describe : 
 describeEmbeddedPostgres("devflow portal", () => {
   let db!: ReturnType<typeof createDb>;
   let tempDb: Awaited<ReturnType<typeof startEmbeddedPostgresTestDatabase>> | null = null;
+  const storageDir = mkdtempSync(join(tmpdir(), "devflow-portal-"));
+  const storage = createStorageService(createLocalDiskStorageProvider(storageDir));
 
   beforeAll(async () => {
     tempDb = await startEmbeddedPostgresTestDatabase("devflow-portal-");
@@ -36,6 +46,7 @@ describeEmbeddedPostgres("devflow portal", () => {
 
   afterAll(async () => {
     await tempDb?.cleanup();
+    rmSync(storageDir, { recursive: true, force: true });
   });
 
   const sessionActor = (userId: string): Express.Request["actor"] => ({
@@ -55,7 +66,7 @@ describeEmbeddedPostgres("devflow portal", () => {
       next();
     });
     instance.use("/api", pipelineRoutes(db, { heartbeat: { wakeup: async () => null } }));
-    instance.use("/api", portalRoutes(db));
+    instance.use("/api", portalRoutes(db, storage));
     instance.use(errorHandler);
     return instance;
   }
@@ -177,7 +188,7 @@ describeEmbeddedPostgres("devflow portal", () => {
     const detail = await request(app(actor)).get("/api/portal/requests/1");
     expect(detail.status).toBe(200);
     expect(Object.keys(detail.body).sort()).toEqual(
-      ["businessImpact", "code", "createdAt", "description", "number", "statusLabel", "title", "updatedAt"],
+      ["attachments", "businessImpact", "code", "createdAt", "description", "number", "statusLabel", "title", "updatedAt"],
     );
     const list = await request(app(actor)).get("/api/portal/requests");
     for (const body of [JSON.stringify(detail.body), JSON.stringify(list.body)]) {
@@ -238,6 +249,117 @@ describeEmbeddedPostgres("devflow portal", () => {
     expect(ok.status).toBe(201);
     const [kase] = await db.select().from(pipelineCases).where(eq(pipelineCases.companyId, b.company.id));
     expect(kase.caseKey).toBe(ok.body.code);
+  });
+
+
+  // ---- attachments -------------------------------------------------------------------------------
+  const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from("png-body")]);
+  const PDF = Buffer.from("%PDF-1.4\n1 0 obj\n<<>>\nendobj\n");
+
+  const submitWithFiles = (
+    actor: Express.Request["actor"],
+    files: Array<{ name: string; type: string; body: Buffer }>,
+    qs = "",
+  ) => {
+    let r = request(app(actor)).post(`/api/portal/requests${qs}`).field("title", "Có tệp").field("description", "Kèm tệp đính kèm");
+    for (const f of files) r = r.attach("files", f.body, { filename: f.name, contentType: f.type });
+    return r;
+  };
+
+  async function caseCount(companyId: string) {
+    return (await db.select().from(pipelineCases).where(eq(pipelineCases.companyId, companyId))).length;
+  }
+
+  it("stores attachments, lists them without storage details, and serves them only to their owner", async () => {
+    const { company } = await seedCompany("Files Co");
+    const owner = await seedRequester(company.id);
+    const other = await seedRequester(company.id);
+    const actor = sessionActor(owner.userId);
+
+    const created = await submitWithFiles(actor, [
+      { name: "../../etc/anh-chup.png", type: "image/png", body: PNG },
+      { name: "bao-cao.pdf", type: "application/pdf", body: PDF },
+    ]);
+    expect(created.status).toBe(201);
+    expect(created.body.attachments).toHaveLength(2);
+    expect(created.body.attachments[0].filename).toBe("anh-chup.png"); // path stripped
+    for (const a of created.body.attachments) {
+      expect(Object.keys(a).sort()).toEqual(["byteSize", "contentType", "createdAt", "filename", "id"]);
+    }
+    expect(JSON.stringify(created.body)).not.toMatch(/objectKey|assetId|sha256|provider|portal\/requests/);
+
+    const file = created.body.attachments[0];
+    const download = await request(app(actor)).get(`/api/portal/requests/1/attachments/${file.id}`).buffer(true).parse((res, cb) => {
+      const chunks: Buffer[] = [];
+      res.on("data", (c: Buffer) => chunks.push(c));
+      res.on("end", () => cb(null, Buffer.concat(chunks)));
+    });
+    expect(download.status).toBe(200);
+    expect(Buffer.compare(download.body as Buffer, PNG)).toBe(0);
+    expect(download.headers["content-disposition"]).toMatch(/^attachment;/);
+    expect(download.headers["x-content-type-options"]).toBe("nosniff");
+
+    // another requester in the same company cannot download or list it
+    const intruder = app(sessionActor(other.userId));
+    expect((await request(intruder).get(`/api/portal/requests/1/attachments/${file.id}`)).status).toBe(404);
+    expect((await request(intruder).get("/api/portal/requests/1")).status).toBe(404);
+  });
+
+  it("refuses bad uploads without creating a request or leaving files behind", async () => {
+    const { company } = await seedCompany("Bad Files Co");
+    const { userId } = await seedRequester(company.id);
+    const actor = sessionActor(userId);
+    const six = Array.from({ length: 6 }, (_, i) => ({ name: `f${i}.png`, type: "image/png", body: PNG }));
+    const cases: Array<[string, Array<{ name: string; type: string; body: Buffer }>]> = [
+      ["more than 5 files", six],
+      ["svg", [{ name: "x.svg", type: "image/svg+xml", body: Buffer.from("<svg onload=alert(1)/>") }]],
+      ["html", [{ name: "x.html", type: "text/html", body: Buffer.from("<script>1</script>") }]],
+      ["zip", [{ name: "x.zip", type: "application/zip", body: Buffer.from("PK\u0003\u0004") }]],
+      ["png type with text content", [{ name: "x.png", type: "image/png", body: Buffer.from("not an image") }]],
+      ["empty file", [{ name: "x.png", type: "image/png", body: Buffer.alloc(0) }]],
+      ["over 10 MB", [{ name: "big.pdf", type: "application/pdf", body: Buffer.concat([PDF, Buffer.alloc(10 * 1024 * 1024)]) }]],
+    ];
+    const assetsBefore = (await db.select().from(assets).where(eq(assets.companyId, company.id))).length;
+    for (const [label, files] of cases) {
+      const res = await submitWithFiles(actor, files);
+      expect(res.status, label).toBe(422);
+    }
+    expect(await caseCount(company.id)).toBe(0);
+    expect((await db.select().from(assets).where(eq(assets.companyId, company.id))).length).toBe(assetsBefore);
+  });
+
+  it("adds files to an existing request up to five in total", async () => {
+    const { company } = await seedCompany("Add Files Co");
+    const { userId } = await seedRequester(company.id);
+    const actor = sessionActor(userId);
+    await submitWithFiles(actor, [{ name: "a.png", type: "image/png", body: PNG }]);
+
+    const add = (n: number) => {
+      let r = request(app(actor)).post("/api/portal/requests/1/attachments");
+      for (let i = 0; i < n; i += 1) r = r.attach("files", PNG, { filename: `n${i}.png`, contentType: "image/png" });
+      return r;
+    };
+    const ok = await add(2);
+    expect(ok.status).toBe(201);
+    expect(ok.body.attachments).toHaveLength(3);
+    expect((await add(3)).status).toBe(422); // 3 + 3 > 5
+    expect((await request(app(actor)).post("/api/portal/requests/1/attachments")).status).toBe(400); // no files
+    expect((await request(app(actor)).post("/api/portal/requests/99/attachments").attach("files", PNG, { filename: "x.png", contentType: "image/png" })).status).toBe(404);
+  });
+
+  it("refuses to link an asset from another company", async () => {
+    const a = await seedCompany("Asset A");
+    const b = await seedCompany("Asset B");
+    const ra = await seedRequester(a.company.id);
+    await submit(sessionActor(ra.userId));
+    const [kase] = await db.select().from(pipelineCases).where(eq(pipelineCases.companyId, a.company.id));
+    const [foreign] = await db
+      .insert(assets)
+      .values({ companyId: b.company.id, provider: "local_disk", objectKey: randomUUID(), contentType: "image/png", byteSize: 1, sha256: "x" })
+      .returning();
+    const ctx = { companyId: a.company.id, requesterId: ra.requester.id, userId: ra.userId };
+    await expect(portalAttachments(db, storage).attach(db, ctx, kase.id, [foreign.id])).rejects.toThrow(/another company/);
+    expect(await db.select().from(drAttachments).where(eq(drAttachments.caseId, kase.id))).toHaveLength(0);
   });
 
   it("removes the case when the business row cannot be written (no orphan in triage)", async () => {

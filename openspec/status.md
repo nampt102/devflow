@@ -8,7 +8,7 @@
 **P1**: Intake Portal + Workflow Core + Triage agent, pilot 1 công ty. P0 (khám phá Paperclip/Plane, docs, khung project-kit) đã xong.
 
 ## Bước đang làm
-Bước 4 (Intake Portal) đang triển khai theo change OpenSpec `add-intake-portal` (đã duyệt A1+B1+C1, ADR 0011). Nhóm 1 đã xong (guard, gửi yêu cầu, DTO, test cách ly: 9/9 pass trên Postgres nhúng; chưa áp dụng vào stack Docker đang chạy). Tiếp theo: nhóm 2 (file đính kèm). Nhóm 3 (bảng `dr_requester_invites`) cần chủ dự án duyệt DDL trước khi tạo migration.
+Bước 4 (Intake Portal) đang triển khai theo change OpenSpec `add-intake-portal` (đã duyệt A1+B1+C1, ADR 0011). Nhóm 1 đã xong (guard, gửi yêu cầu, DTO, test cách ly: 9/9 pass trên Postgres nhúng; chưa áp dụng vào stack Docker đang chạy). Nhóm 2 đã xong (file đính kèm). Tiếp theo: trình DDL `dr_requester_invites` để duyệt (nhóm 3), rồi web `portal/` (nhóm 4). Nhóm 3 (bảng `dr_requester_invites`) cần chủ dự án duyệt DDL trước khi tạo migration.
 
 ## Bước tiếp theo
 1. Hoàn tất nhóm 1 và 2 trong `openspec/changes/add-intake-portal/tasks.md`.
@@ -29,7 +29,7 @@ Bước 4 (Intake Portal) đang triển khai theo change OpenSpec `add-intake-po
 | 1 | Spike Pipelines: approver theo role, quyền agent key, event field-level, request_changes, test hiện có | done: đọc code + smoke API thật (tạo công ty, pipeline 4 stage, case, transition, review approve → done đều 200) | | Pipelines đang experimental; kết quả chốt lại D1 |
 | 2 | Seed pipeline `dev-request` (12 stage; P1 dùng `triage`, `triage_review`, `done`, `cancelled`) + test state machine/gate | done: định nghĩa JSON + 8 test (pass, đột biến bị bắt) + script seed/verify 7/7 pass trên stack thật | | |
 | 3 | Migration #1: `dr_requests`, `dr_requesters`, `dr_attachments` (+ `dr_request_counters`) | done: `0355_devflow_requests.sql`, 11 test cách ly công ty pass trên Postgres nhúng; chưa áp dụng vào stack Docker | | Chủ dự án duyệt schema trước |
-| 4 | Intake Portal tiếng Việt, tách khỏi board: đăng nhập requester, form, upload, trạng thái ticket | doing (change `add-intake-portal`; nhóm 1 xong, còn file đính kèm, mời requester, web) | | UI board gần như chưa có i18n |
+| 4 | Intake Portal tiếng Việt, tách khỏi board: đăng nhập requester, form, upload, trạng thái ticket | doing (change `add-intake-portal`; nhóm 1 và 2 xong; còn mời requester, web) | | UI board gần như chưa có i18n |
 | 5 | Migration #2: `dr_agent_outputs`, `dr_overrides`, `dr_prompts` (hoặc dùng skills Paperclip) + `dr_embeddings` (pgvector) | todo | | Phụ thuộc kết quả spike |
 | 6 | Triage agent: prompt v1 có version, output JSON (Zod) + comment, `pendingSuggestion`; provider API/local theo config | todo | | Cần endpoint vLLM; chưa có adapter vLLM chuẩn |
 | 7 | Dedupe bằng pgvector + LLM xếp hạng (embedding API/local theo config) | todo | | Đổi provider = re-index |
@@ -70,5 +70,6 @@ Kết luận: **cần vá, không phải viết lại state machine**. Chưa th�
 P1 (đang chuẩn bị) → P2 BA Spec + Planner agent, gate còn lại, email mở rộng → P3 Dev agent (worktree/PR), QA agent, dashboard → P4 Governance đầy đủ, SSO, mở rộng toàn group.
 
 ## Gần đây
+- 2026-10-17: Portal nhóm 2 xong: upload file (multipart, tối đa 5 file, 10 MB, ảnh/PDF/Office/txt/csv, kiểm tra nội dung khớp loại, chỉ chủ sở hữu tải được); 13 test pass, đột biến bị bắt.
 - 2026-10-17: Áp dụng project-kit vào DevFlow; chuyển docs vào `openspec/kb/`; ghi D1–D8 thành ADR 0003–0009.
 - 2026-10-17: Hoàn tất P0: clone Paperclip (MIT) và Plane (AGPL, đặt ở `../_ref/plane`), viết kiến trúc, gap analysis, data model đề xuất, kế hoạch P1.

@@ -8,7 +8,7 @@
 
 ## 2. File đính kèm
 
-- [ ] 2.1 Upload qua portal với giới hạn size/MIME/số lượng, kiểm asset cùng công ty + test
+- [x] 2.1 Upload qua portal với giới hạn size/MIME/số lượng, kiểm asset cùng công ty + test
 
 ## 3. Mời requester (cần duyệt DDL `dr_requester_invites`)
 
