@@ -1,0 +1,237 @@
+{
+  "key": "dev-request",
+  "name": "Dev Request",
+  "description": "Software request lifecycle: Triage, BA Spec, Tech Plan, Dev, QA, Done. Agents propose; humans approve at every review stage.",
+  "enforceTransitions": true,
+  "stages": [
+    {
+      "key": "triage",
+      "name": "Triage",
+      "kind": "working",
+      "position": 100
+    },
+    {
+      "key": "triage_review",
+      "name": "Triage Review",
+      "kind": "review",
+      "position": 150,
+      "config": {
+        "requireApproval": true,
+        "approver": {
+          "kind": "any_human"
+        },
+        "approveToStageKey": "ba_spec",
+        "rejectToStageKey": "cancelled",
+        "requestChangesToStageKey": "triage",
+        "requireRejectReason": true,
+        "requireRequestChangesReason": true
+      }
+    },
+    {
+      "key": "ba_spec",
+      "name": "BA Spec",
+      "kind": "working",
+      "position": 200
+    },
+    {
+      "key": "ba_review",
+      "name": "BA Review",
+      "kind": "review",
+      "position": 250,
+      "config": {
+        "requireApproval": true,
+        "approver": {
+          "kind": "any_human"
+        },
+        "approveToStageKey": "tech_plan",
+        "rejectToStageKey": "cancelled",
+        "requestChangesToStageKey": "ba_spec",
+        "requireRejectReason": true,
+        "requireRequestChangesReason": true
+      }
+    },
+    {
+      "key": "tech_plan",
+      "name": "Tech Plan",
+      "kind": "working",
+      "position": 300
+    },
+    {
+      "key": "plan_review",
+      "name": "Plan Review",
+      "kind": "review",
+      "position": 350,
+      "config": {
+        "requireApproval": true,
+        "approver": {
+          "kind": "any_human"
+        },
+        "approveToStageKey": "dev",
+        "rejectToStageKey": "cancelled",
+        "requestChangesToStageKey": "tech_plan",
+        "requireRejectReason": true,
+        "requireRequestChangesReason": true
+      }
+    },
+    {
+      "key": "dev",
+      "name": "Dev",
+      "kind": "working",
+      "position": 400
+    },
+    {
+      "key": "code_review",
+      "name": "Code Review",
+      "kind": "review",
+      "position": 450,
+      "config": {
+        "requireApproval": true,
+        "approver": {
+          "kind": "any_human"
+        },
+        "approveToStageKey": "qa",
+        "rejectToStageKey": "cancelled",
+        "requestChangesToStageKey": "dev",
+        "requireRejectReason": true,
+        "requireRequestChangesReason": true
+      }
+    },
+    {
+      "key": "qa",
+      "name": "QA",
+      "kind": "working",
+      "position": 500
+    },
+    {
+      "key": "qa_signoff",
+      "name": "QA Sign-off",
+      "kind": "review",
+      "position": 550,
+      "config": {
+        "requireApproval": true,
+        "approver": {
+          "kind": "any_human"
+        },
+        "approveToStageKey": "done",
+        "rejectToStageKey": "cancelled",
+        "requestChangesToStageKey": "qa",
+        "requireRejectReason": true,
+        "requireRequestChangesReason": true
+      }
+    },
+    {
+      "key": "done",
+      "name": "Done",
+      "kind": "done",
+      "position": 900
+    },
+    {
+      "key": "cancelled",
+      "name": "Cancelled",
+      "kind": "cancelled",
+      "position": 1000
+    }
+  ],
+  "transitions": [
+    {
+      "fromStageKey": "triage",
+      "toStageKey": "triage_review",
+      "label": "Submit for review"
+    },
+    {
+      "fromStageKey": "triage_review",
+      "toStageKey": "ba_spec",
+      "label": "Approve"
+    },
+    {
+      "fromStageKey": "triage_review",
+      "toStageKey": "triage",
+      "label": "Request changes"
+    },
+    {
+      "fromStageKey": "triage_review",
+      "toStageKey": "cancelled",
+      "label": "Reject"
+    },
+    {
+      "fromStageKey": "ba_spec",
+      "toStageKey": "ba_review",
+      "label": "Submit for review"
+    },
+    {
+      "fromStageKey": "ba_review",
+      "toStageKey": "tech_plan",
+      "label": "Approve"
+    },
+    {
+      "fromStageKey": "ba_review",
+      "toStageKey": "ba_spec",
+      "label": "Request changes"
+    },
+    {
+      "fromStageKey": "ba_review",
+      "toStageKey": "cancelled",
+      "label": "Reject"
+    },
+    {
+      "fromStageKey": "tech_plan",
+      "toStageKey": "plan_review",
+      "label": "Submit for review"
+    },
+    {
+      "fromStageKey": "plan_review",
+      "toStageKey": "dev",
+      "label": "Approve"
+    },
+    {
+      "fromStageKey": "plan_review",
+      "toStageKey": "tech_plan",
+      "label": "Request changes"
+    },
+    {
+      "fromStageKey": "plan_review",
+      "toStageKey": "cancelled",
+      "label": "Reject"
+    },
+    {
+      "fromStageKey": "dev",
+      "toStageKey": "code_review",
+      "label": "Submit for review"
+    },
+    {
+      "fromStageKey": "code_review",
+      "toStageKey": "qa",
+      "label": "Approve"
+    },
+    {
+      "fromStageKey": "code_review",
+      "toStageKey": "dev",
+      "label": "Request changes"
+    },
+    {
+      "fromStageKey": "code_review",
+      "toStageKey": "cancelled",
+      "label": "Reject"
+    },
+    {
+      "fromStageKey": "qa",
+      "toStageKey": "qa_signoff",
+      "label": "Submit for review"
+    },
+    {
+      "fromStageKey": "qa_signoff",
+      "toStageKey": "done",
+      "label": "Approve"
+    },
+    {
+      "fromStageKey": "qa_signoff",
+      "toStageKey": "qa",
+      "label": "Request changes"
+    },
+    {
+      "fromStageKey": "qa_signoff",
+      "toStageKey": "cancelled",
+      "label": "Reject"
+    }
+  ]
+}

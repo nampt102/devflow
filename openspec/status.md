@@ -8,12 +8,12 @@
 **P1**: Intake Portal + Workflow Core + Triage agent, pilot 1 công ty. P0 (khám phá Paperclip/Plane, docs, khung project-kit) đã xong.
 
 ## Bước đang làm
-Bước 0 và 1 **đã xong** (xem bảng). Chờ chủ dự án chốt D1 dựa trên `kb/spike-pipelines.md` và duyệt trước khi sửa schema (bước 2–3).
+Bước 2 **đã xong** (xem bảng, `kb/dev-request-pipeline.md`). Chờ chủ dự án duyệt schema trước bước 3.
 
 ## Bước tiếp theo
-1. Chủ dự án xác nhận D1 (dùng Pipelines + bản vá trong mục kết quả spike) và danh sách bản vá ưu tiên.
-2. Bước 2: seed pipeline `dev-request` + test state machine/gate (chưa đổi schema).
-3. Bước 3: migration #1 (`CREATE EXTENSION vector` ở migration #2) **cần chủ dự án duyệt schema trước**.
+1. Chủ dự án duyệt `kb/data-model-proposed.md` (migration #1: `dr_requests`, `dr_requesters`, `dr_attachments`), kèm quyết định cho các bản vá (role approver, REQ-n, field-diff...) sẽ làm ở đâu.
+2. Bước 3: migration #1 + test cách ly công ty (cần duyệt schema).
+3. Song song được sau bước 3: bước 4 (portal) và bước 5.
 
 ## Việc bị chặn / chờ quyết định
 - Còn thiếu (chưa chặn bước 0–2): model embedding, endpoint/model vLLM, thông tin SMTP (chủ dự án tự tạo/cập nhật env khi test).
@@ -27,7 +27,7 @@ Bước 0 và 1 **đã xong** (xem bảng). Chờ chủ dự án chốt D1 dựa
 |---|---|---|---|---|
 | 0 | Dựng môi trường Docker (Postgres + pgvector), chạy Paperclip, bật `enablePipelines`, chạy tutorial | done: stack chạy trên Docker Desktop (server :3100, migrations OK, pgvector 0.8.7 có sẵn; extension chưa tạo) | | Chưa rõ Docker của repo hỗ trợ pgvector; có thể cần compose riêng |
 | 1 | Spike Pipelines: approver theo role, quyền agent key, event field-level, request_changes, test hiện có | done: đọc code + smoke API thật (tạo công ty, pipeline 4 stage, case, transition, review approve → done đều 200) | | Pipelines đang experimental; kết quả chốt lại D1 |
-| 2 | Seed pipeline `dev-request` (12 stage; P1 dùng `triage`, `triage_review`, `done`, `cancelled`) + test state machine/gate | todo | | |
+| 2 | Seed pipeline `dev-request` (12 stage; P1 dùng `triage`, `triage_review`, `done`, `cancelled`) + test state machine/gate | done: định nghĩa JSON + 8 test (pass, đột biến bị bắt) + script seed/verify 7/7 pass trên stack thật | | |
 | 3 | Migration #1: `dr_requests`, `dr_requesters`, `dr_attachments` | todo | | Chủ dự án duyệt schema trước |
 | 4 | Intake Portal tiếng Việt, tách khỏi board: đăng nhập requester, form, upload, trạng thái ticket | todo | | UI board gần như chưa có i18n |
 | 5 | Migration #2: `dr_agent_outputs`, `dr_overrides`, `dr_prompts` (hoặc dùng skills Paperclip) + `dr_embeddings` (pgvector) | todo | | Phụ thuộc kết quả spike |

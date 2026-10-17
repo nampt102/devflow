@@ -1,7 +1,7 @@
 # 0003. Dùng Pipelines của Paperclip làm lõi workflow (D1)
 
 - **Ngày:** 2026-10-17
-- **Trạng thái:** đã chốt (xác nhận lại sau spike bước 1)
+- **Trạng thái:** đã chốt (xác nhận sau spike bước 1, 2026-10-17: dùng Pipelines và vá theo `kb/spike-pipelines.md`)
 - **Người quyết định:** chủ dự án (Technical Lead)
 
 ## Bối cảnh
