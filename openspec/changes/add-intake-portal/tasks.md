@@ -1,10 +1,10 @@
 ## 1. Nền tảng (không đổi schema)
 
-- [ ] 1.1 Build lại image từ HEAD, xác nhận migration 0355 đã áp dụng (bảng `dr_*` có trong DB)
-- [ ] 1.2 Guard `assertRequester` + test (user không phải requester, requester bị vô hiệu, nhiều công ty)
-- [ ] 1.3 Service portal: gửi yêu cầu (cấp số, `ingestCase`, ghi `dr_requests`, activity, bù trừ khi lỗi) + test
-- [ ] 1.4 API danh sách và chi tiết với DTO allowlist + test không rò rỉ + nhãn trạng thái tiếng Việt
-- [ ] 1.5 Test cách ly: requester A/B, board route, user không phải requester
+- [x] 1.1 Build lại image từ HEAD, xác nhận migration 0355 đã áp dụng (bảng `dr_*` có trong DB)
+- [x] 1.2 Guard `assertRequester` + test (user không phải requester, requester bị vô hiệu, nhiều công ty)
+- [x] 1.3 Service portal: gửi yêu cầu (cấp số, `ingestCase`, ghi `dr_requests`, activity, bù trừ khi lỗi) + test
+- [x] 1.4 API danh sách và chi tiết với DTO allowlist + test không rò rỉ + nhãn trạng thái tiếng Việt
+- [x] 1.5 Test cách ly: requester A/B, board route, user không phải requester
 
 ## 2. File đính kèm
 
