@@ -74,3 +74,7 @@ Hệ thống SHALL cho phép người có link mời hợp lệ tạo tài kho�
 #### Scenario: Thử quá nhiều lần
 - **WHEN** một địa chỉ client gửi quá giới hạn số lần thử đăng ký hoặc nhận lời mời trong một phút
 - **THEN** hệ thống trả 429
+
+#### Scenario: Người đã dùng link mở lại link
+- **WHEN** chính người đã dùng một link (kể cả vừa đăng ký xong) gọi nhận lời mời lại với link đó và vẫn còn là requester hoạt động
+- **THEN** hệ thống trả kết quả requester của họ, không tạo thêm bản ghi, còn người khác vẫn bị từ chối

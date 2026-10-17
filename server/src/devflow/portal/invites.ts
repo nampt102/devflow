@@ -138,6 +138,15 @@ export function portalInvites(db: Db, deps: { hashPassword: (password: string) =
           .from(drRequesterInvites)
           .where(eq(drRequesterInvites.tokenHash, hashInviteToken(token)));
         if (!invite) throw notFound("Invalid invitation link");
+        // The person who already used this link (e.g. through register, or reopening the page) is not an
+        // error: report the requester they became. Anyone else still gets 410 below.
+        if (invite.acceptedAt && invite.acceptedByUserId === userId) {
+          const [mine] = await tx
+            .select({ id: drRequesters.id })
+            .from(drRequesters)
+            .where(and(eq(drRequesters.companyId, invite.companyId), eq(drRequesters.userId, userId), isNull(drRequesters.deactivatedAt)));
+          if (mine) return { companyId: invite.companyId, requesterId: mine.id };
+        }
         assertUsable(invite);
 
         const [existing] = await tx

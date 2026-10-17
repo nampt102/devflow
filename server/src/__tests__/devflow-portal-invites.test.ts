@@ -166,6 +166,23 @@ describeEmbeddedPostgres("devflow portal invitations", () => {
     expect((await accept(session(await seedUser()), token)).status).toBe(410); // later attempt
   });
 
+  it("lets the person who used a link open it again, but not anyone else", async () => {
+    const company = await seedCompany("Idempotent Co");
+    const { token } = await newInvite(company.id);
+    const owner = await seedUser();
+    const first = await accept(session(owner), token);
+    expect(first.status).toBe(200);
+    const again = await accept(session(owner), token);
+    expect(again.status).toBe(200);
+    expect(again.body).toEqual(first.body); // same requester, nothing created twice
+    expect(await db.select().from(drRequesters).where(eq(drRequesters.companyId, company.id))).toHaveLength(1);
+    expect((await accept(session(await seedUser()), token)).status).toBe(410);
+
+    // a deactivated requester gets no free pass from an old link
+    await db.update(drRequesters).set({ deactivatedAt: new Date() }).where(eq(drRequesters.userId, owner));
+    expect((await accept(session(owner), token)).status).toBe(410);
+  });
+
   it("refuses expired, revoked, unknown, malformed links and anonymous callers", async () => {
     const company = await seedCompany("Refuse Co");
     const user = await seedUser();

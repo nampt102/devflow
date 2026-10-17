@@ -121,8 +121,12 @@ describeEmbeddedPostgres("devflow portal registration through an invitation", ()
     const signedIn = await auth.api.signInEmail({ body: { email: "nguoi.dung@example.test", password: credentials.password as string } });
     expect(signedIn.user.id).toBe(user.id);
     expect((await request(app(session(user.id))).get("/api/portal/me")).body.companyId).toBe(company.id);
-    // the link cannot be reused
+    // the link cannot be reused by someone else...
     expect((await register(token, body())).status).toBe(410);
+    // ...but the portal page accepts it right after registering: the new user gets their own result back
+    const accepted = await request(app(session(user.id))).post(`/api/portal/invites/${token}/accept`).send({});
+    expect(accepted.status).toBe(200);
+    expect(accepted.body.requesterId).toBe(requesters[0].id);
   });
 
   it("answers 409 and leaves the link untouched when the email already has an account", async () => {
