@@ -12,14 +12,14 @@ Bước 4 (Intake Portal) đang triển khai theo change OpenSpec `add-intake-po
 
 ## Bước tiếp theo
 1. Chủ dự án quyết định: có bật `PAPERCLIP_AUTH_DISABLE_SIGN_UP=true` cho môi trường thật không (điều kiện trong `kb/admin-accounts.md`), và có cần màn hình quản trị / màn hình nhân viên tạo link mời hay không.
-2. Bước 5: migration #2 (`dr_agent_outputs`, `dr_overrides`, `dr_prompts`, `dr_embeddings`): cần duyệt schema, số chiều vector và model embedding (còn thiếu).
-3. Bước 6 cần endpoint/model vLLM và model embedding; bước 7b cần thông tin SMTP.
+2. Bước 6 (Triage agent): cần endpoint/model vLLM hoặc API và model embedding (chưa có). Làm được trước phần không phụ thuộc model: file prompt có version (`server/src/devflow/prompts/`), schema đầu ra (Zod), LLM giả để test, coi nội dung yêu cầu là dữ liệu không tin cậy (xem `kb/ref-autonomous-company.md`).
+3. Bước 7 (dedupe) dùng `dr_embeddings` nên phải kiểm bảng tồn tại và lùi về pg_trgm khi thiếu pgvector; bước 7b cần thông tin SMTP.
 
 ## Việc bị chặn / chờ quyết định
 - Còn thiếu (chưa chặn bước 0–2): model embedding, endpoint/model vLLM, thông tin SMTP (chủ dự án tự tạo/cập nhật env khi test).
 - Telemetry của Paperclip (mặc định bật, gửi về endpoint của Paperclip): **để mở**, chưa quyết định tắt hay giữ; cần tìm cách tắt trong code trước khi quyết.
 - Agent chưa được thử ở runtime (chưa có agent/adapter, chưa thử vLLM qua opencode_local/pi_local/http); quyền agent trên pipeline mới xác nhận qua code và test, chưa qua runtime.
-- Số chiều vector và model embedding: chốt khi làm migration (bước 3/5).
+- Model embedding: chưa chọn; số chiều vector không còn là điều kiện chặn vì `dr_embeddings` không cố định số chiều (chỉ mục HNSW tạo riêng cho từng model sau khi chọn, ADR 0013).
 
 ## Bảng tiến độ P1
 
@@ -30,7 +30,7 @@ Bước 4 (Intake Portal) đang triển khai theo change OpenSpec `add-intake-po
 | 2 | Seed pipeline `dev-request` (12 stage; P1 dùng `triage`, `triage_review`, `done`, `cancelled`) + test state machine/gate | done: định nghĩa JSON + 8 test (pass, đột biến bị bắt) + script seed/verify 7/7 pass trên stack thật | | |
 | 3 | Migration #1: `dr_requests`, `dr_requesters`, `dr_attachments` (+ `dr_request_counters`) | done: `0355_devflow_requests.sql`, 11 test cách ly công ty pass trên Postgres nhúng; chưa áp dụng vào stack Docker | | Chủ dự án duyệt schema trước |
 | 4 | Intake Portal tiếng Việt, tách khỏi board: đăng nhập requester, form, upload, trạng thái ticket | done (change `add-intake-portal`, gồm task 3.5): API, tệp, lời mời, web `portal/`; smoke trên Docker và trình duyệt pass | `add-intake-portal` | Chưa có màn hình nhân viên tạo link; đăng ký công khai vẫn mở (ADR 0012) |
-| 5 | Migration #2: `dr_agent_outputs`, `dr_overrides`, `dr_prompts` (hoặc dùng skills Paperclip) + `dr_embeddings` (pgvector) | todo | | Phụ thuộc kết quả spike |
+| 5 | Migration #2 (`0357_devflow_agent_outputs`): `dr_agent_outputs`, `dr_overrides`, `dr_embeddings` (tạo có điều kiện khi có pgvector); bỏ `dr_prompts` (prompt là file có version) | done: 47 test trên Postgres nhúng và 5 test trên pgvector thật pass; 6 đột biến bị bắt; ADR 0013 | | Chưa áp dụng vào stack Docker đang chạy (cần build lại image) |
 | 6 | Triage agent: prompt v1 có version, output JSON (Zod) + comment, `pendingSuggestion`; provider API/local theo config | todo | | Cần endpoint vLLM; chưa có adapter vLLM chuẩn |
 | 7 | Dedupe bằng pgvector + LLM xếp hạng (embedding API/local theo config) | todo | | Đổi provider = re-index |
 | 7b | Email requester khi đổi trạng thái (SMTP qua env) | todo | | SMTP giả khi test tự động |
@@ -70,6 +70,7 @@ Kết luận: **cần vá, không phải viết lại state machine**. Chưa th�
 P1 (đang chuẩn bị) → P2 BA Spec + Planner agent, gate còn lại, email mở rộng → P3 Dev agent (worktree/PR), QA agent, dashboard → P4 Governance đầy đủ, SSO, mở rộng toàn group.
 
 ## Gần đây
+- 2026-10-17: Bước 5 xong: migration 0357 (`dr_agent_outputs`, `dr_overrides`, `dr_embeddings`); Postgres nhúng không có pgvector nên embeddings tạo trong khối `DO` có điều kiện; bỏ `dr_prompts`; kiểm chứng trên Postgres nhúng (migration áp dụng sạch khi không có pgvector) và trên DB pgvector thật; 6 đột biến bị bắt (ADR 0013).
 - 2026-10-17: Đọc sâu repo tham khảo Autonomous-Company (MIT, chỉ lấy ý tưởng): ghi chú ở `kb/ref-autonomous-company.md`. Đáng áp dụng nhất cho bước 6: khung prompt có cấu trúc kèm bước tự phản biện, coi nội dung yêu cầu là dữ liệu không tin cậy, LLM giả để test agent; không áp dụng triết lý tự trị.
 - 2026-10-17: Task 3.5 xong (phương án X): `POST /api/admin/users` và `reset-password` cho instance admin (mật khẩu sinh một lần, reset xóa phiên); 8 test mới, 8 đột biến bị bắt; kiểm chứng HTTP trên stack thật khi đóng đăng ký: 15/15 pass (đăng ký công khai bị từ chối, admin tạo nhân viên có quyền board, reset, requester đăng ký qua lời mời); đã trả stack về trạng thái mở. Lưu ý: giới hạn đăng nhập có sẵn của better-auth làm kịch bản kiểm chứng gặp 429.
 - 2026-10-17: Kiểm tra task 3.4 trên trình duyệt thật: tìm ra lỗi "đăng ký xong vẫn báo link đã dùng", sửa bằng accept idempotent cho đúng người dùng link (30 test server pass, đột biến bị bắt), kiểm tra lại: đăng ký mới, email có sẵn, mở lại link, cách ly giữa user đều đúng.

@@ -255,3 +255,5 @@ export { executionWorkspaceRepositoryAccess } from "./execution_workspace_reposi
 export * from "./fast_responses.js";
 export { drRequesters, drRequestCounters, drRequests, drAttachments } from "./dr_requests.js";
 export { drRequesterInvites } from "./dr_requester_invites.js";
+export { drAgentOutputs, drOverrides } from "./dr_agent_outputs.js";
+export { drEmbeddings, pgVector } from "./dr_embeddings.js";

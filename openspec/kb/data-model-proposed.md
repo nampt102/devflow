@@ -121,8 +121,16 @@ Dẫn xuất từ `pipeline_case_events` (thời điểm vào/ra stage) cho dash
 - `dr_requester_invites`: `id`, `company_id`, `token_hash` (unique, SHA-256), `label`, `created_by_user_id`, `expires_at`, `accepted_at`, `accepted_by_user_id` (FK `user`, set null), `revoked_at`, `created_at`. Không có FK tới `dr_requesters` và không có CHECK: DDL đã trình có `accepted_requester_id` và CHECK `accepted_at => accepted_by_user_id`, nhưng chúng xung đột với `ON DELETE SET NULL` và sẽ chặn việc xóa user/requester nên đã bỏ.
 - Kiểm chứng: `server/src/__tests__/devflow-portal-invites.test.ts`.
 
-## Migration #2: phát hiện trước khi thiết kế (2026-10-17, chưa có migration)
+## Migration #2 (`0357_devflow_agent_outputs`, 2026-10-17): phát hiện trước khi thiết kế
 - **Postgres nhúng không có pgvector.** Trong image không có `vector.control` ở đâu cả; gói `@embedded-postgres/linux-x64` chỉ có các extension contrib. Postgres nhúng là DB của mọi test và của `pnpm dev` khi không đặt `DATABASE_URL`. Một `CREATE EXTENSION vector` không điều kiện trong migration sẽ làm hỏng mọi test và cài đặt mặc định. DB Docker (`pgvector/pgvector:pg17`) có extension nhưng chưa được tạo (chỉ có plpgsql, pg_trgm, fuzzystrmatch).
 - **Phiên bản prompt không có sẵn trong Paperclip.** `agent_instruction_revisions` là di sản, đã bị thay bằng "persistent agent files" (`doc/agent-instruction-revisions.md`): chỉnh sửa mới không tạo bản ghi revision.
 - `pipeline-case-outputs` của Paperclip chỉ là read model gom tài liệu, tệp và work product của issue liên kết; không phải đầu ra có cấu trúc theo stage, nên `dr_agent_outputs` không trùng.
 - drizzle-orm có kiểu `vector` nhưng bắt buộc khai báo số chiều; muốn không cố định số chiều phải dùng `customType`.
+
+
+## Migration #2 (đã làm): khác với đề xuất ban đầu
+- `dr_prompts` **bỏ**: prompt là file có version trong repo; `dr_agent_outputs` ghi `prompt_role`, `prompt_version`, `prompt_hash` (ADR 0013).
+- `dr_agent_outputs`: khóa ngoại kép tới case; `agent_id`/`run_id` set null khi xóa; một đề xuất `proposed` mỗi stage (unique có điều kiện); `data` là object ≤ 64 KB; `accepted`/`overridden` bắt buộc ghi người và thời điểm quyết định; chỉ mục `(company_id, prompt_role, prompt_version)` cho tỷ lệ override theo phiên bản.
+- `dr_overrides`: một dòng mỗi `(output_id, field)`, chỉ ghi khi giá trị thật sự đổi (CHECK `is distinct from`, cho phép agent không đề xuất gì hoặc người xóa giá trị).
+- `dr_embeddings`: **chỉ tồn tại nơi có pgvector** (khối `DO` kiểm `pg_available_extensions`); cột `vector` không cố định số chiều, unique `(case_id, kind, model)`, CHECK `vector_dims(embedding) = dimensions`; P1 chỉ `kind = 'request'`; chỉ mục HNSW tạo riêng cho từng model.
+- Kiểm chứng: `packages/db/src/dr-outputs-migration.test.ts` (9 ca trên Postgres nhúng, gồm đường không có pgvector và truy vấn tỷ lệ override) và `dr-embeddings-pgvector.test.ts` (5 ca trên DB pgvector thật, chạy khi đặt `DEVFLOW_PGVECTOR_URL`). Chưa thử set null với agent thật.

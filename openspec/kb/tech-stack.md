@@ -41,3 +41,7 @@ curl http://localhost:3100/api/health
 - Stack đang chạy dùng image build từ `git archive HEAD` nên chỉ chứa code đã commit; sau khi đổi code phải commit rồi build lại image và `docker compose ... up -d` (migration tự áp dụng khi server khởi động).
 - `git archive HEAD` không gồm thay đổi chưa commit; dùng `git archive $(git stash create)` để gồm cả thay đổi.
 - Postgres `pgvector/pgvector:pg17` có extension `vector` 0.8.7 (chưa `CREATE EXTENSION`; sẽ làm trong migration).
+
+
+## Test cần pgvector
+Postgres nhúng của test không có pgvector. Test `packages/db/src/dr-embeddings-pgvector.test.ts` chỉ chạy khi đặt `DEVFLOW_PGVECTOR_URL` tới một server có pgvector (kết nối quản trị, ví dụ DB của compose: `postgres://paperclip:paperclip@docker-db-1:5432/postgres` khi chạy trong mạng `docker_default`, hoặc `localhost:5432` từ host). Test tạo một DB tạm, áp dụng toàn bộ migration rồi xóa DB; bỏ qua nếu thiếu biến.
