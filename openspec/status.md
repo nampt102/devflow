@@ -33,7 +33,7 @@ Bước 4 (Intake Portal) đang triển khai theo change OpenSpec `add-intake-po
 | 5 | Migration #2 (`0357_devflow_agent_outputs`): `dr_agent_outputs`, `dr_overrides`, `dr_embeddings` (tạo có điều kiện khi có pgvector); bỏ `dr_prompts` (prompt là file có version) | done: 47 test trên Postgres nhúng và 5 test trên pgvector thật pass; 6 đột biến bị bắt; ADR 0013 | | Đã áp dụng vào stack Docker qua server khởi động (extension vector 0.8.7 được tạo, 3 bảng có mặt) |
 | 6 | Triage agent: prompt v1 có version, output JSON (Zod) + comment; provider API/local theo config | phần không phụ thuộc model done: client LLM, prompt v1 (hash ghim), schema strict, cờ quy tắc, worker (backoff, breaker, khóa advisory), agent idle để ghi chi phí; 44 test pass, 5 đột biến bị bắt; ADR 0014. **Chưa chạy với model thật** | | Cần endpoint/model; định nghĩa ưu tiên/độ khó là tạm thời; không dùng `pendingSuggestion` ở P1 |
 | 7 | Dedupe bằng pgvector + LLM xếp hạng (embedding API/local theo config) | done (chưa chạy với model/embedding thật): trigram luôn bật + vector khi có cấu hình, prompt v2, backfill; 65 test pass (gồm pgvector thật), 6 đột biến bị bắt; ADR 0015 | | Ngưỡng 0.3/0.65 chưa hiệu chỉnh; đổi provider = re-index |
-| 7b | Email requester khi đổi trạng thái (SMTP qua env) | todo | | SMTP giả khi test tự động |
+| 7b | Email requester khi đổi trạng thái (SMTP qua env) | done (chưa gửi thử qua SMTP thật): migration 0358 `dr_email_outbox`, worker xếp hàng + gửi bằng nodemailer, SMTP giả khi test; 18 test pass, 8 đột biến bị bắt; ADR 0016 | | Chủ dự án sẽ tạo SMTP Gmail (mật khẩu ứng dụng); chưa có giới hạn tần suất theo người nhận |
 | 8 | Màn hình duyệt triage cho Lead/BA (hàng chờ, sửa field, approve/reject/request_changes, snooze/duplicate), ghi override; port ngữ nghĩa/UI intake từ Plane | todo | | Port từ Plane ở mức M–L |
 | 9 | Số liệu cơ bản: tỷ lệ override theo field, thời gian ở triage | todo | | |
 | 10 | Pilot hardening: log lỗi agent, ngân sách token, tài liệu vận hành | todo | | Chủ dự án tự chọn công ty và tự chạy test |
@@ -56,6 +56,7 @@ Thứ tự: 0 → 1 → 2 → 3 → {4, 5} → 6 → 7 → 7b → 8 → 9 → 10
 - 0013 Đầu ra agent, override, embedding: prompt dạng file, embedding tạo có điều kiện
 - 0014 Triage agent: client LLM mỏng, worker quét định kỳ, không dùng pendingSuggestion ở P1
 - 0015 Dedupe: trigram luôn bật, vector khi có cấu hình, prompt v2
+- 0016 Email trạng thái: outbox theo sự kiện, nodemailer
 - D7 (không phải ADR): chủ dự án tự chọn công ty pilot và tự chạy test; Claude bàn giao code, test tự động, hướng dẫn chạy.
 
 ## Kết quả spike Pipelines (đọc code + smoke API; chi tiết `kb/spike-pipelines.md`)
@@ -74,6 +75,7 @@ Kết luận: **cần vá, không phải viết lại state machine**. Chưa th�
 P1 (đang chuẩn bị) → P2 BA Spec + Planner agent, gate còn lại, email mở rộng → P3 Dev agent (worktree/PR), QA agent, dashboard → P4 Governance đầy đủ, SSO, mở rộng toàn group.
 
 ## Gần đây
+- 2026-10-17: Bước 7b xong: migration 0358 `dr_email_outbox`, `devflow/email/` (mailer nodemailer, soạn thư tiếng Việt, worker xếp hàng + gửi với backoff, SMTP giả), dependency `nodemailer@10.1.2` (lockfile +19 dòng); 18 test (12 server + 6 db) pass, 8 đột biến bị bắt. Chưa thử Gmail thật; image Docker chưa build lại (ADR 0016, `kb/email-notifications.md`).
 - 2026-10-17: Chạy thật Triage với claude-haiku-5-5 (20 yêu cầu mẫu tổng hợp): 21/21 đề xuất hợp lệ, dedupe trigram bắt đúng 3 cặp trùng, 3 mẫu injection bị bỏ qua. Lỗi tìm được và sửa: model từ chối `temperature` (nay tùy chọn), quy tắc cờ nhầm "sập"/SAP, "lượng"/"lương". Chi tiết cuối `kb/triage-agent.md`. Image chạy hiện tại chưa có bản sửa quy tắc cờ (cần build lại).
 - 2026-10-17: Bước 7 xong: `dedupe.ts` (pg_trgm bỏ dấu + pgvector có điều kiện), `embed-client.ts`, prompt v2, backfill embedding trong worker, `DEVFLOW_LLM_EXTRA_BODY` + cắt `<think>` cho Qwen3/vLLM; 65 test pass (kể cả trên pgvector thật), 6 đột biến bị bắt. Chưa chạy với vLLM/TEI thật; chưa build lại image Docker (ADR 0015, `kb/triage-agent.md`).
 - 2026-10-17: Bước 6 (phần không phụ thuộc model) xong: `server/src/devflow/prompts/triage.v1.ts`, `devflow/triage/` (schema Zod strict, quy tắc cờ, client, LLM giả, service, worker), 44 test (25 đơn vị + 19 trên Postgres nhúng) pass, 5 đột biến bị bắt. Phát hiện khi làm: unique index một `proposed` mỗi stage là cơ chế chống đua (supersede trong giao dịch sẽ làm mất cả hai output khi hai worker chạy song song). Agent idle xác nhận bằng đọc code, chưa chạy scheduler thật. Chưa chạy với model thật; chưa build lại image Docker (ADR 0014, `kb/triage-agent.md`).

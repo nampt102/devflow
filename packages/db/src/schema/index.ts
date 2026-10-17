@@ -257,3 +257,4 @@ export { drRequesters, drRequestCounters, drRequests, drAttachments } from "./dr
 export { drRequesterInvites } from "./dr_requester_invites.js";
 export { drAgentOutputs, drOverrides } from "./dr_agent_outputs.js";
 export { drEmbeddings, pgVector } from "./dr_embeddings.js";
+export { drEmailOutbox } from "./dr_email_outbox.js";
