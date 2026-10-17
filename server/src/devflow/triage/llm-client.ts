@@ -22,6 +22,8 @@ export interface LlmConfig {
   maxOutputTokens: number;
   // json_schema support differs between vLLM versions and providers (unverified), so it is opt-in.
   responseFormat: "none" | "json_object" | "json_schema";
+  // merged into the request body, e.g. {"chat_template_kwargs":{"enable_thinking":false}} for Qwen3 on vLLM
+  extraBody?: Record<string, unknown>;
 }
 
 export interface LlmResult {
@@ -41,7 +43,14 @@ export function loadLlmConfig(env: NodeJS.ProcessEnv): LlmConfig | null {
   if (format !== "none" && format !== "json_object" && format !== "json_schema") {
     throw new Error("DEVFLOW_LLM_RESPONSE_FORMAT must be none, json_object or json_schema");
   }
+  let extraBody: Record<string, unknown> | undefined;
+  if (env.DEVFLOW_LLM_EXTRA_BODY?.trim()) {
+    const parsed = JSON.parse(env.DEVFLOW_LLM_EXTRA_BODY);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("DEVFLOW_LLM_EXTRA_BODY must be a JSON object");
+    extraBody = parsed;
+  }
   return {
+    extraBody,
     baseUrl: baseUrl.replace(/\/+$/, ""),
     apiKey: env.DEVFLOW_LLM_API_KEY?.trim() || undefined,
     model,
@@ -59,6 +68,14 @@ function retryAfterMs(header: string | null): number | undefined {
   return Number.isNaN(at) ? undefined : Math.min(Math.max(at - Date.now(), 0), 3_600_000);
 }
 
+/** Drop a leading <think>…</think> block (reasoning models without a server-side parser). null = block never closed. */
+export function stripThinking(text: string): string | null {
+  const t = text.trimStart();
+  if (!/^<think>/i.test(t)) return text;
+  const end = t.search(/<\/think>/i);
+  return end === -1 ? null : t.slice(end + "</think>".length).trim();
+}
+
 export async function chatJson(
   config: LlmConfig,
   messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
@@ -66,6 +83,7 @@ export async function chatJson(
   fetchImpl: typeof fetch = fetch,
 ): Promise<LlmResult> {
   const body: Record<string, unknown> = {
+    ...config.extraBody,
     model: config.model,
     messages,
     temperature: 0,
@@ -102,9 +120,12 @@ export async function chatJson(
     throw new LlmError("empty");
   }
   const choice = json?.choices?.[0];
-  const content = choice?.message?.content;
-  if (typeof content !== "string" || content.trim() === "") throw new LlmError("empty");
+  const raw = choice?.message?.content;
+  if (typeof raw !== "string" || raw.trim() === "") throw new LlmError("empty");
   if (choice.finish_reason === "length") throw new LlmError("truncated");
+  const content = stripThinking(raw);
+  if (content === null) throw new LlmError("truncated");
+  if (content === "") throw new LlmError("empty");
   return {
     content,
     model: typeof json.model === "string" ? json.model : config.model,

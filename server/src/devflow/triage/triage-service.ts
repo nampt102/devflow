@@ -14,8 +14,10 @@ import { HttpError } from "../../errors.js";
 import { logActivity } from "../../services/activity-log.js";
 import { logger } from "../../middleware/logger.js";
 import { z } from "zod";
-import { PROMPT_HASH, PROMPT_ROLE, PROMPT_VERSION, SYSTEM_PROMPT, buildUserMessage, newBoundary } from "../prompts/triage.v1.js";
+import { PROMPT_HASH, PROMPT_ROLE, PROMPT_VERSION, SYSTEM_PROMPT, buildUserMessage, newBoundary } from "../prompts/triage.v2.js";
 import { chatJson, LlmError, type LlmConfig, type LlmErrorKind } from "./llm-client.js";
+import { contentHash, dedupeService, loadDedupeConfig, type DedupeConfig } from "./dedupe.js";
+import { embedText, type EmbedConfig } from "./embed-client.js";
 import { ruleFlags } from "./rules.js";
 import { parseTriageOutput, triageOutputSchema, TriageOutputError, REQUIRES_HUMAN_REASONS } from "./schema.js";
 
@@ -33,6 +35,10 @@ export class TriageFailure extends Error {
   }
 }
 
+/** The text that is embedded: title, description and impact, sanitized and capped by the embed client. */
+export const embedSource = (title: string, description: string, impact: string | null) =>
+  sanitizeUntrusted([title, description, impact].filter(Boolean).join("\n\n"), caps.title + caps.description + caps.impact);
+
 /** Untrusted text: drop control characters, defuse boundary lookalikes, cap the length. */
 export function sanitizeUntrusted(text: string, max: number): string {
   return text
@@ -46,8 +52,9 @@ type PipelineTransitions = { transitionCase: (input: any) => Promise<unknown> };
 
 export function triageService(
   db: Db,
-  deps: { pipelines: PipelineTransitions; cost: CostService; llm: LlmConfig; fetchImpl?: typeof fetch },
+  deps: { pipelines: PipelineTransitions; cost: CostService; llm: LlmConfig; embed?: EmbedConfig | null; dedupe?: DedupeConfig; fetchImpl?: typeof fetch },
 ) {
+  const dedupe = dedupeService(db, deps.dedupe ?? loadDedupeConfig({}));
   /** One idle agent row per company, only to attribute cost and budget; heartbeat stays disabled. */
   async function ensureTriageAgent(companyId: string): Promise<string> {
     const find = (d: Db) =>
@@ -78,14 +85,14 @@ export function triageService(
     });
   }
 
-  async function recordUsage(companyId: string, agentId: string, r: { model: string; inputTokens: number; outputTokens: number; requestId: string | null }) {
+  async function recordUsage(companyId: string, agentId: string, r: { model: string; inputTokens: number; outputTokens: number; requestId: string | null }, billingCode = "devflow:triage") {
     try {
       await deps.cost.createEvent(companyId, {
         agentId,
         provider: "openai-compatible",
         billingType: "unknown",
         costStatus: "unpriced", // no price table for the configured model: tokens are real, cost is not invented
-        billingCode: "devflow:triage",
+        billingCode,
         model: r.model,
         inputTokens: r.inputTokens,
         outputTokens: r.outputTokens,
@@ -96,6 +103,36 @@ export function triageService(
     } catch (err) {
       logger.warn({ err, companyId }, "devflow triage: cost event not recorded");
     }
+  }
+
+  /** Embed one request and store the vector. Returns the vector, or null when embedding is off/failed (never throws). */
+  async function embedRequest(companyId: string, agentId: string, caseId: string, text: string): Promise<number[] | null> {
+    if (!deps.embed) return null;
+    try {
+      if (!(await dedupe.hasVectorTable())) return null; // no pgvector: do not pay for vectors that cannot be stored
+      const { vector, tokens } = await embedText(deps.embed, text, deps.fetchImpl);
+      await dedupe.saveEmbedding(companyId, caseId, deps.embed.model, vector, contentHash(text.slice(0, deps.embed.maxChars)));
+      await recordUsage(companyId, agentId, { model: deps.embed.model, inputTokens: tokens, outputTokens: 0, requestId: null }, "devflow:embed");
+      return vector;
+    } catch (err) {
+      const kind = err instanceof LlmError ? err.kind : "unexpected";
+      logger.warn({ kind, caseId }, "devflow triage: embedding failed");
+      await recordFailure(companyId, caseId, "agent.embed_failed", kind, 1).catch(() => {});
+      return null;
+    }
+  }
+
+  /** Backfill: embed requests that have no vector for the configured model. Stops at the first failure. */
+  async function embedPending(limit: number): Promise<number> {
+    if (!deps.embed) return 0;
+    let done = 0;
+    for (const r of await dedupe.missingEmbeddings(deps.embed.model, limit)) {
+      const agentId = await ensureTriageAgent(r.company_id);
+      const text = embedSource(r.title, r.description, r.business_impact);
+      if (!(await embedRequest(r.company_id, agentId, r.case_id, text))) break;
+      done += 1;
+    }
+    return done;
   }
 
   /** Cases waiting in `triage` with no live proposal (also re-picks cases sent back by request_changes). */
@@ -159,7 +196,23 @@ export function triageService(
       .where(and(eq(drAttachments.caseId, caseId), eq(drAttachments.companyId, companyId)))
       .limit(caps.files);
     const attachmentNames = files.map((f) => sanitizeUntrusted(f.name ?? "(no name)", caps.fileName));
-    const candidateCaseKeys: string[] = []; // filled by step 7 (dedupe)
+
+    // Duplicate candidates: best effort, any failure means an empty list.
+    const vector = await embedRequest(companyId, agentId, caseId, embedSource(row.title, row.description, row.businessImpact));
+    let found: Awaited<ReturnType<typeof dedupe.findCandidates>> = { candidates: [], mode: "trigram" };
+    try {
+      found = await dedupe.findCandidates({
+        companyId,
+        caseId,
+        title: row.title,
+        description: row.description,
+        model: deps.embed?.model,
+        vector,
+      });
+    } catch (err) {
+      logger.warn({ err, caseId }, "devflow triage: candidate search failed, continuing without candidates");
+    }
+    const candidateCaseKeys = found.candidates.map((c) => c.caseKey);
 
     const messages: Array<{ role: "system" | "user"; content: string }> = [
       { role: "system", content: SYSTEM_PROMPT },
@@ -171,7 +224,13 @@ export function triageService(
           description: sanitizeUntrusted(row.description, caps.description),
           businessImpact: row.businessImpact ? sanitizeUntrusted(row.businessImpact, caps.impact) : null,
           attachmentNames,
-          candidateCaseKeys,
+          existing: found.candidates.map((c) => ({
+            caseKey: c.caseKey,
+            title: sanitizeUntrusted(c.title, 200),
+            stageKey: c.stageKey,
+            snippet: sanitizeUntrusted(c.snippet, 200).replace(/\s+/g, " "),
+            score: c.score,
+          })),
         }),
       },
     ];
@@ -216,6 +275,8 @@ export function triageService(
       requiresHumanReasons: reasons,
       modelRequiresHumanReasons: output.requiresHumanReasons,
       ruleFlags: flags,
+      dedupeMode: found.mode,
+      candidateScores: found.candidates.map((c) => ({ caseKey: c.caseKey, trigram: c.trigram, vector: c.vector })),
       model: last.model,
       latencyMs: last.latencyMs,
       inputTokens,
@@ -296,7 +357,7 @@ export function triageService(
   }
 
   /** Failure record for dashboards: kind only, never request text or model output. */
-  async function recordFailure(companyId: string, caseId: string, action: "agent.triage_failed" | "agent.triage_gave_up", kind: string, attempts: number) {
+  async function recordFailure(companyId: string, caseId: string, action: "agent.triage_failed" | "agent.triage_gave_up" | "agent.embed_failed", kind: string, attempts: number) {
     await logActivity(db, {
       companyId,
       actorType: "system",
@@ -308,5 +369,5 @@ export function triageService(
     });
   }
 
-  return { ensureTriageAgent, findPending, triageCase, recordFailure };
+  return { ensureTriageAgent, findPending, triageCase, recordFailure, embedPending };
 }

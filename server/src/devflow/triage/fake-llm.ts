@@ -15,6 +15,9 @@ export interface FakeLlm {
   baseUrl: string;
   requests: Array<{ headers: IncomingMessage["headers"]; body: any }>;
   queue: FakeStep[];
+  embedRequests: Array<{ body: any }>;
+  /** Steps for /embeddings; empty queue = a deterministic bag-of-words vector. */
+  embedQueue: FakeStep[];
   fallback: FakeStep;
   close(): Promise<void>;
 }
@@ -35,8 +38,20 @@ export const VALID_TRIAGE_REPLY = {
   openQuestions: [],
 };
 
+/** Deterministic bag-of-words embedding (32 dims, unit length): texts sharing words get a high cosine. */
+export function fakeEmbedding(text: string, dims = 32): number[] {
+  const v = new Array<number>(dims).fill(0);
+  for (const w of text.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean)) {
+    let h = 0;
+    for (const c of w) h = (h * 31 + c.codePointAt(0)!) >>> 0;
+    v[h % dims] += 1;
+  }
+  const norm = Math.sqrt(v.reduce((a, b) => a + b * b, 0)) || 1;
+  return v.map((x) => x / norm);
+}
+
 export async function startFakeLlm(fallback: FakeStep = { reply: VALID_TRIAGE_REPLY }): Promise<FakeLlm> {
-  const fake: FakeLlm = { baseUrl: "", requests: [], queue: [], fallback, close: async () => {} };
+  const fake: FakeLlm = { baseUrl: "", requests: [], queue: [], embedRequests: [], embedQueue: [], fallback, close: async () => {} };
   const sockets = new Set<import("node:net").Socket>();
   const server: Server = createServer((req, res) => {
     const chunks: Buffer[] = [];
@@ -47,6 +62,17 @@ export async function startFakeLlm(fallback: FakeStep = { reply: VALID_TRIAGE_RE
         body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
       } catch {
         /* recorded as null */
+      }
+      if (req.url?.endsWith("/embeddings")) {
+        fake.embedRequests.push({ body });
+        const es = fake.embedQueue.shift();
+        if (es && "hang" in es) return;
+        if (es && "status" in es) return void res.writeHead(es.status).end("{}");
+        if (es && "raw" in es) return void res.writeHead(200, { "content-type": "application/json" }).end(es.raw);
+        const input = String(body?.input?.[0] ?? "");
+        return void res
+          .writeHead(200, { "content-type": "application/json" })
+          .end(JSON.stringify({ data: [{ index: 0, embedding: fakeEmbedding(input) }], usage: { prompt_tokens: 7 } }));
       }
       fake.requests.push({ headers: req.headers, body });
       const step = fake.queue.shift() ?? fake.fallback;

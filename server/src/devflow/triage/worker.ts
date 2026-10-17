@@ -9,6 +9,7 @@ import { TriageFailure, type triageService } from "./triage-service.js";
 
 export interface TriageWorkerOptions {
   batchSize?: number;
+  embedBatch?: number;
   maxAttemptsPerCase?: number;
   breakerThreshold?: number;
   breakerCooldownMs?: number;
@@ -21,6 +22,7 @@ const LOCK_KEY = "dr-triage-worker";
 
 export function createTriageWorker(db: Db, service: ReturnType<typeof triageService>, opts: TriageWorkerOptions = {}) {
   const batchSize = opts.batchSize ?? 5;
+  const embedBatch = opts.embedBatch ?? 20;
   const maxAttempts = opts.maxAttemptsPerCase ?? 5;
   const breakerThreshold = opts.breakerThreshold ?? 5;
   const breakerCooldownMs = opts.breakerCooldownMs ?? 300_000;
@@ -79,6 +81,8 @@ export function createTriageWorker(db: Db, service: ReturnType<typeof triageServ
         attempted += 1;
         if (!(await handle(item))) break;
       }
+      // Backfill vectors for older requests (no-op without an embedding config or pgvector).
+      await service.embedPending(embedBatch).catch((e) => logger.warn({ err: e }, "devflow triage: embed backfill failed"));
     });
     return attempted;
   }

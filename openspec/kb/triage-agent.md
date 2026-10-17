@@ -1,6 +1,6 @@
 # Triage agent (bước 6, phần không phụ thuộc model)
 
-Trạng thái: code + test xong (2026-10-17); **chưa chạy với model thật** (chưa có endpoint). Quyết định: `decisions/0014-triage-agent.md`.
+Trạng thái: code + test xong (2026-10-17); **chưa chạy với model thật** (chưa có endpoint). Quyết định: `decisions/0014-triage-agent.md`. Bước 7 (prompt v2, dedupe) ở cuối file.
 
 ## Luồng
 1. Worker quét mỗi 15 giây (`DEVFLOW_TRIAGE_INTERVAL_MS`): các case của pipeline `dev-request` đang ở stage `triage`, chưa có `dr_agent_outputs` trạng thái `proposed` (cũng nhặt lại case bị `request_changes` đưa về `triage`, miễn là output cũ đã được bước 8 đánh dấu khác `proposed`).
@@ -28,9 +28,24 @@ Trạng thái: code + test xong (2026-10-17); **chưa chạy với model thật*
 - Chi phí: mỗi công ty có một agent "DevFlow Triage" (`agents`, `status=idle`, `runtimeConfig.heartbeat.enabled=false`, `metadata.devflowRole=triage`) chỉ để gắn `cost_events` (`usage_kind=agent`, `cost_status=unpriced`, `cost_cents=0`: có token thật, không bịa giá). Xác nhận bằng đọc code: `parseHeartbeatPolicy` mặc định `enabled=false` nên scheduler bỏ qua; **chưa chạy scheduler thật để kiểm**.
 
 ## Liên quan bước sau
-- Bước 7 (dedupe) điền `candidateCaseKeys` trong `triageCase`; hiện luôn rỗng.
+- Bước 7 (dedupe) đã điền danh sách ứng viên trong `triageCase` (xem cuối file); prompt đang dùng là v2.
 - Bước 8 phải đánh dấu output cũ (`accepted`/`overridden`/`superseded`) khi người quyết định, nếu không worker sẽ không phân loại lại case bị `request_changes`. Lý do request_changes chưa được đưa vào prompt (việc của bước sau).
 - Không dùng `pendingSuggestion` ở P1: nộp từ stage làm việc sang review không cần ai duyệt; đầu ra là nội dung để người quyết ở review stage.
 
 ## Kiểm chứng
 `server/src/__tests__/devflow-triage-unit.test.ts` (25 ca: schema, quy tắc, hash, boundary, client với LLM giả) và `devflow-triage.test.ts` (19 ca trên Postgres nhúng: ghi output, agent idle + cost unpriced, cờ hợp, injection, thử lại, 429/500/timeout, đua hai worker, cách ly công ty, log không lộ nội dung, backoff/bỏ cuộc, breaker, khóa advisory). 5 đột biến (bỏ hợp cờ, bỏ strict, bỏ làm sạch boundary, bỏ bắt unique, bỏ lọc công ty) đều bị test bắt. LLM giả: `server/src/devflow/triage/fake-llm.ts` (`startFakeLlm`); chưa có script chạy riêng.
+
+# Bước 7: tìm yêu cầu trùng (dedupe), prompt v2
+
+Quyết định: `decisions/0015-dedupe.md`. Code: `server/src/devflow/triage/dedupe.ts`, `embed-client.ts`, `server/src/devflow/prompts/triage.v2.ts`. **Chưa chạy với model/embedding thật** (chưa có endpoint).
+
+- Triage dùng **prompt v2** (v1 giữ nguyên, hash v1 vẫn ghim). v2 thêm khối "existing requests" do server cấp; model chỉ xếp hạng và giải thích, không tự tìm; `caseKey` ngoài danh sách bị Zod từ chối.
+- **Lexical (`pg_trgm`) luôn bật**: `similarity` trên tiêu đề và trên (tiêu đề + mô tả, 1000 ký tự đầu), đã bỏ dấu tiếng Việt cả hai phía (`translate` trong SQL, `foldText` trong app); ngưỡng `DEVFLOW_DEDUPE_MIN_TRIGRAM` (0.3). Quét tuần tự trong công ty (chấp nhận ở P1).
+- **Vector (pgvector)** chỉ khi: bảng `dr_embeddings` tồn tại, có `DEVFLOW_EMBED_BASE_URL` + `DEVFLOW_EMBED_MODEL`, và embed thành công; cosine ≥ `DEVFLOW_DEDUPE_MIN_VECTOR` (0.65, **điểm khởi đầu chưa hiệu chỉnh**, cần cặp trùng thật). Hợp hai danh sách, xếp theo điểm mạnh hơn, tối đa `DEVFLOW_DEDUPE_LIMIT` (5). Thiếu pgvector thì không gọi embedding (không trả tiền cho vector không lưu được).
+- Phạm vi: cùng công ty, pipeline `dev-request`, loại chính nó và case `cancelled`; case `done` vẫn được xét. Không gửi thông tin người gửi. Tiêu đề và đoạn mô tả của yêu cầu cũ đi qua cùng làm sạch và khối ranh giới như dữ liệu không tin cậy.
+- `dr_agent_outputs.data` giữ thêm `dedupeMode` (`trigram` | `trigram+vector`) và `candidateScores` (điểm trigram/vector của từng ứng viên) để người duyệt thấy số liệu thật, không chỉ lời model.
+- Embedding: `/embeddings` kiểu OpenAI (TEI, vLLM, OpenAI). Lưu `dr_embeddings` (`ON CONFLICT … DO UPDATE` chỉ khi `content_hash` đổi). Lỗi embedding không làm hỏng triage (ghi `agent.embed_failed`, tìm ứng viên vẫn chạy bằng trigram). Worker backfill 20 yêu cầu thiếu vector mỗi lượt quét, dừng ở lỗi đầu tiên. Chi phí embedding ghi `cost_events` (`billing_code=devflow:embed`, `unpriced`).
+- Qwen (vLLM): thêm `DEVFLOW_LLM_EXTRA_BODY` (JSON gộp vào request, ví dụ `{"chat_template_kwargs":{"enable_thinking":false}}`) và client tự cắt khối `<think>…</think>` ở đầu câu trả lời (khối không đóng được coi là bị cắt). **Chưa kiểm chứng với Qwen thật**; cần xem vLLM của bạn có bật reasoning parser hay không.
+- Hai yêu cầu nộp gần như cùng lúc có thể không thấy nhau (chưa commit); trigram vẫn bắt được những cái đã commit.
+- Kiểm chứng: 65 test (đơn vị, Postgres nhúng, và pgvector thật qua `DEVFLOW_PGVECTOR_URL`); 6 đột biến bị bắt (bỏ lọc công ty, bỏ loại `cancelled`, bỏ làm sạch ứng viên, bỏ ngưỡng trigram, bỏ lọc model/chiều vector, bỏ kiểm bảng vector).
+- Chưa làm: chỉ mục HNSW/GIN, dedupe liên công ty, tự gộp, đo chất lượng với yêu cầu thật, đưa lý do `request_changes` vào prompt.
