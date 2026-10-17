@@ -16,6 +16,12 @@ Nguồn: `portal/`, `server/src/devflow/portal/static.ts`, change `openspec/chan
 ## Đã kiểm chứng trên stack Docker thật (2026-10-17)
 Trình duyệt tích hợp, tài khoản test cục bộ (biến `DEVFLOW_TEST_PORTAL_EMAIL/PASSWORD` trong `docker/.env`, gitignore): tạo link mời bằng API staff → mở link → tạo tài khoản → xác nhận lời mời → danh sách trống → gửi yêu cầu kèm một ảnh PNG → trang chi tiết `REQ-1` trạng thái "Đã tiếp nhận", tệp tải về đúng 70 byte (`attachment`, `nosniff`, `no-store`). Phía board: case `REQ-1` ở `triage`, `fields` rỗng, event `ingested` do actor `user` (requester), lời mời ở trạng thái `accepted`. Giao diện điện thoại (375 px) dùng được; nhãn form gắn đúng với ô nhập.
 
+### Đăng ký qua lời mời (task 3.4), kiểm chứng trên trình duyệt sau khi build lại
+- Trang đăng nhập thường chỉ có đăng nhập kèm gợi ý mở link mời; trang lời mời mặc định là "Tạo tài khoản và nhận lời mời".
+- Email đã có tài khoản (gõ khác hoa thường): thông báo tiếng Việt và form tự chuyển sang đăng nhập, link vẫn dùng được.
+- Đăng ký mới hoàn chỉnh: tạo tài khoản, đăng nhập, "Đã xác nhận lời mời", vào danh sách trống; mở thẳng `/portal/requests/1` của người khác ra "Không tìm thấy".
+- **Lỗi tìm ra ở lần thử đầu:** đăng ký thành công nhưng màn hình báo "lời mời đã được sử dụng" vì giao diện gọi `accept` sau `register` và link đã bị dùng. Đã sửa ở server (accept idempotent cho đúng người dùng link, commit `3afb73947`); mở lại link đã dùng bằng đúng tài khoản giờ ra "Đã xác nhận lời mời". Test tự động không bắt được lỗi này khi chưa có ca "accept ngay sau register"; ca đó đã được thêm.
+
 ## Chưa làm / hạn chế
 - Đăng ký công khai vẫn mở; chỉ nên đóng sau task 3.5 (ADR 0012). Màn hình đăng nhập không còn nút "Tạo tài khoản" khi không có link mời; với link mời, form mặc định là "Tạo tài khoản và nhận lời mời" (gọi `register` rồi đăng nhập), email đã có tài khoản thì tự chuyển sang đăng nhập.
 - Chưa có màn hình cho nhân viên tạo link mời (hiện dùng API `POST /api/companies/:id/portal/invites`).

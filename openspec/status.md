@@ -70,6 +70,7 @@ Kết luận: **cần vá, không phải viết lại state machine**. Chưa th�
 P1 (đang chuẩn bị) → P2 BA Spec + Planner agent, gate còn lại, email mở rộng → P3 Dev agent (worktree/PR), QA agent, dashboard → P4 Governance đầy đủ, SSO, mở rộng toàn group.
 
 ## Gần đây
+- 2026-10-17: Kiểm tra task 3.4 trên trình duyệt thật: tìm ra lỗi "đăng ký xong vẫn báo link đã dùng", sửa bằng accept idempotent cho đúng người dùng link (30 test server pass, đột biến bị bắt), kiểm tra lại: đăng ký mới, email có sẵn, mở lại link, cách ly giữa user đều đúng.
 - 2026-10-17: Task 3.4 xong (phương án A, ADR 0012): `POST /api/portal/invites/:token/register` tạo tài khoản + requester trong một giao dịch, 409 khi email có sẵn, giới hạn 10 lần/phút/IP; 9 test mới và 6 đột biến bị bắt; giao diện nhận lời mời tạo tài khoản qua endpoint này; đăng ký công khai vẫn mở.
 - 2026-10-17: Portal nhóm 4 xong: package `portal/` (React+Vite, tiếng Việt), phục vụ ở `/portal`, lockfile chỉ thêm một khối importer; image build lại, migration 0355/0356 áp dụng vào DB thật; luồng mời → đăng ký → gửi yêu cầu kèm tệp chạy trong trình duyệt; 36 test server + 12 test portal pass. Xem `kb/intake-portal-web.md`.
 - 2026-10-17: Portal nhóm 3 xong: migration 0356 `dr_requester_invites` (bỏ `accepted_requester_id`/CHECK so với DDL trình duyệt vì xung đột với xóa user), API mời/thu hồi/nhận link, 7 test + 4 test đăng ký đóng; đăng ký đóng vẫn tạo được tài khoản qua server (task 3.4 đề xuất).
