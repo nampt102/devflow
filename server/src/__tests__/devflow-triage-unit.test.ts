@@ -83,6 +83,21 @@ describe("deterministic rule flags", () => {
     expect(ruleFlags(text)).toContain(flag);
   });
 
+  it.each([
+    "Hệ thống bán hàng sập toàn bộ",
+    "Thêm cột số lượng vào báo cáo",
+    "Cần thuê thêm máy chủ",
+  ])("does not flag words that only look alike once accents are removed: %s", (text) => {
+    expect(ruleFlags(text)).toEqual([]);
+  });
+
+  it("still flags SAP, lương and thuế (accented or not)", () => {
+    expect(ruleFlags("Gửi đơn sang SAP")).toContain("external_integration");
+    expect(ruleFlags("Tính lương tháng")).toContain("finance_or_payroll_data");
+    expect(ruleFlags("Báo cáo thuế")).toContain("finance_or_payroll_data");
+    expect(ruleFlags("bang luong thang 3")).toContain("finance_or_payroll_data");
+  });
+
   it("does not flag an ordinary request", () => {
     expect(ruleFlags("Thêm cột ngày giao vào báo cáo tồn kho")).toEqual([]);
   });
