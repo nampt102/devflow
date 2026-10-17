@@ -51,3 +51,26 @@ Hệ thống SHALL kết nạp requester bằng link mời một lần do nhân 
 #### Scenario: Link đã dùng hoặc hết hạn
 - **WHEN** user mở link đã dùng hoặc quá hạn
 - **THEN** hệ thống từ chối và không tạo `dr_requesters`
+
+### Requirement: Registration through an invitation
+Hệ thống SHALL cho phép người có link mời hợp lệ tạo tài khoản và trở thành requester trong một bước, kể cả khi đăng ký công khai đã đóng. Hệ thống SHALL kiểm tra link trước khi băm mật khẩu, SHALL tạo tài khoản, thông tin đăng nhập và `dr_requesters` trong cùng một giao dịch, và SHALL giới hạn số lần thử theo địa chỉ client. Nếu email đã có tài khoản, hệ thống MUST trả 409 và MUST NOT tiêu thụ link.
+
+#### Scenario: Đăng ký bằng link hợp lệ khi đăng ký công khai đã đóng
+- **WHEN** người chưa đăng nhập gửi tên, email và mật khẩu hợp lệ với link mời còn hiệu lực
+- **THEN** hệ thống tạo tài khoản và requester, đánh dấu link đã dùng, và người đó đăng nhập được bằng mật khẩu vừa đặt
+
+#### Scenario: Email đã có tài khoản
+- **WHEN** email gửi lên (không phân biệt hoa thường) đã thuộc một tài khoản
+- **THEN** hệ thống trả 409, không tạo gì và link vẫn dùng được
+
+#### Scenario: Nhiều người dùng chung một link cùng lúc
+- **WHEN** nhiều yêu cầu đăng ký đồng thời dùng cùng một link
+- **THEN** đúng một yêu cầu thành công, các yêu cầu còn lại bị từ chối và không để lại tài khoản
+
+#### Scenario: Link không dùng được
+- **WHEN** link sai, đã dùng, hết hạn hoặc bị thu hồi
+- **THEN** hệ thống từ chối trước khi băm mật khẩu và không tạo tài khoản
+
+#### Scenario: Thử quá nhiều lần
+- **WHEN** một địa chỉ client gửi quá giới hạn số lần thử đăng ký hoặc nhận lời mời trong một phút
+- **THEN** hệ thống trả 429

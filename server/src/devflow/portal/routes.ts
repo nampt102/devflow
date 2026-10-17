@@ -9,6 +9,7 @@ import { MAX_FILES_PER_REQUEST, MAX_FILE_BYTES, cleanFilename, type UploadedFile
 import { pipelineService } from "../../services/pipelines.js";
 import { INVITE_TOKEN_PATTERN, portalInvites } from "./invites.js";
 import { portalService } from "./portal-service.js";
+import { ipRateLimit } from "./rate-limit.js";
 import { requireRequester } from "./requester-guard.js";
 
 // Unknown keys (stageKey, priority, fields...) are stripped: a requester cannot set internal data.
@@ -18,6 +19,13 @@ const submitSchema = z.object({
   businessImpact: z.string().trim().max(4_000).nullish(),
 });
 const inviteSchema = z.object({ label: z.string().trim().max(200).nullish() });
+// Same password bounds as better-auth (8 to 128); the password is never trimmed.
+const registerSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  email: z.string().trim().max(254).email(),
+  password: z.string().min(8).max(128),
+});
+export type PortalRouteOptions = { rateLimit?: { max: number; windowMs: number } };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Company staff who may issue portal invitations: board members who are not viewers. */
@@ -34,8 +42,9 @@ function assertInviteManager(req: Request, companyId: string): string {
 }
 
 /** /api/portal/* for requesters and /api/companies/:id/portal/invites for staff (openspec/decisions/0011). */
-export function portalRoutes(db: Db, storage: StorageService) {
+export function portalRoutes(db: Db, storage: StorageService, options: PortalRouteOptions = {}) {
   const router = Router();
+  const attemptLimit = ipRateLimit(options.rateLimit ?? { max: 10, windowMs: 60_000 });
   const service = portalService(db, { ingestCase: (input) => pipelineService(db).ingestCase(input), storage });
   const invites = portalInvites(db);
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_FILE_BYTES, files: MAX_FILES_PER_REQUEST } });
@@ -76,7 +85,17 @@ export function portalRoutes(db: Db, storage: StorageService) {
   });
 
   // ---- invitations: the invited person (any signed-in user; this is how they become a requester) ---
-  router.post("/portal/invites/:token/accept", async (req, res) => {
+  // Creates the account and the requester in one step, so it works while public sign-up is closed.
+  // No session needed: the single-use token is the credential. The client signs in afterwards.
+  router.post("/portal/invites/:token/register", attemptLimit, async (req, res) => {
+    const token = String(req.params.token);
+    if (!INVITE_TOKEN_PATTERN.test(token)) throw notFound("Invalid invitation link");
+    const parsed = registerSchema.safeParse(req.body);
+    if (!parsed.success) throw badRequest("Invalid registration", parsed.error.flatten());
+    res.status(201).json(await invites.register({ token, ...parsed.data }));
+  });
+
+  router.post("/portal/invites/:token/accept", attemptLimit, async (req, res) => {
     const actor = req.actor;
     if (!actor || actor.type !== "board" || actor.source !== "session" || !actor.userId) {
       throw unauthorized("Sign in to accept the invitation");

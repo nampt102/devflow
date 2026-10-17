@@ -17,9 +17,10 @@
 6. **Mời requester:** bảng riêng `dr_requester_invites`, không tái dùng invite công ty của Paperclip vì chấp nhận invite đó có thể cấp membership, tức quyền đọc board (chưa đọc `access.ts` để xác nhận). Token băm như agent key, một lần, hết hạn, gắn với session user khi chấp nhận. Email không phải căn cứ bảo mật vì đăng ký chưa xác minh.
 7. **Web:** `portal/` workspace package `@devflow/portal` (React + Vite, chỉ tiếng Việt, không thêm thư viện router/i18n/UI, dependency trùng phiên bản với `ui/` nên lockfile chỉ thêm một khối importer). Phục vụ tĩnh ở `/portal` qua `server/src/devflow/portal/static.ts`, mount trong `app.ts` trước `app.use(staticUi)` của board (catch-all của board sẽ nuốt mọi đường dẫn nếu mount sau). Đã triển khai và kiểm chứng; xem `kb/intake-portal-web.md`.
 8. **Nhãn trạng thái:** ánh xạ stage key sang nhãn tiếng Việt ở server (một nơi); client không tự suy từ stage.
+9. **Đăng ký qua lời mời (task 3.4):** `POST /api/portal/invites/:token/register` (không cần session). Kiểm tra link trước (rẻ) rồi mới băm mật khẩu bằng `hashPassword` của better-auth; một giao dịch gồm khóa advisory theo email (vì `user.email` không có unique index), kiểm tra email (không phân biệt hoa thường, 409 nếu có, link không bị tiêu thụ), tạo `user` + `account` (`credential`, `issuer local:credential`), `UPDATE` có điều kiện để cướp link, tạo `dr_requesters`, ghi activity (không chứa email hay mật khẩu). Không tạo phiên: client gọi sign-in bình thường. Giới hạn 10 lần/phút/IP dùng chung cho `register` và `accept` (trong bộ nhớ tiến trình). Đăng ký công khai vẫn mở (ADR 0012).
 
 ## Risks / Trade-offs
 
 - Bù trừ thay cho giao dịch duy nhất: có cửa sổ nhỏ tồn tại case thiếu `dr_requests`; giảm bằng kiểm tra health và test.
 - Thêm workspace package đổi lockfile và Dockerfile; không tạo lockfile được trên host (Node 22, chưa cài node_modules), phải chạy `pnpm install` trong container.
-- Đăng ký mở vẫn tạo user rác không có quyền; cân nhắc `PAPERCLIP_AUTH_DISABLE_SIGN_UP` sau khi kiểm chứng luồng mời (chưa xác nhận hoạt động khi tắt đăng ký).
+- Đăng ký mở vẫn tạo user rác không có quyền; việc đóng đăng ký đã kiểm chứng ở task 3.3 và quyết định ở ADR 0012 (chưa đóng, chờ task 3.5).

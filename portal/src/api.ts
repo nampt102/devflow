@@ -66,9 +66,11 @@ export const api = {
     return data?.user ?? null;
   },
   signIn: (email: string, password: string) => call<unknown>("POST", "/api/auth/sign-in/email", { email, password }),
-  signUp: (name: string, email: string, password: string) => call<unknown>("POST", "/api/auth/sign-up/email", { name, email, password }),
   signOut: () => call<unknown>("POST", "/api/auth/sign-out", {}),
   me: () => call<{ companyId: string; requesterId: string }>("GET", "/api/portal/me"),
+  /** Creates the account and the requester in one step; the caller signs in afterwards. */
+  registerWithInvite: (token: string, name: string, email: string, password: string) =>
+    call<{ companyId: string; requesterId: string }>("POST", `/api/portal/invites/${token}/register`, { name, email, password }),
   acceptInvite: (token: string) => call<{ companyId: string; requesterId: string }>("POST", `/api/portal/invites/${token}/accept`, {}),
   list: () => call<{ items: RequestItem[] }>("GET", "/api/portal/requests"),
   get: (number: number) => call<RequestItem>("GET", `/api/portal/requests/${number}`),
@@ -97,6 +99,7 @@ export function describeError(err: unknown): string {
     USER_ALREADY_EXISTS: e.emailTaken,
     USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL: e.emailTaken,
     PASSWORD_TOO_SHORT: e.weakPassword,
+    account_exists: e.accountExists,
     invite_used: e.inviteUsed,
     invite_expired: e.inviteExpired,
     invite_revoked: e.inviteRevoked,

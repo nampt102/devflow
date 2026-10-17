@@ -27,8 +27,13 @@ function useRoute(): [Route, Navigate, string | undefined] {
   return [route, navigate, notice];
 }
 
-function AuthPanel({ inviteMode, onAuthed }: { inviteMode: boolean; onAuthed: () => void }) {
-  const [register, setRegister] = useState(false);
+/**
+ * Without an invitation only sign-in is offered: accounts are created through an invitation link
+ * (POST /api/portal/invites/:token/register), which keeps working when public sign-up is closed.
+ */
+function AuthPanel({ inviteToken, onAuthed }: { inviteToken?: string; onAuthed: () => void }) {
+  const inviteMode = Boolean(inviteToken);
+  const [register, setRegister] = useState(inviteMode);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -41,15 +46,14 @@ function AuthPanel({ inviteMode, onAuthed }: { inviteMode: boolean; onAuthed: ()
     setBusy(true);
     setError(null);
     try {
-      if (register) {
-        await api.signUp(name.trim(), email.trim(), password);
-        // sign-up normally signs the user in; make sure of it
-        if (!(await api.session())) await api.signIn(email.trim(), password);
-      } else {
-        await api.signIn(email.trim(), password);
+      if (register && inviteToken) {
+        // one step creates the account and consumes the link; then a normal sign-in starts the session
+        await api.registerWithInvite(inviteToken, name.trim(), email.trim(), password);
       }
+      await api.signIn(email.trim(), password);
       onAuthed();
     } catch (err) {
+      if (err instanceof ApiError && err.code === "account_exists") setRegister(false); // the link is still valid
       setError(describeError(err));
       setBusy(false);
     }
@@ -57,8 +61,8 @@ function AuthPanel({ inviteMode, onAuthed }: { inviteMode: boolean; onAuthed: ()
 
   return (
     <div className="auth">
-      <h1>{inviteMode ? vi.auth.inviteTitle : register ? vi.auth.registerTitle : vi.auth.title}</h1>
-      {inviteMode && <p className="muted">{vi.auth.inviteHint}</p>}
+      <h1>{inviteMode ? vi.auth.inviteTitle : vi.auth.title}</h1>
+      {inviteMode ? <p className="muted">{vi.auth.inviteHint}</p> : <p className="muted">{vi.auth.noAccountHint}</p>}
       <form className="form" onSubmit={submit}>
         {error && <div className="alert alert-error" role="alert">{error}</div>}
         {register && (
@@ -84,11 +88,13 @@ function AuthPanel({ inviteMode, onAuthed }: { inviteMode: boolean; onAuthed: ()
           {register && <span className="hint">{vi.auth.passwordHint}</span>}
         </label>
         <button type="submit" className="btn btn-primary" disabled={busy}>
-          {register ? vi.auth.register : vi.auth.signIn}
+          {register ? vi.auth.registerAndAccept : vi.auth.signIn}
         </button>
-        <button type="button" className="link-button" onClick={() => { setRegister(!register); setError(null); }}>
-          {register ? vi.auth.switchToSignIn : vi.auth.switchToRegister}
-        </button>
+        {inviteMode && (
+          <button type="button" className="link-button" onClick={() => { setRegister(!register); setError(null); }}>
+            {register ? vi.auth.switchToSignIn : vi.auth.switchToRegister}
+          </button>
+        )}
       </form>
     </div>
   );
@@ -165,7 +171,7 @@ export function App() {
   if (auth.state === "loading") {
     body = <p className="muted">{vi.loading}</p>;
   } else if (auth.state === "out") {
-    body = <AuthPanel inviteMode={route.name === "invite"} onAuthed={() => void refresh()} />;
+    body = <AuthPanel inviteToken={route.name === "invite" ? route.token : undefined} onAuthed={() => void refresh()} />;
   } else if (route.name === "invite") {
     body = <InviteGate token={route.token} onAccepted={() => void refresh()} navigate={navigate} />;
   } else if (access === "checking") {

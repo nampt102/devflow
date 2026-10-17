@@ -10,14 +10,14 @@ Nguồn: `portal/`, `server/src/devflow/portal/static.ts`, change `openspec/chan
 ## Chạy và build
 - Dev: `pnpm --filter @devflow/portal dev` (cổng 5174, proxy `/api` tới `http://localhost:3100`, base `/portal/`).
 - Build: `pnpm --filter @devflow/portal build` → `portal/dist`; Dockerfile có bước này sau build `ui`. Server phục vụ `portal/dist` (hoặc `server/portal-dist`) ở `/portal` **trước** catch-all của board; `/portal` chuyển 301 sang `/portal/`.
-- Kiểm tra: `pnpm --filter @devflow/portal typecheck` và `... test` (12 test logic); phía server: `server/src/__tests__/devflow-portal-static.test.ts` (4 ca).
+- Kiểm tra: `pnpm --filter @devflow/portal typecheck` và `... test` (14 test logic); phía server: `server/src/__tests__/devflow-portal-static.test.ts` (4 ca).
 - Trên máy này không có pnpm/node_modules ở host: typecheck, test và build chạy trong container từ image `devflow-paperclip:local` (cài với `NODE_ENV=development pnpm install --prod=false --frozen-lockfile --filter @devflow/portal...`, vì image đặt `NODE_ENV=production`).
 
 ## Đã kiểm chứng trên stack Docker thật (2026-10-17)
 Trình duyệt tích hợp, tài khoản test cục bộ (biến `DEVFLOW_TEST_PORTAL_EMAIL/PASSWORD` trong `docker/.env`, gitignore): tạo link mời bằng API staff → mở link → tạo tài khoản → xác nhận lời mời → danh sách trống → gửi yêu cầu kèm một ảnh PNG → trang chi tiết `REQ-1` trạng thái "Đã tiếp nhận", tệp tải về đúng 70 byte (`attachment`, `nosniff`, `no-store`). Phía board: case `REQ-1` ở `triage`, `fields` rỗng, event `ingested` do actor `user` (requester), lời mời ở trạng thái `accepted`. Giao diện điện thoại (375 px) dùng được; nhãn form gắn đúng với ô nhập.
 
 ## Chưa làm / hạn chế
-- Chưa có đăng ký tài khoản qua lời mời để đóng đăng ký công khai (task 3.4).
+- Đăng ký công khai vẫn mở; chỉ nên đóng sau task 3.5 (ADR 0012). Màn hình đăng nhập không còn nút "Tạo tài khoản" khi không có link mời; với link mời, form mặc định là "Tạo tài khoản và nhận lời mời" (gọi `register` rồi đăng nhập), email đã có tài khoản thì tự chuyển sang đăng nhập.
 - Chưa có màn hình cho nhân viên tạo link mời (hiện dùng API `POST /api/companies/:id/portal/invites`).
 - Chưa kiểm chứng trên Safari/Firefox và trình đọc màn hình; chưa có test thành phần React (chỉ test logic thuần).
 - User là requester của nhiều công ty chưa chọn được công ty trên giao diện (API cần `companyId`).

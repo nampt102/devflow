@@ -15,7 +15,8 @@
 - [x] 3.1 Chủ dự án duyệt DDL (2026-10-17; điều chỉnh: bỏ `accepted_requester_id` và CHECK vì xung đột với xóa user/requester)
 - [x] 3.2 Migration 0356 + API tạo/liệt kê/thu hồi link (nhân viên), chấp nhận link (requester) + test token một lần, hết hạn, thu hồi, vai trò, race
 - [x] 3.3 Kiểm chứng đăng ký khi `PAPERCLIP_AUTH_DISABLE_SIGN_UP=true` (xem `kb/requester-access.md`)
-- [ ] 3.4 (đề xuất, chưa duyệt) Đăng ký tài khoản qua lời mời (`POST /api/portal/invites/:token/register`) để có thể đóng đăng ký công khai
+- [x] 3.4 Đăng ký tài khoản qua lời mời (`POST /api/portal/invites/:token/register`, phương án A đã duyệt 2026-10-17): một giao dịch, 409 khi email có sẵn, giới hạn 10 lần/phút/IP; **chưa đóng đăng ký công khai**
+- [ ] 3.5 (đề xuất, chưa làm) Cách tạo tài khoản cho nhân viên mới khi đăng ký công khai đã đóng (endpoint hoặc CLI do admin dùng); cần có trước khi bật `PAPERCLIP_AUTH_DISABLE_SIGN_UP=true`
 
 ## 4. Web portal
 

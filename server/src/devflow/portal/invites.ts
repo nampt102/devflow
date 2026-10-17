@@ -1,7 +1,8 @@
 import { createHash, randomBytes } from "node:crypto";
-import { and, desc, eq, gt, isNull } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, sql } from "drizzle-orm";
+import { hashPassword } from "better-auth/crypto";
 import type { Db } from "@paperclipai/db";
-import { drRequesterInvites, drRequesters } from "@paperclipai/db";
+import { authAccounts, authUsers, drRequesterInvites, drRequesters } from "@paperclipai/db";
 import { HttpError, conflict, notFound } from "../../errors.js";
 import { logActivity } from "../../services/activity-log.js";
 
@@ -41,7 +42,30 @@ const toDto = (row: typeof drRequesterInvites.$inferSelect): InviteDto => ({
   revokedAt: row.revokedAt?.toISOString() ?? null,
 });
 
-export function portalInvites(db: Db) {
+function assertUsable(invite: typeof drRequesterInvites.$inferSelect) {
+  if (invite.revokedAt) throw gone("This invitation was revoked", "invite_revoked");
+  if (invite.acceptedAt) throw gone("This invitation was already used", "invite_used");
+  if (invite.expiresAt.getTime() <= Date.now()) throw gone("This invitation has expired", "invite_expired");
+}
+
+export type RegisterInput = { token: string; name: string; email: string; password: string };
+
+export function portalInvites(db: Db, deps: { hashPassword: (password: string) => Promise<string> } = { hashPassword }) {
+  /** One conditional UPDATE decides who gets the invitation; the caller runs it inside its transaction. */
+  const claim = (tx: Db, inviteId: string, userId: string) =>
+    tx
+      .update(drRequesterInvites)
+      .set({ acceptedAt: new Date(), acceptedByUserId: userId })
+      .where(
+        and(
+          eq(drRequesterInvites.id, inviteId),
+          isNull(drRequesterInvites.acceptedAt),
+          isNull(drRequesterInvites.revokedAt),
+          gt(drRequesterInvites.expiresAt, new Date()),
+        ),
+      )
+      .returning({ id: drRequesterInvites.id });
+
   return {
     /** The token is returned once and never stored: only its hash is. */
     async create(companyId: string, createdByUserId: string, input: { label?: string | null } = {}) {
@@ -104,8 +128,8 @@ export function portalInvites(db: Db) {
     },
 
     /**
-     * Binds the invite to the signed-in user, never to an email. One conditional UPDATE decides the
-     * race, in the same transaction that creates the requester, so a link works exactly once.
+     * Binds the invite to the signed-in user, never to an email. The conditional UPDATE runs in the same
+     * transaction that creates the requester, so a link works exactly once.
      */
     async accept(userId: string, token: string) {
       return db.transaction(async (tx) => {
@@ -114,9 +138,7 @@ export function portalInvites(db: Db) {
           .from(drRequesterInvites)
           .where(eq(drRequesterInvites.tokenHash, hashInviteToken(token)));
         if (!invite) throw notFound("Invalid invitation link");
-        if (invite.revokedAt) throw gone("This invitation was revoked", "invite_revoked");
-        if (invite.acceptedAt) throw gone("This invitation was already used", "invite_used");
-        if (invite.expiresAt.getTime() <= Date.now()) throw gone("This invitation has expired", "invite_expired");
+        assertUsable(invite);
 
         const [existing] = await tx
           .select()
@@ -126,18 +148,7 @@ export function portalInvites(db: Db) {
           throw conflict("You already have portal access in this company", { code: "already_requester" });
         }
 
-        const [claimed] = await tx
-          .update(drRequesterInvites)
-          .set({ acceptedAt: new Date(), acceptedByUserId: userId })
-          .where(
-            and(
-              eq(drRequesterInvites.id, invite.id),
-              isNull(drRequesterInvites.acceptedAt),
-              isNull(drRequesterInvites.revokedAt),
-              gt(drRequesterInvites.expiresAt, new Date()),
-            ),
-          )
-          .returning({ id: drRequesterInvites.id });
+        const [claimed] = await claim(tx as unknown as Db, invite.id, userId);
         if (!claimed) throw gone("This invitation is no longer valid", "invite_unavailable");
 
         let requesterId: string;
@@ -161,6 +172,66 @@ export function portalInvites(db: Db) {
           details: { requesterId },
         });
         return { companyId: invite.companyId, requesterId };
+      });
+    },
+
+    /**
+     * Creates the account and the requester in one transaction, so people can join while public sign-up is
+     * closed. Order matters: the invite is checked first (cheap) so a made-up token never costs a password hash,
+     * and the hash runs outside the transaction. Email is a per-email advisory lock because `user.email` has
+     * no unique index. An existing email gets 409 and the invite stays untouched.
+     */
+    async register(input: RegisterInput) {
+      const [invite] = await db
+        .select()
+        .from(drRequesterInvites)
+        .where(eq(drRequesterInvites.tokenHash, hashInviteToken(input.token)));
+      if (!invite) throw notFound("Invalid invitation link");
+      assertUsable(invite);
+
+      const email = input.email.trim().toLowerCase();
+      const name = input.name.trim();
+      const passwordHash = await deps.hashPassword(input.password);
+      const userId = randomBytes(24).toString("base64url");
+
+      return db.transaction(async (tx) => {
+        await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`dr-register:${email}`}))`);
+        const [taken] = await tx
+          .select({ id: authUsers.id })
+          .from(authUsers)
+          .where(sql`lower(${authUsers.email}) = ${email}`)
+          .limit(1);
+        if (taken) throw conflict("An account with this email already exists", { code: "account_exists" });
+
+        const now = new Date();
+        await tx.insert(authUsers).values({ id: userId, name, email, emailVerified: false, createdAt: now, updatedAt: now });
+        await tx.insert(authAccounts).values({
+          id: randomBytes(24).toString("base64url"),
+          issuer: "local:credential",
+          accountId: userId,
+          providerId: "credential",
+          userId,
+          password: passwordHash,
+          createdAt: now,
+          updatedAt: now,
+        });
+        // losing the race rolls the whole transaction back, including the new user
+        const [claimed] = await claim(tx as unknown as Db, invite.id, userId);
+        if (!claimed) throw gone("This invitation is no longer valid", "invite_unavailable");
+        const [requester] = await tx
+          .insert(drRequesters)
+          .values({ companyId: invite.companyId, userId })
+          .returning({ id: drRequesters.id });
+        await logActivity(tx as unknown as Db, {
+          companyId: invite.companyId,
+          actorType: "user",
+          actorId: userId,
+          action: "portal.invite_registered",
+          entityType: "dr_requester_invite",
+          entityId: invite.id,
+          details: { requesterId: requester.id },
+        });
+        return { companyId: invite.companyId, requesterId: requester.id };
       });
     },
   };

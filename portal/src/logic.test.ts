@@ -63,6 +63,7 @@ describe("error handling", () => {
     const cases: Array<[ApiError, string]> = [
       [new ApiError(401, "INVALID_EMAIL_OR_PASSWORD", "Invalid email or password"), vi.errors.badCredentials],
       [new ApiError(422, "USER_ALREADY_EXISTS", "x"), vi.errors.emailTaken],
+      [new ApiError(409, "account_exists", "An account with this email already exists"), vi.errors.accountExists],
       [new ApiError(410, "invite_expired", "x"), vi.errors.inviteExpired],
       [new ApiError(410, "invite_revoked", "x"), vi.errors.inviteRevoked],
       [new ApiError(410, undefined, "x"), vi.errors.inviteUsed],
@@ -96,6 +97,27 @@ describe("api client", () => {
   it("raises ApiError with status and code on failure", async () => {
     globalThis.fetch = respond(410, { error: "used", details: { code: "invite_used" } }) as unknown as typeof fetch;
     await expect(api.acceptInvite("A".repeat(43))).rejects.toMatchObject({ status: 410, code: "invite_used" });
+  });
+
+  it("registers through the invitation endpoint with a JSON body and no sign-up call", async () => {
+    const fetchMock = respond(201, { companyId: "c", requesterId: "r" });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const token = "A".repeat(43);
+    await api.registerWithInvite(token, "Nguyễn Văn A", "a@x.test", "password-123");
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe(`/api/portal/invites/${token}/register`);
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({ name: "Nguyễn Văn A", email: "a@x.test", password: "password-123" });
+    expect((init.headers as Record<string, string>)["Content-Type"]).toBe("application/json");
+    expect(Object.keys(api)).not.toContain("signUp"); // public sign-up may be closed
+  });
+
+  it("surfaces an existing account as a typed error so the form can switch to sign-in", async () => {
+    globalThis.fetch = respond(409, { error: "exists", details: { code: "account_exists" } }) as unknown as typeof fetch;
+    const error = await api.registerWithInvite("A".repeat(43), "N", "a@x.test", "password-123").catch((e) => e);
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({ status: 409, code: "account_exists" });
+    expect(describeError(error)).toBe(vi.errors.accountExists);
   });
 
   it("maps a network failure to a Vietnamese error", async () => {

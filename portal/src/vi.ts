@@ -8,7 +8,6 @@ export const vi = {
 
   auth: {
     title: "Đăng nhập",
-    registerTitle: "Tạo tài khoản",
     inviteTitle: "Bạn được mời sử dụng cổng yêu cầu",
     inviteHint: "Đăng nhập hoặc tạo tài khoản để nhận lời mời.",
     name: "Họ và tên",
@@ -16,9 +15,10 @@ export const vi = {
     password: "Mật khẩu",
     passwordHint: "Ít nhất 8 ký tự",
     signIn: "Đăng nhập",
-    register: "Tạo tài khoản",
+    registerAndAccept: "Tạo tài khoản và nhận lời mời",
     switchToRegister: "Chưa có tài khoản? Tạo tài khoản",
     switchToSignIn: "Đã có tài khoản? Đăng nhập",
+    noAccountHint: "Chưa có tài khoản? Hãy mở đường dẫn lời mời mà bộ phận IT đã gửi cho bạn.",
   },
 
   invite: {
@@ -86,6 +86,7 @@ export const vi = {
     sessionExpired: "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
     badCredentials: "Email hoặc mật khẩu không đúng.",
     emailTaken: "Email này đã có tài khoản. Hãy đăng nhập.",
+    accountExists: "Email này đã có tài khoản. Hãy đăng nhập để nhận lời mời.",
     weakPassword: "Mật khẩu cần ít nhất 8 ký tự.",
     notRequester: "Tài khoản chưa được cấp quyền sử dụng cổng yêu cầu.",
     inviteInvalid: "Đường dẫn lời mời không hợp lệ.",
