@@ -9,5 +9,15 @@
 - Hệ quả: board API đã tự chặn người ngoài; việc còn lại là **thêm** một bề mặt riêng cho requester, không phải khóa board.
 - Role `viewer` không dùng được cho requester: viewer đọc được **mọi** case của công ty (spike).
 
-## Lựa chọn (xem trao đổi): A kết nạp, B nơi enforce, C giao diện, D phạm vi, E chống lạm dụng
-Chi tiết và khuyến nghị: xem phần trả lời của phiên 2026-10-17; sau khi duyệt sẽ chuyển thành change OpenSpec `add-intake-portal` và ADR.
+## Quyết định (đã duyệt 2026-10-17, ADR 0011)
+A1 link mời một lần, B1 `/api/portal/*` + guard, C1 app `portal/` riêng. Change: `openspec/changes/add-intake-portal`. API hiện trạng: `kb/intake-portal-api.md`.
+
+## Kiểm chứng đăng ký khi `PAPERCLIP_AUTH_DISABLE_SIGN_UP=true` (task 3.3)
+Test đặc tính `server/src/__tests__/devflow-auth-signup.test.ts` (4 ca, Postgres nhúng, instance better-auth thật):
+- Mặc định (mở): `signUpEmail` thành công.
+- Đóng: `signUpEmail` bị từ chối **kể cả khi gọi từ server** (`auth.api`), không chỉ qua HTTP.
+- Đóng: user đã có vẫn đăng nhập bình thường.
+- Đóng: server vẫn tạo được tài khoản bằng `internalAdapter.createUser` + `linkAccount` (cần `issuer: "local:credential"`, cột NOT NULL ở fork này, cùng mật khẩu băm `ctx.password.hash`), và tài khoản đó đăng nhập được. Nghĩa là một endpoint đăng ký theo lời mời (task 3.4) khả thi mà không cần mở đăng ký công khai.
+- Chưa kiểm chứng ở mức HTTP trên stack chạy thật, và chưa kiểm chứng ảnh hưởng của việc đóng đăng ký lên luồng bootstrap quản trị đầu tiên và lời mời board của Paperclip (instance mới cần đăng ký để nhận quyền admin; chỉ đóng sau khi đã có admin).
+
+Hệ quả cho vận hành: trong lúc đăng ký còn mở, người lạ vẫn tạo được tài khoản nhưng không có quyền gì; link mời mới là thứ cấp quyền requester. Nếu muốn đóng đăng ký công khai cho requester, cần làm task 3.4 trước, nếu không requester mới không có cách tạo tài khoản.

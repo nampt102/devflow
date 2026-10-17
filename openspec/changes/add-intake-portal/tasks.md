@@ -12,9 +12,10 @@
 
 ## 3. Mời requester (cần duyệt DDL `dr_requester_invites`)
 
-- [ ] 3.1 Chủ dự án duyệt DDL
-- [ ] 3.2 Migration + API tạo link (nhân viên), chấp nhận link (requester) + test token một lần/hết hạn
-- [ ] 3.3 Kiểm chứng đăng ký khi `PAPERCLIP_AUTH_DISABLE_SIGN_UP=true`
+- [x] 3.1 Chủ dự án duyệt DDL (2026-10-17; điều chỉnh: bỏ `accepted_requester_id` và CHECK vì xung đột với xóa user/requester)
+- [x] 3.2 Migration 0356 + API tạo/liệt kê/thu hồi link (nhân viên), chấp nhận link (requester) + test token một lần, hết hạn, thu hồi, vai trò, race
+- [x] 3.3 Kiểm chứng đăng ký khi `PAPERCLIP_AUTH_DISABLE_SIGN_UP=true` (xem `kb/requester-access.md`)
+- [ ] 3.4 (đề xuất, chưa duyệt) Đăng ký tài khoản qua lời mời (`POST /api/portal/invites/:token/register`) để có thể đóng đăng ký công khai
 
 ## 4. Web portal
 

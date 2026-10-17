@@ -2,10 +2,12 @@ import { Router, type Request, type RequestHandler } from "express";
 import multer from "multer";
 import { z } from "zod";
 import type { Db } from "@paperclipai/db";
-import { badRequest, unprocessable } from "../../errors.js";
+import { badRequest, forbidden, notFound, unauthorized, unprocessable } from "../../errors.js";
 import type { StorageService } from "../../storage/types.js";
+import { assertCompanyAccess } from "../../routes/authz.js";
 import { MAX_FILES_PER_REQUEST, MAX_FILE_BYTES, cleanFilename, type UploadedFile } from "./attachments.js";
 import { pipelineService } from "../../services/pipelines.js";
+import { INVITE_TOKEN_PATTERN, portalInvites } from "./invites.js";
 import { portalService } from "./portal-service.js";
 import { requireRequester } from "./requester-guard.js";
 
@@ -15,11 +17,27 @@ const submitSchema = z.object({
   description: z.string().trim().min(1).max(8_000),
   businessImpact: z.string().trim().max(4_000).nullish(),
 });
+const inviteSchema = z.object({ label: z.string().trim().max(200).nullish() });
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** /api/portal/*: the only API surface for requesters (openspec/decisions/0011). */
+/** Company staff who may issue portal invitations: board members who are not viewers. */
+function assertInviteManager(req: Request, companyId: string): string {
+  assertCompanyAccess(req, companyId);
+  const actor = req.actor;
+  if (actor.type !== "board") throw forbidden("Board access required");
+  if (actor.source === "local_implicit" || actor.isInstanceAdmin) return actor.userId ?? "local-board";
+  const membership = actor.memberships?.find((m) => m.companyId === companyId && m.status === "active");
+  if (!membership || membership.membershipRole === "viewer" || !actor.userId) {
+    throw forbidden("Not allowed to manage portal invitations");
+  }
+  return actor.userId;
+}
+
+/** /api/portal/* for requesters and /api/companies/:id/portal/invites for staff (openspec/decisions/0011). */
 export function portalRoutes(db: Db, storage: StorageService) {
   const router = Router();
   const service = portalService(db, { ingestCase: (input) => pipelineService(db).ingestCase(input), storage });
+  const invites = portalInvites(db);
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_FILE_BYTES, files: MAX_FILES_PER_REQUEST } });
   // multipart only when the client sends it; JSON bodies are already parsed. Field name: "files".
   const readFiles: RequestHandler = (req, res, next) => {
@@ -34,6 +52,41 @@ export function portalRoutes(db: Db, storage: StorageService) {
   const filesOf = (req: Request) => ((req as Request & { files?: UploadedFile[] }).files ?? []) as UploadedFile[];
   const guard = requireRequester(db);
 
+  // ---- invitations: staff side ------------------------------------------------------------------
+  router.post("/companies/:companyId/portal/invites", async (req, res) => {
+    const companyId = String(req.params.companyId);
+    const actorId = assertInviteManager(req, companyId);
+    const parsed = inviteSchema.safeParse(req.body ?? {});
+    if (!parsed.success) throw badRequest("Invalid invitation", parsed.error.flatten());
+    res.status(201).json(await invites.create(companyId, actorId, parsed.data));
+  });
+
+  router.get("/companies/:companyId/portal/invites", async (req, res) => {
+    const companyId = String(req.params.companyId);
+    assertInviteManager(req, companyId);
+    res.json({ items: await invites.list(companyId) });
+  });
+
+  router.post("/companies/:companyId/portal/invites/:inviteId/revoke", async (req, res) => {
+    const companyId = String(req.params.companyId);
+    const actorId = assertInviteManager(req, companyId);
+    const inviteId = String(req.params.inviteId);
+    if (!UUID.test(inviteId)) throw notFound("Invitation not found or no longer pending");
+    res.json(await invites.revoke(companyId, actorId, inviteId));
+  });
+
+  // ---- invitations: the invited person (any signed-in user; this is how they become a requester) ---
+  router.post("/portal/invites/:token/accept", async (req, res) => {
+    const actor = req.actor;
+    if (!actor || actor.type !== "board" || actor.source !== "session" || !actor.userId) {
+      throw unauthorized("Sign in to accept the invitation");
+    }
+    const token = String(req.params.token);
+    if (!INVITE_TOKEN_PATTERN.test(token)) throw notFound("Invalid invitation link");
+    res.json(await invites.accept(actor.userId, token));
+  });
+
+  // ---- requester API ----------------------------------------------------------------------------
   router.get("/portal/me", guard, (_req, res) => {
     const { companyId, requesterId } = res.locals.requester!;
     res.json({ companyId, requesterId });

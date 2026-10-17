@@ -116,3 +116,7 @@ Dẫn xuất từ `pipeline_case_events` (thời điểm vào/ra stage) cho dash
 - `dr_attachments`: `asset_id` → `assets` (unique), không lưu storage_key/filename/mime/size; thêm `uploaded_by_requester_id`, `uploaded_by_user_id`.
 - Thêm unique index `pipeline_cases_id_company_uq` vào `pipeline_cases`.
 - Kiểm chứng: `packages/db/src/dr-requests-migration.test.ts` (11 test trên Postgres nhúng); `check:migrations`, `tsc --noEmit` và các test schema liên quan của db đều pass.
+
+## Migration #2a (`0356_devflow_requester_invites`, 2026-10-17)
+- `dr_requester_invites`: `id`, `company_id`, `token_hash` (unique, SHA-256), `label`, `created_by_user_id`, `expires_at`, `accepted_at`, `accepted_by_user_id` (FK `user`, set null), `revoked_at`, `created_at`. Không có FK tới `dr_requesters` và không có CHECK: DDL đã trình có `accepted_requester_id` và CHECK `accepted_at => accepted_by_user_id`, nhưng chúng xung đột với `ON DELETE SET NULL` và sẽ chặn việc xóa user/requester nên đã bỏ.
+- Kiểm chứng: `server/src/__tests__/devflow-portal-invites.test.ts`.
