@@ -1,5 +1,40 @@
 # AGENTS.md
 
+# Quy trình phiên DevFlow (mọi AI tool và người)
+
+DevFlow là fork của Paperclip (xem `openspec/decisions/0001-fork-paperclip.md`). Nguồn sự thật về tiến độ, KB và quyết định nằm trong file markdown của repo, không nằm trong memory riêng của từng tool. Quy tắc kỹ thuật kế thừa của Paperclip nằm ở phần "Paperclip engineering rules" bên dưới và **vẫn có hiệu lực**.
+
+## Bắt đầu mỗi phiên (bắt buộc)
+1. Đọc `openspec/status.md`: phase hiện tại, bước đang làm, việc bị chặn, bước tiếp theo.
+2. Đọc `openspec/config.yaml` và các file `openspec/kb/` liên quan đến việc sắp làm.
+3. Chạy `openspec list` để biết các change đang mở; đọc `proposal.md`/`tasks.md` của change liên quan.
+4. Nếu việc sắp làm mâu thuẫn với một quyết định trong `openspec/decisions/`, dừng và hỏi.
+5. Sau đó đọc theo danh sách "Read This First" của Paperclip bên dưới.
+
+## Khi làm việc
+- Thay đổi hành vi, kiến trúc, schema, API: tạo **change proposal** OpenSpec (`/opsx:propose` hoặc tương đương của tool), **chờ duyệt** rồi mới code. Sửa schema luôn cần chủ dự án duyệt trước.
+- Sửa lỗi nhỏ, chính tả, cấu hình, test cho hành vi đã có: làm trực tiếp.
+- Không đoán hành vi của Paperclip hay thư viện: đọc code, ghi rõ "chưa xác nhận".
+- Có quyết định mới: ghi 1 file trong `openspec/decisions/`.
+
+## Kết thúc mỗi bước hoặc phiên (bắt buộc)
+1. Cập nhật `openspec/status.md` (trạng thái bước, việc bị chặn, bước tiếp theo, mục "Gần đây").
+2. Cập nhật `openspec/kb/` nếu kiến thức đã đổi; không để KB lệch với code.
+3. Tick `tasks.md` của change đang làm; khi xong và đã deploy, hỏi người dùng rồi mới `/opsx:archive`.
+4. Thêm ADR nếu có quyết định mới.
+- Claude Code: dùng skill `project-sync`. Tool khác: làm theo danh sách trên.
+
+## Hòa giải với quy tắc Paperclip
+- **Kế hoạch:** kế hoạch của DevFlow là change của OpenSpec (`openspec/changes/`). Mục "Keep repo plan docs dated" bên dưới (`doc/plans/`) chỉ áp dụng cho tài liệu kế thừa của Paperclip.
+- **Dev DB:** DevFlow dùng Docker Postgres có extension `vector` (ADR 0009), thay vì PGlite ở mục "Dev Setup" bên dưới.
+- **Telemetry** của Paperclip (opt-out, gửi về endpoint của Paperclip): **chưa quyết định** tắt hay giữ (xem `openspec/status.md`). Đến khi quyết, không đổi code telemetry; mục 7 bên dưới vẫn áp dụng.
+- **PR:** mục "Pull Request Requirements" và PR template của Paperclip giữ nguyên.
+- Tài liệu dự án: tiếng Việt, thuật ngữ kỹ thuật tiếng Anh; không ghi bí mật vào repo (dùng env và `.env.example`).
+
+---
+
+# Paperclip engineering rules (kế thừa)
+
 Guidance for human and AI contributors working in this repository.
 
 ## 1. Purpose

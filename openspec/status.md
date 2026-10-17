@@ -1,0 +1,66 @@
+# Trạng thái dự án
+
+> Đọc file này đầu tiên mỗi phiên. Cập nhật cuối mỗi bước/phiên. Lịch sử chi tiết ở `changes/archive/` và git log.
+
+**Cập nhật lần cuối:** 2026-10-17
+
+## Phase hiện tại
+**P1**: Intake Portal + Workflow Core + Triage agent, pilot 1 công ty. P0 (khám phá Paperclip/Plane, docs, khung project-kit) đã xong.
+
+## Bước đang làm
+Chưa bắt đầu bước nào của P1. Chờ chủ dự án cho phép bắt đầu bước 0–1.
+
+## Bước tiếp theo
+1. Bước 0: dựng Paperclip bằng Docker (Postgres có pgvector), bật `enablePipelines`, chạy tutorial `docs/pipelines-tutorial.md`.
+2. Bước 1: spike Pipelines (đọc `server/src/services/pipelines.ts`, chạy thử); ghi kết luận vào `kb/paperclip-architecture.md` và cập nhật `kb/data-model-proposed.md`. **Dừng chờ chủ dự án duyệt trước khi sửa schema.**
+
+## Việc bị chặn / chờ quyết định
+- Còn thiếu (chưa chặn bước 0–2): model embedding, endpoint/model vLLM, thông tin SMTP (chủ dự án tự tạo/cập nhật env khi test).
+- Telemetry của Paperclip (mặc định bật, gửi về endpoint của Paperclip): **để mở**, chưa quyết định tắt hay giữ; cần tìm cách tắt trong code trước khi quyết.
+- Số chiều vector và model embedding: chốt khi làm migration (bước 3/5).
+
+## Bảng tiến độ P1
+
+| # | Bước | Trạng thái | Change / PR | Ghi chú |
+|---|---|---|---|---|
+| 0 | Dựng môi trường Docker (Postgres + pgvector), chạy Paperclip, bật `enablePipelines`, chạy tutorial | todo | | Chưa rõ Docker của repo hỗ trợ pgvector; có thể cần compose riêng |
+| 1 | Spike Pipelines: approver theo role, quyền agent key, event field-level, request_changes, test hiện có | todo | | Pipelines đang experimental; kết quả chốt lại D1 |
+| 2 | Seed pipeline `dev-request` (12 stage; P1 dùng `triage`, `triage_review`, `done`, `cancelled`) + test state machine/gate | todo | | |
+| 3 | Migration #1: `dr_requests`, `dr_requesters`, `dr_attachments` | todo | | Chủ dự án duyệt schema trước |
+| 4 | Intake Portal tiếng Việt, tách khỏi board: đăng nhập requester, form, upload, trạng thái ticket | todo | | UI board gần như chưa có i18n |
+| 5 | Migration #2: `dr_agent_outputs`, `dr_overrides`, `dr_prompts` (hoặc dùng skills Paperclip) + `dr_embeddings` (pgvector) | todo | | Phụ thuộc kết quả spike |
+| 6 | Triage agent: prompt v1 có version, output JSON (Zod) + comment, `pendingSuggestion`; provider API/local theo config | todo | | Cần endpoint vLLM; chưa có adapter vLLM chuẩn |
+| 7 | Dedupe bằng pgvector + LLM xếp hạng (embedding API/local theo config) | todo | | Đổi provider = re-index |
+| 7b | Email requester khi đổi trạng thái (SMTP qua env) | todo | | SMTP giả khi test tự động |
+| 8 | Màn hình duyệt triage cho Lead/BA (hàng chờ, sửa field, approve/reject/request_changes, snooze/duplicate), ghi override; port ngữ nghĩa/UI intake từ Plane | todo | | Port từ Plane ở mức M–L |
+| 9 | Số liệu cơ bản: tỷ lệ override theo field, thời gian ở triage | todo | | |
+| 10 | Pilot hardening: log lỗi agent, ngân sách token, tài liệu vận hành | todo | | Chủ dự án tự chọn công ty và tự chạy test |
+
+Thứ tự: 0 → 1 → 2 → 3 → {4, 5} → 6 → 7 → 7b → 8 → 9 → 10.
+
+## Quyết định chính (link tới `decisions/`)
+- 0001 Fork Paperclip (MIT) làm lõi
+- 0002 Đọc và port code Plane (không clean-room); hoãn xét AGPL
+- 0003 Dùng Pipelines của Paperclip làm lõi workflow (D1)
+- 0004 Bảng mới trong core `packages/db` (D2)
+- 0005 pgvector ở P1; embedding API + local theo config (D3)
+- 0006 Email "đổi trạng thái" cho requester ở P1 (D4)
+- 0007 Requester dùng better-auth + role (D5)
+- 0008 LLM cho agent: API thương mại + local theo config (D6)
+- 0009 Dev bằng Docker (D8)
+- D7 (không phải ADR): chủ dự án tự chọn công ty pilot và tự chạy test; Claude bàn giao code, test tự động, hướng dẫn chạy.
+
+## Rủi ro mở
+1. Pipelines experimental, có thể phải vá lõi.
+2. Chất lượng Triage agent: cần bộ mẫu thật; tỷ lệ override là thước đo.
+3. UI board gần như chưa có i18n (chỉ 5 key): portal tách riêng.
+4. Cách ly dữ liệu công ty chỉ ở tầng ứng dụng (không RLS): test bắt buộc, cân nhắc RLS ở P4.
+5. AGPL ở phần port từ Plane: hoãn xét đến sau bản test; phải xem lại trước khi triển khai thật (ADR 0002).
+6. Telemetry mặc định bật của Paperclip (xem mục chờ quyết định).
+
+## Lộ trình tổng
+P1 (đang chuẩn bị) → P2 BA Spec + Planner agent, gate còn lại, email mở rộng → P3 Dev agent (worktree/PR), QA agent, dashboard → P4 Governance đầy đủ, SSO, mở rộng toàn group.
+
+## Gần đây
+- 2026-10-17: Áp dụng project-kit vào DevFlow; chuyển docs vào `openspec/kb/`; ghi D1–D8 thành ADR 0003–0009.
+- 2026-10-17: Hoàn tất P0: clone Paperclip (MIT) và Plane (AGPL, đặt ở `../_ref/plane`), viết kiến trúc, gap analysis, data model đề xuất, kế hoạch P1.

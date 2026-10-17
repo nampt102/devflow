@@ -1,0 +1,34 @@
+schema: spec-driven
+
+context: |
+  Bộ nhớ dự án nằm trong repo: đọc openspec/status.md đầu tiên, rồi openspec/kb/ và openspec/decisions/. Quy trình bắt đầu/kết thúc phiên ở AGENTS.md.
+  DevFlow: hệ thống nội bộ quản lý vòng đời yêu cầu phần mềm (fork của Paperclip, MIT; Node.js + TypeScript). Pipeline: Intake -> Triage -> BA Spec -> Tech Plan -> Dev -> QA -> Done; agent chỉ đề xuất, mọi gate là người duyệt; output agent có comment dễ đọc + dữ liệu có cấu trúc; mọi duyệt/override ghi audit.
+  User cuối của portal là user nghiệp vụ không rành kỹ thuật, dùng tiếng Việt; UI nội bộ có thể tiếng Anh.
+  Multi-company: mọi bảng mới có company_id, kiểm tra quyền bằng assertCompanyAccess. Schema đổi qua migration Drizzle; test cho state machine, gate và cách ly công ty.
+  Không đoán hành vi Paperclip: đọc code, ghi "chưa xác nhận". Lập kế hoạch và chờ duyệt trước khi viết code tính năng hoặc sửa schema.
+  Quy tắc kỹ thuật kế thừa của Paperclip nằm trong AGENTS.md (phần Paperclip engineering rules).
+  Language: vi
+  All artifacts must be written in vi.
+  Keep OpenSpec structural headings and SHALL/MUST keywords in English.
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always state what is out of scope
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
+
+# Per-operation guidance (optional)
+# Add advisory guidance for how apply and archive work should be conducted.
+# This is separate from artifact rules above.
+# Example:
+#   operations:
+#     apply:
+#       guidance:
+#         - Keep test summaries concise
+#     archive:
+#       guidance:
+#         - Summarize the archive outcome before finishing
