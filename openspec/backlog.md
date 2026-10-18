@@ -15,7 +15,7 @@ Mức ưu tiên: **A** cần trước pilot, **B** nên làm sớm trong pilot, 
 | B-06 | Role BA/Tech Lead cho người duyệt (hiện mọi board user không phải viewer duyệt được) | B | `kb/spike-pipelines.md` |
 | C-07 | Requester chỉ thấy "Không tiếp tục xử lý" cho cả reject lẫn trùng | C | `kb/triage-review.md` |
 | B-08 | Agent "DevFlow Triage" hiện trong danh sách Agents với nút Test báo "Couldn't connect" (gây hiểu nhầm; đó là dòng giữ chỗ để ghi chi phí). Gắn nhãn hoặc ẩn | B | chủ dự án, 2026-10-18 |
-| B-09 | Portal và Board dùng chung phiên đăng nhập trên `localhost:3100`: đăng nhập requester làm mất phiên admin. Chỉ dẫn dùng cửa sổ ẩn danh; xem xét tách cookie hoặc cổng | B | chủ dự án, 2026-10-18 |
+| B-09 | Portal và Board dùng chung phiên đăng nhập trên `localhost:3100`: đăng nhập requester làm mất phiên admin (và chia sẻ khóa giao diện sáng/tối, việc này là chủ ý). Chỉ dẫn dùng cửa sổ ẩn danh; xem xét tách cookie hoặc cổng | B | chủ dự án, 2026-10-18 |
 | C-10 | UI chưa có test render component (chỉ test logic thuần); `pnpm check:token-gates` đã báo vi phạm từ trước ở trang khác | C | `kb/triage-review.md` |
 
 ## Portal và tài khoản
@@ -54,6 +54,13 @@ Mức ưu tiên: **A** cần trước pilot, **B** nên làm sớm trong pilot, 
 | B-29 | Quét bí mật lịch sử upstream của Paperclip chưa làm; kho `nampt102/devflow` công khai | C | `kb/runbook.md` mục 11 |
 
 ## Đã xong gần đây
+- Portal làm lại giao diện: đồng nhất token với Board, có chuyển sáng/tối dùng chung khóa `paperclip.theme` (xem `kb/intake-portal-web.md`).
 - LLM max output tokens 1500 gây `truncated` → 4000 (commit `751f2f07b`).
 - Quy tắc cờ nhầm "sập"/SAP, "lượng"/"lương" (commit `93a8fd34d`).
 - Model từ chối `temperature` → tùy chọn (commit `fix(devflow): send temperature only when configured`).
+
+## Giao diện portal (theo dõi)
+| Mã | Nội dung | Ưu tiên | Nguồn |
+|---|---|---|---|
+| C-30 | Portal chưa kiểm tra bằng trình đọc màn hình và chưa đo tương phản bằng công cụ; chưa có test render component | C | `kb/intake-portal-web.md` |
+| C-31 | Staff UI (trang Triage review) vẫn tiếng Anh; phông Inter của portal lấy từ `/fonts/` của Board (nếu tách máy chủ phải đi kèm phông) | C | 2026-10-18 |

@@ -4,7 +4,7 @@ Nguồn: `portal/`, `server/src/devflow/portal/static.ts`, change `openspec/chan
 
 ## Cấu trúc
 - Workspace package `@devflow/portal` (private): React 19 + Vite + TypeScript, **chỉ tiếng Việt**, không dùng thư viện router/i18n/UI; phiên bản dependency trùng với `ui/` nên lockfile chỉ thêm một khối importer.
-- `src/vi.ts` chứa toàn bộ chuỗi giao diện; nhãn trạng thái do server trả (`status-labels.ts`). `src/api.ts` (client + ánh xạ lỗi sang tiếng Việt), `src/route.ts` (điều hướng bằng History API), `src/files.ts` (kiểm tra tệp phía client, phản chiếu giới hạn server), `src/pages.tsx`, `src/App.tsx`, `src/styles.css` (CSS thuần, sáng/tối theo hệ thống, dùng được trên điện thoại).
+- `src/vi.ts` chứa toàn bộ chuỗi giao diện; nhãn trạng thái do server trả (`status-labels.ts`). `src/api.ts` (client + ánh xạ lỗi sang tiếng Việt), `src/route.ts` (điều hướng bằng History API), `src/files.ts` (kiểm tra tệp phía client, phản chiếu giới hạn server), `src/pages.tsx`, `src/App.tsx`, `src/styles.css`, `src/ui.tsx` (Link, Alert, StatusChip, skeleton), `src/icons.tsx`, `src/theme.ts`.
 - Màn hình: đăng nhập / tạo tài khoản; `/portal/invite/:token` (đăng nhập hoặc đăng ký rồi nhận lời mời, mỗi link chỉ gọi accept một lần dù StrictMode chạy effect hai lần); danh sách yêu cầu; gửi yêu cầu (tối đa 5 tệp); chi tiết (trạng thái, tải tệp, bổ sung tệp). User đăng nhập nhưng chưa là requester thấy thông báo "chưa được cấp quyền".
 
 ## Chạy và build
@@ -28,3 +28,9 @@ Trình duyệt tích hợp, tài khoản test cục bộ (biến `DEVFLOW_TEST_P
 - Chưa kiểm chứng trên Safari/Firefox và trình đọc màn hình; chưa có test thành phần React (chỉ test logic thuần).
 - User là requester của nhiều công ty chưa chọn được công ty trên giao diện (API cần `companyId`).
 - Xóa file đang chọn trước khi gửi, hay lỗi mạng giữa chừng khi tải lên, mới kiểm tra bằng logic, chưa bằng thao tác thật.
+
+## Giao diện (làm lại 2026-10-18, dùng skill ui-ux-pro-max)
+- **Đồng nhất với Board của Paperclip:** cùng tên biến và giá trị token (`--background`, `--foreground`, `--card`, `--primary`, `--muted`, `--border`, `--input`, `--ring`, `--destructive`, bán kính 0.5rem) lấy từ `ui/src/index.css`, cùng phông Inter (`/fonts/InterVariable.woff2` do server phục vụ), nút chính đen/trắng như Board. Chỉ có màu trạng thái (`--info-*`, `--success-*`, `--danger-*`) là riêng của portal, có giá trị sáng và tối.
+- **Chuyển sáng/tối:** nút mặt trời/mặt trăng trên thanh đầu trang. Dùng chung khóa `paperclip.theme` và lớp `dark` trên `<html>` với Board, nên chọn ở đâu cũng áp dụng cho cả hai (cùng origin). Chưa chọn thì theo hệ điều hành. Script nhỏ trong `index.html` đặt giao diện trước khi vẽ để không bị chớp trắng; khi chuyển, hiệu ứng chuyển màu tắt trong một khung hình để màu nền và chữ đổi cùng lúc.
+- **Trải nghiệm:** liên kết "bỏ qua đến nội dung", nhãn có `htmlFor`, báo lỗi dưới từng ô khi rời ô (`aria-invalid`), nút hiện/ẩn mật khẩu, vùng kéo thả tệp, danh sách tệp có nút bỏ, trạng thái đang tải dạng khung xương, trạng thái rỗng có nút hành động, nút chính ở bên phải thanh cuối form, vùng bấm tối thiểu 44px, biểu tượng SVG (không emoji), tôn trọng `prefers-reduced-motion`.
+- **Kiểm chứng:** `tsc` sạch, 18 test (14 logic cũ + 4 theme), build Vite; xem trên trình duyệt thật (qua proxy xem trước) ở sáng, tối và rộng 375px: đăng nhập, danh sách, form gửi (kèm lỗi), chi tiết. Chưa thử bằng trình đọc màn hình và chưa đo tương phản bằng công cụ (dùng cặp màu của Paperclip và tint riêng chọn theo mức tương phản cao).

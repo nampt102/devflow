@@ -5,6 +5,9 @@ export const vi = {
   signOut: "Đăng xuất",
   back: "Quay lại",
   retry: "Thử lại",
+  skipToContent: "Bỏ qua đến nội dung chính",
+  brandSub: "Cổng yêu cầu",
+  theme: { toLight: "Chuyển sang giao diện sáng", toDark: "Chuyển sang giao diện tối" },
 
   auth: {
     title: "Đăng nhập",
@@ -14,6 +17,9 @@ export const vi = {
     email: "Email",
     password: "Mật khẩu",
     passwordHint: "Ít nhất 8 ký tự",
+    showPassword: "Hiện mật khẩu",
+    hidePassword: "Ẩn mật khẩu",
+    signingIn: "Đang xử lý...",
     signIn: "Đăng nhập",
     registerAndAccept: "Tạo tài khoản và nhận lời mời",
     switchToRegister: "Chưa có tài khoản? Tạo tài khoản",
@@ -34,6 +40,8 @@ export const vi = {
 
   list: {
     title: "Yêu cầu của tôi",
+    subtitle: "Theo dõi trạng thái các yêu cầu bạn đã gửi.",
+    count: "yêu cầu",
     newRequest: "Gửi yêu cầu mới",
     empty: "Bạn chưa gửi yêu cầu nào.",
     emptyHint: "Nhấn \"Gửi yêu cầu mới\" để bắt đầu.",
@@ -51,7 +59,13 @@ export const vi = {
     files: "Tệp đính kèm (không bắt buộc)",
     filesHint: "Tối đa 5 tệp, mỗi tệp không quá 10 MB. Hỗ trợ ảnh, PDF, Word, Excel, PowerPoint, TXT, CSV.",
     chooseFiles: "Chọn tệp",
+    dropPrompt: "Kéo thả tệp vào đây hoặc chọn từ máy",
+    dropFull: "Đã đủ số tệp tối đa",
+    required: "bắt buộc",
+    optional: "không bắt buộc",
+    removeFile: "Bỏ tệp",
     remove: "Bỏ",
+    fieldRequired: "Trường này là bắt buộc.",
     submit: "Gửi yêu cầu",
     submitting: "Đang gửi...",
     submitted: "Đã gửi yêu cầu. Bộ phận IT sẽ xem xét và cập nhật trạng thái tại đây.",
