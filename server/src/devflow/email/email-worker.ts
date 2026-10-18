@@ -5,6 +5,7 @@ import { logActivity } from "../../services/activity-log.js";
 import { statusLabelVi } from "../portal/status-labels.js";
 import { composeStatusEmail } from "./compose.js";
 import { MailError, type SendMail } from "./mailer.js";
+import { createStaffNotifier, type StaffNotifyOptions } from "./staff-notify.js";
 
 // Status-change emails to requesters (openspec/decisions/0016). Two steps per sweep:
 //  1. enqueue: turn new pipeline events of dev-request cases into outbox rows (one row per event);
@@ -21,6 +22,10 @@ export interface EmailWorkerOptions {
   deliverBatch?: number;
   maxAttempts?: number;
   baseBackoffMs?: number;
+  /** First start on an instance with email history: record it as skipped instead of mailing it (default true). */
+  skipHistoryOnFirstStart?: boolean;
+  /** Digest email to staff about new proposals waiting for review; off when omitted. */
+  staff?: StaffNotifyOptions;
 }
 
 type EventRow = {
@@ -47,8 +52,11 @@ export function createEmailWorker(db: Db, send: SendMail, opts: EmailWorkerOptio
   const deliverBatch = opts.deliverBatch ?? 10;
   const maxAttempts = opts.maxAttempts ?? 5;
   const baseBackoff = opts.baseBackoffMs ?? 60_000;
+  let cutoverChecked = false;
+  const staffNotifier = opts.staff ? createStaffNotifier(db, send, opts.staff) : null;
 
-  async function enqueue(): Promise<number> {
+  /** `skipHistory`: record every eligible event as skipped instead of queueing it (first start, see sweep). */
+  async function enqueue(skipHistory = false): Promise<{ queued: number; scanned: number }> {
     const events = (await db.execute(sql`
       select e.id as event_id, e.type, e.case_id, e.company_id, c.case_key, c.title, r.request_number,
              rq.id as requester_id, (rq.deactivated_at is not null) as deactivated, u.email,
@@ -80,6 +88,7 @@ export function createEmailWorker(db: Db, send: SendMail, opts: EmailWorkerOptio
       if (lastOfCase.get(e.case_id) !== e.event_id) [status, note] = ["skipped", "superseded"];
       else if (e.deactivated || !e.email || !e.to_key) [status, note] = ["skipped", "no_recipient"];
       else if (e.type !== "ingested" && statusLabelVi(e.from_key) === label) [status, note] = ["skipped", "same_label"];
+      if (skipHistory && status === "pending") [status, note] = ["skipped", "before_email_enabled"];
       const mail =
         status === "pending"
           ? composeStatusEmail({ requestKey: e.case_key, requestNumber: e.request_number, title: e.title, statusLabel: label, portalBaseUrl: opts.portalBaseUrl })
@@ -101,7 +110,7 @@ export function createEmailWorker(db: Db, send: SendMail, opts: EmailWorkerOptio
         .returning({ id: drEmailOutbox.id });
       if (inserted.length && status === "pending") queued += 1;
     }
-    return queued;
+    return { queued, scanned: events.length };
   }
 
   async function deliver(): Promise<{ sent: number; failed: number }> {
@@ -156,12 +165,21 @@ export function createEmailWorker(db: Db, send: SendMail, opts: EmailWorkerOptio
   }
 
   /** One pass; at most one server instance runs it at a time. */
-  async function sweep(): Promise<{ queued: number; sent: number; failed: number } | null> {
+  async function sweep(): Promise<{ queued: number; sent: number; failed: number; staffDigests: number } | null> {
     return db.transaction(async (lockTx) => {
       const [lock] = await lockTx.execute<{ ok: boolean }>(sql`select pg_try_advisory_xact_lock(hashtext(${LOCK_KEY})) as ok`);
       if (!lock?.ok) return null;
-      const queued = await enqueue();
-      return { queued, ...(await deliver()) };
+      // Email has never run on this instance: whatever history exists must not be mailed. Test data with fake
+      // addresses once got real messages out through the SMTP account when email was first switched on.
+      if (!cutoverChecked) {
+        const [{ n }] = (await lockTx.execute(sql`select count(*)::int as n from dr_email_outbox`)) as unknown as Array<{ n: number }>;
+        if (n === 0 && opts.skipHistoryOnFirstStart !== false) while ((await enqueue(true)).scanned === enqueueBatch);
+        cutoverChecked = true;
+      }
+      const { queued } = await enqueue();
+      const delivered = await deliver();
+      const staffDigests = staffNotifier ? await staffNotifier.run().catch((err) => (logger.error({ err }, "devflow staff notify failed"), 0)) : 0;
+      return { queued, ...delivered, staffDigests };
     });
   }
 

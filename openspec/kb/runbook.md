@@ -51,16 +51,20 @@ Worker email gửi thư cho mọi sự kiện đổi trạng thái trong `DEVFLO
 Dừng khẩn cấp phần agent: đặt `DEVFLOW_WORKERS_ENABLED=false` và `up -d`.
 
 ## 6. Sao lưu và khôi phục
-- Paperclip có sao lưu DB tự động (`/api/health` → `databaseBackup`); vị trí và chu kỳ trong dự án này **chưa xác nhận**, kiểm tra trước pilot.
+- **Sao lưu tự động của Paperclip (đã xác nhận 2026-10-18):** bật mặc định, mỗi 60 phút, giữ 7 ngày; thư mục `/paperclip/instances/default/data/backups` trong container (volume `docker_paperclip-data`), tệp `paperclip-YYYYMMDD-HHMMSS.sql.gz` (SQL thuần, khoảng 0,4 đến 0,6 MB hiện tại). Chỉnh bằng `PAPERCLIP_DB_BACKUP_ENABLED`, `_INTERVAL_MINUTES`, `_RETENTION_DAYS`, `_DIR`. **Đã thử khôi phục bản mới nhất** vào DB trống bằng `gunzip -c file | psql`: 0 lỗi, số dòng khớp ở các bảng `dr_*`, `pipeline_cases`, `activity_log`. Lưu ý: bản sao nằm **cùng volume Docker và cùng ổ đĩa** với dữ liệu thật, nên chưa bảo vệ khi mất máy hoặc ổ đĩa; cần sao chép ra ngoài máy định kỳ. Khi Docker tắt thì không có bản sao (có khoảng trống giờ trong thư mục).
 - Sao lưu thủ công: `docker exec docker-db-1 pg_dump -U paperclip -Fc -f /tmp/devflow.dump paperclip` rồi `docker cp docker-db-1:/tmp/devflow.dump .`.
 - **Đã diễn tập khôi phục (2026-10-18):** dump (1,7 MB) → `pg_restore` vào DB mới trong cùng server pgvector → số dòng giống hệt ở các bảng `dr_requests` (21), `dr_requesters`, `dr_attachments`, `dr_agent_outputs`, `dr_overrides`, `dr_embeddings` (21, extension `vector` có), `dr_email_outbox`, `dr_requester_invites`, `pipeline_cases` (27), `pipeline_case_events`, `cost_events`, `activity_log`; số migration giống (357). Quy trình: `create database restore_check`; `pg_restore -d restore_check --no-owner file.dump`; so số dòng; `drop database restore_check`. Chưa diễn tập khôi phục lên máy khác hoặc khôi phục tệp đính kèm (nằm ngoài DB, trong thư mục lưu trữ của server).
-- Dữ liệu tệp đính kèm nằm ở storage của server (local disk theo mặc định); cần sao lưu thư mục đó riêng.
+- Tệp đính kèm nằm ở `/paperclip/instances/default/data/storage/<companyId>/…`, **cùng volume `docker_paperclip-data`** với thư mục sao lưu DB. Sao lưu volume này (và volume `docker_pgdata` nếu muốn sao chép DB thô) ra ngoài máy; bản dump `.sql.gz` không chứa tệp đính kèm.
 
 ## 7. Telemetry của Paperclip
 Mặc định bật và gửi về endpoint của Paperclip. Tắt bằng `PAPERCLIP_TELEMETRY_DISABLED=1` (hoặc `DO_NOT_TRACK=1`), đã đọc trong `packages/shared/src/telemetry/config.ts`. Compose override của DevFlow đặt mặc định tắt. Chưa quan sát lưu lượng ra ngoài thực tế để xác nhận.
 
 ## 8. Đóng đăng ký công khai
-Đăng ký công khai đang **mở** theo mặc định (ADR 0012). Chỉ đặt `PAPERCLIP_AUTH_DISABLE_SIGN_UP=true` khi: instance đã có admin; nhân viên mới được tạo bằng `POST /api/admin/users`; requester vào qua link mời. Chưa kiểm chứng ở môi trường thật: luồng bootstrap admin đầu tiên và mời thành viên board khi đã đóng (xem `admin-accounts.md`). Khi mở, người lạ tạo được tài khoản nhưng không có quyền gì.
+Đăng ký công khai đang **mở** theo mặc định (ADR 0012). Khi mở, người lạ tạo được tài khoản nhưng không có quyền gì. Thứ tự đúng để đóng (đã kiểm chứng 2026-10-18 trên một instance thử với DB trống):
+1. **Bootstrap admin đầu tiên khi đăng ký còn mở** (đăng ký rồi claim instance). Trên instance mới với `PAPERCLIP_AUTH_DISABLE_SIGN_UP=true`, đăng ký bị từ chối (`400 EMAIL_PASSWORD_SIGN_UP_DISABLED`) và nhận lời mời bootstrap đòi người dùng đã đăng nhập, nên **không có cách nào tạo admin đầu tiên qua HTTP**.
+2. Sau khi đã có admin, đặt `PAPERCLIP_AUTH_DISABLE_SIGN_UP=true` và `up -d`.
+3. Nhân viên mới: admin gọi `POST /api/admin/users` (kèm `companyIds`, mật khẩu trả một lần). Người đã có tài khoản vẫn đăng nhập bình thường. Requester vào qua link mời (đăng ký theo lời mời vẫn chạy khi đã đóng, xem `admin-accounts.md`).
+
 
 ## 9. Chính sách dữ liệu
 Triage gửi nội dung yêu cầu (tiêu đề, mô tả, tác động, tên tệp, đoạn mô tả của yêu cầu tương tự) tới nhà cung cấp LLM và embedding đã cấu hình. **Pilot với dữ liệu thật nên dùng vLLM và embedding chạy local**; API ngoài (Anthropic, OpenAI, Google) chỉ dùng với dữ liệu mẫu hoặc khi chủ dự án chấp thuận chính sách dữ liệu. Không gửi nội dung tệp đính kèm, không gửi email hay tên người gửi tới model. Nhân viên thấy tên (không email) của requester trong màn hình duyệt.
@@ -76,6 +80,6 @@ Quét 30 commit của DevFlow (từ `935c17b6e`) và cây tệp: không có giá
 - [ ] Chọn nhà cung cấp LLM theo chính sách dữ liệu (mục 9); đặt `DEVFLOW_LLM_*`, thử bằng `smoke-p1.mjs`.
 - [x] Gmail: đã đặt `DEVFLOW_SMTP_*` và gửi thật thành công (2026-10-18, xem `email-notifications.md`); còn xác nhận người nhận thấy thư trong hộp thư.
 - [ ] Cung cấp ~20 yêu cầu mẫu thật và vài cặp trùng để hiệu chỉnh ngưỡng dedupe (0.3 trigram, 0.65 vector); xác nhận định nghĩa ưu tiên và độ khó (prompt v4 thay bản TEMPORARY).
-- [ ] Xác nhận vị trí và chu kỳ sao lưu tự động của Paperclip; sao lưu thư mục tệp đính kèm.
-- [ ] Quyết định bật đóng đăng ký công khai (mục 8) và kiểm thử luồng bootstrap.
+- [x] Sao lưu tự động đã xác nhận (mục 6); còn làm: sao chép bản sao và tệp đính kèm ra ngoài máy.
+- [x] Luồng bootstrap khi đóng đăng ký đã kiểm (mục 8: phải bootstrap trước, rồi mới đóng); còn quyết định thời điểm đóng.
 - [ ] Xem xét AGPL (ADR 0002) trước khi triển khai ngoài thử nghiệm.

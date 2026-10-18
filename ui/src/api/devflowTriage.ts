@@ -30,6 +30,7 @@ export interface TriageQueueItem {
   version: number;
   outputId: string;
   promptVersion: string;
+  proposedAt: string;
   proposal: TriageProposalSummary;
 }
 
@@ -102,6 +103,7 @@ export interface TriageMetrics {
 }
 
 export const devflowTriageApi = {
+  count: (companyId: string) => api.get<{ waiting: number; newest: string | null }>(`/companies/${companyId}/devflow/triage-count`),
   metrics: (companyId: string, days = 30) => api.get<TriageMetrics>(`/companies/${companyId}/devflow/triage-metrics?days=${days}`),
   queue: (companyId: string) => api.get<{ items: TriageQueueItem[] }>(`/companies/${companyId}/devflow/triage-queue`),
   detail: (companyId: string, caseId: string) => api.get<TriageDetail>(`/companies/${companyId}/devflow/triage-cases/${caseId}`),

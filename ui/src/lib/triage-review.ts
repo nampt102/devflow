@@ -111,3 +111,47 @@ export const FIELD_LABELS: Record<string, string> = {
   requiresHumanReasons: "Developer reasons",
   duplicateOf: "Duplicate of",
 };
+
+export type QueueOrder = "newest" | "oldest";
+
+/** Order by when the proposal arrived. Ties keep the server's order. */
+export function sortQueue(items: TriageQueueItem[], order: QueueOrder): TriageQueueItem[] {
+  const at = (i: TriageQueueItem) => new Date(i.proposedAt).getTime();
+  return [...items].sort((a, b) => (order === "newest" ? at(b) - at(a) : at(a) - at(b)));
+}
+
+/** "New" = arrived after the reviewer last left the page. Unknown last visit (first time) marks nothing. */
+export const isNewSince = (proposedAt: string, seenAt: number | null): boolean => seenAt !== null && new Date(proposedAt).getTime() > seenAt;
+
+const seenKey = (companyId: string) => `devflow.triage.seenAt:${companyId}`;
+const ORDER_KEY = "devflow.triage.order";
+
+export function readSeenAt(companyId: string): number | null {
+  try {
+    const v = Number(localStorage.getItem(seenKey(companyId)));
+    return Number.isFinite(v) && v > 0 ? v : null;
+  } catch {
+    return null;
+  }
+}
+export function writeSeenAt(companyId: string, at: number = Date.now()): void {
+  try {
+    localStorage.setItem(seenKey(companyId), String(at));
+  } catch {
+    /* storage can be blocked; the labels just do not persist */
+  }
+}
+export function readOrder(): QueueOrder {
+  try {
+    return localStorage.getItem(ORDER_KEY) === "oldest" ? "oldest" : "newest";
+  } catch {
+    return "newest";
+  }
+}
+export function writeOrder(order: QueueOrder): void {
+  try {
+    localStorage.setItem(ORDER_KEY, order);
+  } catch {
+    /* see above */
+  }
+}

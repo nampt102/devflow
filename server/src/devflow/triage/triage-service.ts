@@ -22,6 +22,10 @@ import { ruleFlags } from "./rules.js";
 import { parseTriageOutput, triageOutputSchema, TriageOutputError, REQUIRES_HUMAN_REASONS } from "./schema.js";
 
 export const TRIAGE_PIPELINE_KEY = "dev-request";
+// The agent row only attributes token usage; Triage itself runs inside the server. Say so where people look.
+export const TRIAGE_AGENT_NAME = "DevFlow Triage (internal)";
+export const TRIAGE_AGENT_NOTE =
+  "Internal DevFlow worker: classifies intake requests and records token usage here. It has no runtime of its own, so the Test button under Runtime is expected to fail. Nothing to configure.";
 const MAX_ATTEMPTS = 2; // one retry when the model's JSON is rejected
 const caps = { title: 300, description: 8000, impact: 2000, fileName: 120, files: 10 };
 
@@ -64,7 +68,13 @@ export function triageService(
         .where(and(eq(agents.companyId, companyId), sql`${agents.metadata}->>'devflowRole' = ${PROMPT_ROLE}`))
         .then((r) => r[0]?.id);
     const existing = await find(db);
-    if (existing) return existing;
+    if (existing) {
+      await db
+        .update(agents)
+        .set({ name: TRIAGE_AGENT_NAME, capabilities: TRIAGE_AGENT_NOTE, updatedAt: new Date() })
+        .where(and(eq(agents.id, existing), sql`(${agents.name} is distinct from ${TRIAGE_AGENT_NAME} or ${agents.capabilities} is distinct from ${TRIAGE_AGENT_NOTE})`));
+      return existing;
+    }
     return db.transaction(async (tx) => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"dr-triage-agent:" + companyId}))`);
       const again = await find(tx as unknown as Db);
@@ -73,9 +83,10 @@ export function triageService(
         .insert(agents)
         .values({
           companyId,
-          name: "DevFlow Triage",
+          name: TRIAGE_AGENT_NAME,
           role: "general",
           title: "Triage (DevFlow)",
+          capabilities: TRIAGE_AGENT_NOTE,
           status: "idle",
           runtimeConfig: { heartbeat: { enabled: false } },
           metadata: { devflowRole: PROMPT_ROLE },

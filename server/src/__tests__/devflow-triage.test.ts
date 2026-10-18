@@ -151,6 +151,19 @@ describeEmbeddedPostgres("devflow triage", () => {
     expect(fake.requests[0].headers.authorization).toBe("Bearer test-key");
   });
 
+  it("labels the triage agent as an internal worker, and relabels one created under the old name", async () => {
+    const ctx = await seedCompany();
+    const id = await service().ensureTriageAgent(ctx.company.id);
+    const [row] = await db.select().from(agents).where(eq(agents.id, id));
+    expect(row.name).toBe("DevFlow Triage (internal)");
+    expect(row.capabilities).toContain("Test button");
+    await db.update(agents).set({ name: "DevFlow Triage", capabilities: null }).where(eq(agents.id, id));
+    expect(await service().ensureTriageAgent(ctx.company.id)).toBe(id);
+    const [again] = await db.select().from(agents).where(eq(agents.id, id));
+    expect(again).toMatchObject({ name: "DevFlow Triage (internal)" });
+    expect(again.capabilities).toContain("Test button");
+  });
+
   it("keeps one triage agent per company even when asked concurrently", async () => {
     const ctx = await seedCompany();
     const svc = service();

@@ -22,3 +22,12 @@ Migration `0358_devflow_email_outbox`: `dr_email_outbox` (khóa ngoại kép t�
 ## Kiểm chứng
 `packages/db/src/dr-email-outbox-migration.test.ts` (6 ca) và `server/src/__tests__/devflow-email.test.ts` (12 ca: nodemailer thật + SMTP giả `devflow/email/fake-smtp.ts`): một thư cho chuỗi bước nhanh và không gửi lại, nhãn trùng, trễ/quá cũ/loại sự kiện, requester vô hiệu hóa và cách ly công ty, backoff rồi gửi được, bỏ cuộc không lộ nội dung, dừng lô khi sai đăng nhập, xác thực, hai worker và khóa advisory. 8 đột biến bị bắt (bỏ gộp, bỏ tuổi tối đa, bỏ trễ, bỏ kiểm vô hiệu hóa, bỏ nhãn trùng, bỏ dừng lô, bỏ khóa, bỏ backoff).
 Chưa làm: giới hạn tần suất theo người nhận, email cho nhân viên duyệt, mẫu HTML, hủy đăng ký.
+
+## Email cho nhân viên khi có yêu cầu mới chờ duyệt (B-01, 2026-10-18)
+- Cùng worker email (`staff-notify.ts`), bật khi email bật; tắt bằng `DEVFLOW_STAFF_NOTIFY_ENABLED=false`. Mỗi công ty một thư tóm tắt: yêu cầu đầu tiên gửi ngay, các yêu cầu sau được gom và gửi khi đã qua `DEVFLOW_STAFF_NOTIFY_INTERVAL_MINUTES` (mặc định 5) kể từ thư trước. Mới nhất xếp trước, tối đa 20 dòng rồi "... và N yêu cầu khác".
+- **Người nhận:** danh sách `DEVFLOW_STAFF_NOTIFY_EMAILS` (phân tách bằng dấu phẩy hoặc chấm phẩy; áp dụng cho mọi công ty); nếu để trống thì là các thành viên **owner và admin đang hoạt động** của công ty đó (không gồm operator, viewer, agent, thành viên bị tạm ngưng). Trên stack này đã đặt `jamesphan102@gmail.com`.
+- Nội dung chỉ có mã REQ, tiêu đề (một dòng) và link tới `${DEVFLOW_PORTAL_BASE_URL}/<tiền tố công ty>/triage`; không có mô tả hay đề xuất của agent.
+- Không thêm bảng: sổ cái là `activity_log` (`staff.notified` ghi số lượng, mốc đề xuất mới nhất đã báo và số người nhận, không ghi địa chỉ; `staff.notify_failed` ghi loại lỗi). Gửi lỗi thì không ghi sổ và chờ hết khoảng gom rồi thử lại; gửi được cho ít nhất một người thì tính là đã gửi. Bỏ qua đề xuất cũ hơn `DEVFLOW_STAFF_NOTIFY_MAX_AGE_HOURS` (mặc định 24).
+- Cùng với số đếm trên mục "Triage review" ở sidebar (làm mới 30 giây), nhãn "New" (đến sau lần bạn rời trang gần nhất; lần đầu không đánh dấu) và nút đổi thứ tự (mặc định mới nhất trước, nhớ trong trình duyệt).
+- **Lần chạy email đầu trên instance (B-22):** khi bảng gửi thư còn trống, toàn bộ sự kiện cũ được ghi `skipped` (`before_email_enabled`) thay vì gửi.
+- Kiểm chứng: `devflow-staff-notify.test.ts` (10 ca), `devflow-email-cutover.test.ts`; 7 đột biến của thông báo nhân viên và 2 của cutover bị bắt (đột biến thứ ba là tương đương).

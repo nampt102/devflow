@@ -27,7 +27,14 @@ import {
   finalPatch,
   HUMAN_REASON_LABELS,
   HUMAN_REASONS,
+  isNewSince,
   pct,
+  readOrder,
+  readSeenAt,
+  sortQueue,
+  writeOrder,
+  writeSeenAt,
+  type QueueOrder,
   PRIORITIES,
   scoreLabel,
   type QueueFilter,
@@ -48,6 +55,19 @@ export function TriageReview() {
   const { setBreadcrumbs } = useBreadcrumbs();
   const [filter, setFilter] = useState<QueueFilter>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [order, setOrder] = useState<QueueOrder>(readOrder);
+  // When the reviewer last left this page: anything that arrived since carries a "New" label.
+  const [seenAt, setSeenAt] = useState<number | null>(null);
+  useEffect(() => {
+    if (!selectedCompanyId) return;
+    setSeenAt(readSeenAt(selectedCompanyId));
+    const mark = () => writeSeenAt(selectedCompanyId);
+    window.addEventListener("pagehide", mark);
+    return () => {
+      mark();
+      window.removeEventListener("pagehide", mark);
+    };
+  }, [selectedCompanyId]);
 
   useEffect(() => {
     setBreadcrumbs([{ label: "Triage review" }]);
@@ -61,7 +81,8 @@ export function TriageReview() {
     refetchInterval: 30_000,
   });
   const all = queueQuery.data?.items ?? [];
-  const items = useMemo(() => filterQueue(all, filter), [all, filter]);
+  const items = useMemo(() => sortQueue(filterQueue(all, filter), order), [all, filter, order]);
+  const newCount = all.filter((i) => isNewSince(i.proposedAt, seenAt)).length;
   const activeId = selectedId && items.some((i) => i.caseId === selectedId) ? selectedId : (items[0]?.caseId ?? null);
 
   if (!selectedCompanyId) return <EmptyState icon={ClipboardCheck} message="Select an organization to review triage proposals." />;
@@ -72,7 +93,7 @@ export function TriageReview() {
       <div>
         <h1 className="text-2xl font-semibold tracking-normal text-foreground">Triage review</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {all.length} request{all.length === 1 ? "" : "s"} waiting. The agent only proposes; your decision moves the request on.
+          {all.length} request{all.length === 1 ? "" : "s"} waiting{newCount > 0 ? ` (${newCount} new since your last visit)` : ""}. The agent only proposes; your decision moves the request on.
         </p>
       </div>
 
@@ -86,6 +107,19 @@ export function TriageReview() {
             {f.label}
           </Button>
         ))}
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          onClick={() => {
+            const next: QueueOrder = order === "newest" ? "oldest" : "newest";
+            writeOrder(next);
+            setOrder(next);
+          }}
+          aria-label={`Sorted ${order === "newest" ? "newest" : "oldest"} first. Click to reverse.`}
+        >
+          {order === "newest" ? "Newest first" : "Oldest first"}
+        </Button>
       </div>
 
       {items.length === 0 ? (
@@ -102,7 +136,10 @@ export function TriageReview() {
                   className={`w-full border p-3 text-left transition-colors hover:bg-accent/50 ${item.caseId === activeId ? "border-primary bg-accent/40" : "border-border"}`}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-mono text-xs text-muted-foreground">{item.caseKey}</span>
+                    <span className="flex items-center gap-2">
+                      <span className="font-mono text-xs text-muted-foreground">{item.caseKey}</span>
+                      {isNewSince(item.proposedAt, seenAt) ? <Badge>New</Badge> : null}
+                    </span>
                     <span className="text-xs text-muted-foreground">{ageLabel(item.createdAt)}</span>
                   </div>
                   <p className="mt-1 text-sm font-medium text-foreground">{item.title}</p>

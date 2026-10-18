@@ -28,6 +28,12 @@ export function triageReviewRoutes(db: Db, deps: { reviewCase: ReviewCase }) {
     res.json(await svc.queue(companyId));
   });
 
+  router.get("/companies/:companyId/devflow/triage-count", async (req, res) => {
+    const companyId = req.params.companyId as string;
+    staffUser(req, companyId);
+    res.json(await svc.count(companyId));
+  });
+
   router.get("/companies/:companyId/devflow/triage-metrics", async (req, res) => {
     const companyId = req.params.companyId as string;
     staffUser(req, companyId);

@@ -169,9 +169,29 @@ describeEmbeddedPostgres("devflow triage review", () => {
     expect(keys).not.toContain(theirs.key);
     const item = res.body.items.find((i: any) => i.caseKey === waiting.key);
     expect(item).toMatchObject({ requesterName: "Nguyễn Văn A", outputId: waiting.outputId, promptVersion: "v2" });
+    expect(Number.isNaN(new Date(item.proposedAt).getTime())).toBe(false); // when the proposal arrived, for the "New" label and sorting
     expect(item.proposal).toMatchObject({ classification: "feature", priority: "medium" });
     expect(JSON.stringify(res.body)).not.toContain("@example.test");
     expect(JSON.stringify(res.body)).not.toContain(a.requesterUser);
+  });
+
+  it("counts waiting proposals for the sidebar badge, scoped to the company and to staff", async () => {
+    const a = await seedCompany();
+    const b = await seedCompany();
+    await seedRequest(a);
+    await seedRequest(a);
+    await seedRequest(a, { stage: "triage" }); // not yet submitted for review
+    await seedRequest(b);
+    const url = (id: string) => `/api/companies/${id}/devflow/triage-count`;
+    const res = await request(app(staff(a.reviewer, a.company.id))).get(url(a.company.id));
+    expect(res.status).toBe(200);
+    expect(res.body.waiting).toBe(2);
+    expect(Number.isNaN(new Date(res.body.newest).getTime())).toBe(false);
+    expect((await request(app(staff(b.reviewer, b.company.id))).get(url(b.company.id))).body.waiting).toBe(1);
+    expect((await request(app(staff(b.reviewer, b.company.id))).get(url(a.company.id))).status).toBe(404);
+    expect((await request(app({ type: "none" } as any)).get(url(a.company.id))).status).toBe(401);
+    const empty = await seedCompany();
+    expect((await request(app(staff(empty.reviewer, empty.company.id))).get(url(empty.company.id))).body).toEqual({ waiting: 0, newest: null });
   });
 
   it("shows the detail with the model's reasons and the server's duplicate scores", async () => {

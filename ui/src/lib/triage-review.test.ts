@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TriageDetail, TriageQueueItem } from "../api/devflowTriage";
-import { ageLabel, changedFields, decisionBlocker, draftFromDetail, durationLabel, filterQueue, finalPatch, pct, scoreLabel } from "./triage-review";
+import { ageLabel, changedFields, decisionBlocker, draftFromDetail, durationLabel, filterQueue, finalPatch, isNewSince, pct, readOrder, readSeenAt, scoreLabel, sortQueue } from "./triage-review";
 
 const detail = (over: Partial<TriageDetail["proposal"]> = {}, candidates: TriageDetail["candidates"] = []): TriageDetail => ({
   caseId: "c1",
@@ -104,6 +104,7 @@ describe("queue helpers", () => {
     version: 1,
     outputId: "o",
     promptVersion: "v3",
+    proposedAt: "2026-10-17T00:00:00Z",
     proposal: { ...detail().proposal, ...over },
   });
   it("filters by needs-developer and possible duplicate", () => {
@@ -133,5 +134,29 @@ describe("metric formatting", () => {
     expect(durationLabel(12 * 60)).toBe("12 min");
     expect(durationLabel(3.5 * 3600)).toBe("3.5 h");
     expect(durationLabel(3 * 86400)).toBe("3 d");
+  });
+});
+
+describe("new-arrival helpers", () => {
+  const at = (iso: string): TriageQueueItem => ({ ...(({ caseId: iso, caseKey: iso, requestNumber: 1, title: "t", requesterName: "A", attachments: 0, createdAt: iso, version: 1, outputId: iso, promptVersion: "v3", proposedAt: iso, proposal: detail().proposal }) as TriageQueueItem) });
+
+  it("sorts by the time the proposal arrived, newest or oldest first", () => {
+    const items = [at("2026-10-17T10:00:00Z"), at("2026-10-17T12:00:00Z"), at("2026-10-17T11:00:00Z")];
+    expect(sortQueue(items, "newest").map((i) => i.proposedAt.slice(11, 13))).toEqual(["12", "11", "10"]);
+    expect(sortQueue(items, "oldest").map((i) => i.proposedAt.slice(11, 13))).toEqual(["10", "11", "12"]);
+    expect(items.map((i) => i.proposedAt.slice(11, 13))).toEqual(["10", "12", "11"]); // input untouched
+  });
+
+  it("marks only what arrived after the last visit, and nothing on a first visit", () => {
+    const seen = new Date("2026-10-17T11:00:00Z").getTime();
+    expect(isNewSince("2026-10-17T11:30:00Z", seen)).toBe(true);
+    expect(isNewSince("2026-10-17T10:30:00Z", seen)).toBe(false);
+    expect(isNewSince("2026-10-17T11:00:00Z", seen)).toBe(false);
+    expect(isNewSince("2026-10-17T11:30:00Z", null)).toBe(false);
+  });
+
+  it("falls back quietly when browser storage is unavailable", () => {
+    expect(readSeenAt("c")).toBeNull();
+    expect(readOrder()).toBe("newest");
   });
 });

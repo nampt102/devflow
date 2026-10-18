@@ -77,7 +77,7 @@ export function triageReviewService(db: Db, deps: { reviewCase: ReviewCase }) {
     const list = await rows(sql`
       select c.id as case_id, c.case_key, c.title, c.version, c.created_at, r.request_number, u.name as requester_name,
              (select count(*)::int from dr_attachments a where a.case_id = c.id and a.company_id = c.company_id) as attachments,
-             o.id as output_id, o.prompt_version, o.data
+             o.id as output_id, o.prompt_version, o.created_at as proposed_at, o.data
       from pipeline_cases c
       join pipelines p on p.id = c.pipeline_id and p.key = 'dev-request'
       join pipeline_stages st on st.id = c.stage_id and st.key = 'triage_review'
@@ -100,9 +100,22 @@ export function triageReviewService(db: Db, deps: { reviewCase: ReviewCase }) {
         version: r.version,
         outputId: r.output_id,
         promptVersion: r.prompt_version,
+        proposedAt: r.proposed_at,
         proposal: proposalSummary(r.data ?? {}),
       })),
     };
+  }
+
+  /** Cheap count for the sidebar badge: proposals waiting for review and when the newest one arrived. */
+  async function count(companyId: string) {
+    const [r] = await rows(sql`
+      select count(*)::int as waiting, max(o.created_at) as newest
+      from pipeline_cases c
+      join pipelines p on p.id = c.pipeline_id and p.key = 'dev-request'
+      join pipeline_stages st on st.id = c.stage_id and st.key = 'triage_review'
+      join dr_agent_outputs o on o.case_id = c.id and o.company_id = c.company_id and o.stage_key = 'triage' and o.status = 'proposed'
+      where c.company_id = ${companyId} and c.terminal_kind is null`);
+    return { waiting: r?.waiting ?? 0, newest: r?.newest ? new Date(r.newest).toISOString() : null };
   }
 
   async function candidatesFor(companyId: string, data: Row) {
@@ -297,5 +310,5 @@ export function triageReviewService(db: Db, deps: { reviewCase: ReviewCase }) {
     return { ok: true as const, decision: body.decision, overriddenFields: overridden };
   }
 
-  return { queue, detail, decide };
+  return { queue, count, detail, decide };
 }

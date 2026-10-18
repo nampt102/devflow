@@ -87,7 +87,7 @@ describeEmbeddedPostgres("devflow status emails", () => {
     ...extra,
   });
   const worker = (opts: Partial<Parameters<typeof createEmailWorker>[2]> = {}, cfg: Partial<MailConfig> = {}) =>
-    createEmailWorker(db, createSender(mailConfig(cfg)), { portalBaseUrl: "https://devflow.example", delaySeconds: 0, ...opts });
+    createEmailWorker(db, createSender(mailConfig(cfg)), { portalBaseUrl: "https://devflow.example", delaySeconds: 0, skipHistoryOnFirstStart: false, ...opts });
 
   async function seedCompany() {
     const [company] = await db

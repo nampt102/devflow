@@ -36,6 +36,7 @@ import { attentionApi } from "../api/attention";
 import { heartbeatsApi } from "../api/heartbeats";
 import { instanceSettingsApi } from "../api/instanceSettings";
 import { queryKeys } from "../lib/queryKeys";
+import { devflowTriageApi } from "../api/devflowTriage";
 import { attentionBadgeCount } from "../lib/attention";
 import { useInboxBadge } from "../hooks/useInboxBadge";
 import { usePublishSharedQueryData, useSharedPollingQuery } from "../hooks/useSharedPolling";
@@ -82,6 +83,14 @@ export function Sidebar() {
   const showWorkspacesLink = experimentalSettings?.enableIsolatedWorkspaces === true;
   const showApps = experimentalSettings?.enableApps === true;
   const showPipelines = experimentalSettings?.enablePipelines === true;
+  // Proposals waiting for review (DevFlow): the count rides on the Triage review row.
+  const { data: triageCount } = useQuery({
+    queryKey: queryKeys.devflowTriage.count(selectedCompanyId!),
+    queryFn: () => devflowTriageApi.count(selectedCompanyId!),
+    enabled: !!selectedCompanyId && showPipelines,
+    refetchInterval: 30_000,
+    retry: false,
+  });
   const showStatusCards = experimentalSettings?.enableStatusCards === true;
   const goalsLinkPending = experimentalSettings === undefined;
   const showGoalsLink = experimentalSettings?.enableGoalsSidebarLink === true;
@@ -190,7 +199,7 @@ export function Sidebar() {
             <SidebarNavItem to="/pipelines" label="Pipelines" icon={GitBranch} />
           ) : null}
           {showPipelines ? (
-            <SidebarNavItem to="/triage" label="Triage review" icon={ClipboardCheck} />
+            <SidebarNavItem to="/triage" label="Triage review" icon={ClipboardCheck} badge={triageCount?.waiting || undefined} badgeLabel="waiting for review" />
           ) : null}
           {showGoalsLink ? (
             <SidebarNavItem to="/goals" label="Goals" icon={Target} />
