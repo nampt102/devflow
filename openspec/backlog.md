@@ -7,7 +7,7 @@ Mức ưu tiên: **A** cần trước pilot, **B** nên làm sớm trong pilot, 
 ## Màn hình duyệt (nhân viên)
 | Mã | Nội dung | Ưu tiên | Nguồn |
 |---|---|---|---|
-| B-01 | **Không có thông báo khi có yêu cầu mới chờ duyệt**; phải vào trang và cuộn. Đề xuất: số đếm ở sidebar, nhãn "New" + đổi thứ tự, email cho nhân viên (gom 5 phút, danh sách `DEVFLOW_STAFF_NOTIFY_EMAILS`) | A | chủ dự án, 2026-10-18 (chờ duyệt thiết kế) |
+| B-01 | **Không có thông báo khi có yêu cầu mới chờ duyệt**; phải vào trang và cuộn. Đề xuất: số đếm ở sidebar, nhãn "New" + đổi thứ tự, email cho nhân viên (gom 5 phút, danh sách `DEVFLOW_STAFF_NOTIFY_EMAILS`) | A | chủ dự án, 2026-10-18. **Đã chọn làm cả 3 (sidebar + nhãn New/sắp xếp + email gom 5 phút); chưa làm, chờ chủ dự án rà soát xong rồi mới code.** Chưa chốt: người nhận email ban đầu (đề xuất hai hộp thư test) |
 | B-02 | Hàng chờ xếp cũ nhất trước nên yêu cầu mới ở cuối; chưa có tìm kiếm trong hàng chờ | B | thấy khi dùng |
 | B-03 | Dưới 1024px hàng chờ xếp trên chi tiết, phải cuộn | C | `kb/triage-review.md` |
 | B-04 | Chọn bản trùng chỉ trong danh sách ứng viên, chưa nhập mã REQ bất kỳ | B | `kb/triage-review.md` |
