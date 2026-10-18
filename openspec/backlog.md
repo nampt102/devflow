@@ -21,7 +21,7 @@ Mức ưu tiên: **A** cần trước pilot, **B** nên làm sớm trong pilot, 
 ## Portal và tài khoản
 | Mã | Nội dung | Ưu tiên | Nguồn |
 |---|---|---|---|
-| A-11 | Chưa có màn hình cho nhân viên tạo link mời requester và tạo tài khoản (chỉ có API) | A | `kb/admin-accounts.md` |
+| A-11 | **Xong (chờ kiểm tra trên stack)**: trang Portal access (link mời requester; tạo tài khoản và reset mật khẩu cho instance admin), xem `kb/admin-accounts.md` | done | `kb/admin-accounts.md` |
 | B-12 | Chưa có đổi mật khẩu, buộc đổi mật khẩu lần đầu, và email gửi thông tin tài khoản | B | `kb/admin-accounts.md` |
 | A-13 | **Đã kiểm (2026-10-18)**: trên instance trống, đóng đăng ký khiến không tạo được admin đầu tiên; quy trình: bootstrap khi mở rồi mới đóng (runbook mục 8). Còn lại: chủ dự án quyết thời điểm đóng | done (kiểm tra) | `kb/runbook.md` mục 8 |
 

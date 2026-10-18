@@ -13,6 +13,7 @@ import {
   Repeat,
   Layers,
   ClipboardCheck,
+  UserPlus,
   GitBranch,
   Package,
   Settings,
@@ -197,6 +198,9 @@ export function Sidebar() {
           <SidebarNavItem to="/routines" label="Routines" icon={Repeat} />
           {showPipelines ? (
             <SidebarNavItem to="/pipelines" label="Pipelines" icon={GitBranch} />
+          ) : null}
+          {showPipelines ? (
+            <SidebarNavItem to="/portal-access" label="Portal access" icon={UserPlus} />
           ) : null}
           {showPipelines ? (
             <SidebarNavItem to="/triage" label="Triage review" icon={ClipboardCheck} badge={triageCount?.waiting || undefined} badgeLabel="waiting for review" />

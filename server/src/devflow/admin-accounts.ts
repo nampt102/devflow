@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { Router } from "express";
 import { z } from "zod";
 import { hashPassword } from "better-auth/crypto";
@@ -68,6 +68,17 @@ export function adminAccounts(db: Db, deps: Deps = defaultDeps) {
       return { user: { id: userId, name, email }, companyIds, ...(generated ? { password } : {}) };
     },
 
+    /** People of one company (users only), for the Portal access page. No secrets: whether a password exists is a boolean. */
+    async listCompanyUsers(companyId: string) {
+      const rows = (await db.execute(sql`
+        select u.id, u.name, u.email, m.membership_role as role, m.status,
+               exists (select 1 from account a where a.user_id = u.id and a.provider_id = 'credential') as has_password
+        from company_memberships m join "user" u on u.id = m.principal_id
+        where m.company_id = ${companyId} and m.principal_type = 'user'
+        order by lower(u.name), u.email`)) as unknown as Array<{ id: string; name: string; email: string; role: string | null; status: string; has_password: boolean }>;
+      return rows.map((r) => ({ id: r.id, name: r.name, email: r.email, membershipRole: r.role, status: r.status, hasPassword: r.has_password }));
+    },
+
     /** Replaces the credential password and signs the user out everywhere. */
     async resetPassword(actorUserId: string | null, userId: string, suppliedPassword?: string) {
       const [user] = await db.select({ id: authUsers.id, email: authUsers.email }).from(authUsers).where(eq(authUsers.id, userId));
@@ -111,6 +122,14 @@ export function adminAccountRoutes(db: Db, deps?: Deps) {
       });
     }
   };
+
+  router.get("/admin/users", async (req, res) => {
+    guard(req);
+    const parsed = z.string().uuid().safeParse(req.query.companyId);
+    if (!parsed.success) throw badRequest("companyId is required");
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ items: await service.listCompanyUsers(parsed.data) });
+  });
 
   router.post("/admin/users", async (req, res) => {
     guard(req);

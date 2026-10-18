@@ -76,6 +76,29 @@ describeEmbeddedPostgres("devflow instance admin accounts", () => {
   const usersWithEmail = async (email: string) =>
     db.select().from(authUsers).where(sql`lower(${authUsers.email}) = ${email.toLowerCase()}`);
 
+  it("lists a company's users for the access page: instance admins only, scoped to the company, no secrets", async () => {
+    const a = await seedCompany("List A");
+    const b = await seedCompany("List B");
+    const inA = await create(payload({ name: "Bình", companyIds: [a.id] }));
+    const inB = await create(payload({ name: "An", companyIds: [b.id] }));
+    const both = await create(payload({ name: "Cường", companyIds: [a.id, b.id] }));
+    // an agent membership shares the table but is not a person
+    await db.insert(companyMemberships).values({ companyId: a.id, principalType: "agent", principalId: inA.body.user.id + "-agent", status: "active", membershipRole: "member" });
+    const res = await request(app()).get(`/api/admin/users?companyId=${a.id}`);
+    expect(res.status).toBe(200);
+    expect(res.headers["cache-control"]).toBe("no-store");
+    expect(res.body.items.map((u: any) => u.name)).toEqual(["Bình", "Cường"]); // ordered by name, company A only
+    expect(res.body.items.map((u: any) => u.id)).toEqual([inA.body.user.id, both.body.user.id]);
+    expect(res.body.items[0]).toEqual({ id: inA.body.user.id, name: "Bình", email: inA.body.user.email, membershipRole: "operator", status: "active", hasPassword: true });
+    expect(JSON.stringify(res.body)).not.toMatch(/password"\s*:\s*"/i);
+    expect(JSON.stringify(res.body)).not.toContain(inB.body.user.email);
+    expect((await request(app()).get(`/api/admin/users?companyId=${randomUUID()}`)).body.items).toEqual([]);
+    expect((await request(app()).get("/api/admin/users")).status).toBe(400);
+    expect((await request(app()).get("/api/admin/users?companyId=not-a-uuid")).status).toBe(400);
+    expect((await request(app(staff(a.id))).get(`/api/admin/users?companyId=${a.id}`)).status).toBe(403);
+    expect((await request(app({ type: "none" } as Actor)).get(`/api/admin/users?companyId=${a.id}`)).status).toBeGreaterThanOrEqual(401);
+  });
+
   it("is limited to instance admins", async () => {
     const company = await seedCompany("Roles Co");
     const target = await create(payload());
