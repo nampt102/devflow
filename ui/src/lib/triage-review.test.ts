@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TriageDetail, TriageQueueItem } from "../api/devflowTriage";
-import { ageLabel, changedFields, decisionBlocker, draftFromDetail, durationLabel, filterQueue, finalPatch, isNewSince, pct, readOrder, readSeenAt, scoreLabel, sortQueue } from "./triage-review";
+import { ageLabel, agoLabel, changedFields, decisionBlocker, draftFromDetail, durationLabel, filterQueue, finalPatch, isNewSince, pct, readOrder, readSeenAt, scoreLabel, sortQueue } from "./triage-review";
 
 const detail = (over: Partial<TriageDetail["proposal"]> = {}, candidates: TriageDetail["candidates"] = []): TriageDetail => ({
   caseId: "c1",
@@ -119,6 +119,8 @@ describe("queue helpers", () => {
     expect(ageLabel("2026-10-17T11:30:00Z", now)).toBe("30 min");
     expect(ageLabel("2026-10-17T07:00:00Z", now)).toBe("5 h");
     expect(ageLabel("2026-10-14T12:00:00Z", now)).toBe("3 d");
+    expect(agoLabel("2026-10-17T11:59:40Z", now)).toBe("just now");
+    expect(agoLabel("2026-10-17T11:30:00Z", now)).toBe("30 min ago");
     expect(scoreLabel(null)).toBe("-");
     expect(scoreLabel(0.456)).toBe("0.46");
   });

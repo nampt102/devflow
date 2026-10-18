@@ -16,6 +16,7 @@ import { useToastActions } from "../context/ToastContext";
 import { queryKeys } from "../lib/queryKeys";
 import {
   ageLabel,
+  agoLabel,
   changedFields,
   CLASSIFICATIONS,
   decisionBlocker,
@@ -224,7 +225,7 @@ function ReviewForm({ companyId, detail, onDecided }: { companyId: string; detai
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-mono text-sm text-muted-foreground">{detail.caseKey}</span>
           <span className="text-xs text-muted-foreground">
-            from {detail.requesterName}, {ageLabel(detail.createdAt)} ago
+            from {detail.requesterName}, {agoLabel(detail.createdAt)}
           </span>
         </div>
         <h2 className="text-lg font-semibold text-foreground">{detail.title}</h2>
@@ -511,7 +512,7 @@ function MetricsBody({ m }: { m: TriageMetrics }) {
                   <li key={i}>
                     {PROBLEM_LABELS[f.action] ?? f.action}
                     {f.caseKey ? ` on ${f.caseKey}` : ""}
-                    {f.kind ? ` (${f.kind})` : ""} <span className="text-muted-foreground">{ageLabel(f.at)} ago</span>
+                    {f.kind ? ` (${f.kind})` : ""} <span className="text-muted-foreground">{agoLabel(f.at)}</span>
                   </li>
                 ))}
               </ul>

@@ -14,7 +14,7 @@ import { useCompany } from "../context/CompanyContext";
 import { useToastActions } from "../context/ToastContext";
 import { queryKeys } from "../lib/queryKeys";
 import { accessErrorMessage, copyText, expiryLabel, INVITE_STATUS_LABEL, inviteUrl, isEmail } from "../lib/portal-access";
-import { ageLabel } from "../lib/triage-review";
+import { agoLabel } from "../lib/triage-review";
 
 // DevFlow "Portal access" (backlog A-11): who can use the requester portal and the board.
 // Secrets (an invite link, a generated password) are shown once, kept only in this page's memory, and
@@ -146,7 +146,7 @@ function InvitesTab({ companyId }: { companyId: string }) {
               <div className="space-y-0.5">
                 <p className="text-sm font-medium text-foreground">{i.label || "Untitled invite"}</p>
                 <p className="text-xs text-muted-foreground">
-                  Created {ageLabel(i.createdAt)} ago
+                  Created {agoLabel(i.createdAt)}
                   {i.status === "pending" ? `, ${expiryLabel(i.expiresAt)}` : ""}
                 </p>
               </div>

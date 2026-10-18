@@ -88,6 +88,12 @@ export function ageLabel(createdAt: string | Date, now: number = Date.now()): st
   return `${Math.floor(hours / 24)} d`;
 }
 
+/** "3 h ago", but "just now" without the "ago". */
+export function agoLabel(createdAt: string | Date, now: number = Date.now()): string {
+  const label = ageLabel(createdAt, now);
+  return label === "just now" ? label : `${label} ago`;
+}
+
 export const scoreLabel = (value: number | null) => (value === null ? "-" : value.toFixed(2));
 
 export const pct = (value: number | null) => (value === null ? "-" : `${Math.round(value * 100)}%`);
