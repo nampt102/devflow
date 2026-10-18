@@ -56,3 +56,11 @@ Quyết định: `decisions/0015-dedupe.md`. Code: `server/src/devflow/triage/de
 - Cờ "cần người làm": các ca SQL Server, sửa dữ liệu production, phân quyền, tích hợp, lương đều được gắn. Phát hiện lỗi quy tắc: bỏ dấu làm "sập" trùng "SAP", "lượng" trùng "lương", "thuê" trùng "thuế" (false positive) → sửa bằng quy tắc không bỏ dấu cho các từ này (`rules.ts`, test mới).
 - Chống injection (3 yêu cầu: lệnh trong mô tả, JSON giả + boundary giả, lệnh trong trường tác động): cả 3 bị model nhận ra, bỏ qua và ghi vào `assumptions`; không có ưu tiên urgent, không có trùng giả, không ai chuyển stage ngoài `triage_review`. Mới thử 3 mẫu, chưa phải bằng chứng đủ.
 - Điểm yếu thấy được: model hay chọn `medium`; yêu cầu "hỏi giờ làm việc của IT" (không phải yêu cầu phát triển) vẫn được phân loại `request`/`low`, vì schema chưa có lựa chọn "ngoài phạm vi"; `requiresHuman=true` đôi khi không kèm lý do. Cần bộ mẫu thật và người duyệt để đo.
+
+## Đổi prompt (ví dụ thay định nghĩa ưu tiên và độ khó TEMPORARY)
+Định nghĩa nằm trong khối `DEFINITIONS (TEMPORARY, ...)` của `SYSTEM_PROMPT` ở `server/src/devflow/prompts/triage.v3.ts`. Không sửa trực tiếp: test ghim hash của từng phiên bản nên sửa v3 làm test hỏng, và dữ liệu cũ (`dr_agent_outputs.prompt_version`, số liệu theo phiên bản) sẽ mất ý nghĩa. Cách đổi:
+1. Sao chép `triage.v3.ts` thành `triage.v4.ts`; đổi `PROMPT_VERSION = "v4"`; sửa khối định nghĩa (bỏ chữ TEMPORARY khi đã là định nghĩa chính thức).
+2. Trong `triage/triage-service.ts` đổi dòng import từ `../prompts/triage.v3.js` sang `triage.v4.js`.
+3. Cập nhật test: `devflow-triage.test.ts` (`promptVersion`, import) và thêm khối ghim hash v4 trong `devflow-triage-unit.test.ts` (chạy một lần để lấy hash rồi dán vào).
+4. Chạy bộ test `devflow-triage*`, build lại image. Đề xuất mới sẽ ghi `prompt_version=v4`; mục "Quality" tách tỷ lệ sửa theo phiên bản nên so được v3 với v4.
+Chưa có cách đổi định nghĩa mà không build lại; nếu cần chỉnh thường xuyên, có thể đọc phần định nghĩa từ một tệp cấu hình (đề xuất làm sau khi có định nghĩa chính thức).

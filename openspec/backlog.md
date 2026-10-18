@@ -28,7 +28,7 @@ Mức ưu tiên: **A** cần trước pilot, **B** nên làm sớm trong pilot, 
 ## Triage agent và dedupe
 | Mã | Nội dung | Ưu tiên | Nguồn |
 |---|---|---|---|
-| A-14 | **Bỏ qua lúc này (chủ dự án, 2026-10-18)**.  Định nghĩa mức ưu tiên và độ khó là bản TEMPORARY; cần định nghĩa của công ty (prompt v4) | A | `kb/triage-agent.md` |
+| A-14 | Định nghĩa mức ưu tiên và độ khó là bản TEMPORARY trong `server/src/devflow/prompts/triage.v3.ts` (khối `DEFINITIONS`). Chờ chủ dự án đưa định nghĩa của công ty; khi có thì tạo `triage.v4.ts` (xem `kb/triage-agent.md` mục "Đổi prompt") | A | `kb/triage-agent.md` |
 | B-15 | Model hay chọn `medium`; yêu cầu không phải phát triển (ví dụ hỏi giờ làm việc IT) vẫn được phân loại; schema chưa có "ngoài phạm vi" | B | lần chạy thật đầu |
 | C-16 | `requiresHuman=true` đôi khi không kèm lý do | C | lần chạy thật đầu |
 | B-17 | Trung bình ~945 token ra cho JSON ngắn; chưa rõ model có "suy nghĩ" không | B | lần chạy thật đầu |
