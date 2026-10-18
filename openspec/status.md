@@ -15,6 +15,9 @@ Các bước 0–10 của P1 đã code, kiểm bằng test và chạy thử trê
 2. Quyết định của chủ dự án: định nghĩa ưu tiên và độ khó của công ty (prompt v4 thay bản TEMPORARY); có bật `PAPERCLIP_AUTH_DISABLE_SIGN_UP=true` không (và kiểm thử luồng bootstrap); có cần màn hình quản trị tài khoản và màn hình tạo link mời cho nhân viên không.
 3. P2 (BA Spec + Planner agent, các gate còn lại, email mở rộng) chỉ bắt đầu khi P1 chạy pilot ổn; role BA/Tech Lead cho approver là bản vá chờ làm.
 
+## Backlog cải tiến
+Các vấn đề nhỏ và cải tiến chưa làm nằm ở `openspec/backlog.md` (mã số, nguồn, mức ưu tiên A/B/C). Chủ dự án báo trong chat, Claude ghi vào đó.
+
 ## Việc bị chặn / chờ quyết định
 - Còn thiếu cho pilot: xác nhận người nhận thấy thư (SMTP đã gửi thật); vLLM local (đã chạy thử bằng API Claude và OpenAI embedding, chưa với vLLM/TEI).
 - Telemetry của Paperclip: **đã chốt tắt** trong cấu hình Docker (`PAPERCLIP_TELEMETRY_DISABLED=1`, ADR 0019); chưa quan sát lưu lượng ra ngoài thực tế.
