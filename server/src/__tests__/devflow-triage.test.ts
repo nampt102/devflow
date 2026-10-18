@@ -23,6 +23,9 @@ import { startFakeLlm, VALID_TRIAGE_REPLY, type FakeLlm } from "../devflow/triag
 import type { LlmConfig } from "../devflow/triage/llm-client.js";
 import { triageService, TriageFailure } from "../devflow/triage/triage-service.js";
 import { createTriageWorker } from "../devflow/triage/worker.js";
+import { devflowWorkersDisabled } from "../devflow/kill-switch.js";
+import { startDevflowTriageFromEnv } from "../devflow/triage/start.js";
+import { startDevflowEmailFromEnv } from "../devflow/email/start.js";
 
 // Triage agent (step 6): outputs, flags, injection handling, failures, races, isolation.
 const embeddedPostgresSupport = await getEmbeddedPostgresTestSupport();
@@ -53,8 +56,8 @@ describeEmbeddedPostgres("devflow triage", () => {
     responseFormat: "json_object",
     ...extra,
   });
-  const service = (extra: Partial<LlmConfig> = {}) =>
-    triageService(db, { pipelines: pipelineService(db), cost: costService(db), llm: llm(extra) });
+  const service = (extra: Partial<LlmConfig> = {}, maxTokensPerDay?: number) =>
+    triageService(db, { pipelines: pipelineService(db), cost: costService(db), llm: llm(extra), maxTokensPerDay });
 
   async function seedCompany() {
     const [company] = await db
@@ -282,6 +285,84 @@ describeEmbeddedPostgres("devflow triage", () => {
     expect(rows).toHaveLength(1);
     expect(JSON.stringify(rows[0].details)).not.toContain("SECRET-REQUEST-TEXT");
     expect((rows[0].details as any).kind).toBe("server_error");
+  });
+
+  describe("daily token cap", () => {
+    const spend = async (companyId: string, tokens: number, opts: { code?: string; daysAgo?: number } = {}) => {
+      const agentId = await service().ensureTriageAgent(companyId);
+      const at = new Date(Date.now() - (opts.daysAgo ?? 0) * 24 * 3600 * 1000 - (opts.daysAgo ? 0 : 0));
+      await db.execute(sql`insert into cost_events (company_id, agent_id, usage_kind, provider, biller, billing_type, cost_status, model, input_tokens, output_tokens, cost_cents, billing_code, occurred_at)
+        values (${companyId}, ${agentId}, 'agent', 'p', 'p', 'unknown', 'unpriced', 'm', ${tokens}, 0, 0, ${opts.code ?? "devflow:triage"}, ${at.toISOString()}::timestamptz)`);
+    };
+
+    it("is off when the cap is 0 or unset", async () => {
+      const ctx = await seedCompany();
+      await spend(ctx.company.id, 10_000_000);
+      expect(await service().overBudgetCompanies()).toEqual([]);
+      expect(await service({}, 0).overBudgetCompanies()).toEqual([]);
+    });
+
+    it("lists only companies at or over the cap today, counting Triage and embedding tokens, not other kinds or other days", async () => {
+      const over = await seedCompany();
+      const under = await seedCompany();
+      const old = await seedCompany();
+      await spend(over.company.id, 600);
+      await spend(over.company.id, 400, { code: "devflow:embed" });
+      await spend(under.company.id, 999);
+      await spend(under.company.id, 5000, { code: "other" });
+      await spend(old.company.id, 5000, { daysAgo: 2 });
+      const list = await service({}, 1000).overBudgetCompanies();
+      expect(list.map((x) => x.companyId)).toContain(over.company.id);
+      expect(list.find((x) => x.companyId === over.company.id)?.tokens).toBe(1000);
+      expect(list.map((x) => x.companyId)).not.toContain(under.company.id);
+      expect(list.map((x) => x.companyId)).not.toContain(old.company.id);
+    });
+
+    it("the worker skips a paused company, still serves the others, and logs the pause once", async () => {
+      const paused = await seedCompany();
+      const other = await seedCompany();
+      const stuck = await seedRequest(paused);
+      const served = await seedRequest(other);
+      await spend(paused.company.id, 5000);
+      const svc = service({}, 4000);
+      const scoped = { ...svc, findPending: async (_limit: number, exclude: readonly string[] = []) => (await svc.findPending(200, exclude)).filter((r) => r.caseId === stuck || r.caseId === served) };
+      const worker = createTriageWorker(db, scoped as any);
+      fake.requests.length = 0;
+      await worker.sweep();
+      await worker.sweep();
+      expect(await stageOf(stuck)).toBe("triage");
+      expect(await stageOf(served)).toBe("triage_review");
+      expect(fake.requests).toHaveLength(1);
+      const logs = await db.select().from(activityLog).where(and(eq(activityLog.companyId, paused.company.id), eq(activityLog.action, "agent.triage_budget_paused")));
+      expect(logs).toHaveLength(1);
+      expect(logs[0].details).toMatchObject({ tokensToday: 5000, maxTokensPerDay: 4000 });
+    });
+
+    it("findPending leaves out the excluded companies", async () => {
+      const ctx = await seedCompany();
+      const id = await seedRequest(ctx);
+      expect((await service().findPending(200)).map((r) => r.caseId)).toContain(id);
+      expect((await service().findPending(200, [ctx.company.id])).map((r) => r.caseId)).not.toContain(id);
+    });
+  });
+
+  describe("kill switch", () => {
+    it("reads DEVFLOW_WORKERS_ENABLED", () => {
+      for (const off of ["false", "FALSE", "0", "no", "off", " false "]) expect(devflowWorkersDisabled({ DEVFLOW_WORKERS_ENABLED: off })).toBe(true);
+      for (const on of [undefined, "", "true", "1", "yes"]) expect(devflowWorkersDisabled({ DEVFLOW_WORKERS_ENABLED: on })).toBe(false);
+    });
+
+    it("keeps the Triage and email workers from starting when switched off, starts them otherwise", () => {
+      const env = { DEVFLOW_LLM_BASE_URL: "http://127.0.0.1:1/v1", DEVFLOW_LLM_MODEL: "m", DEVFLOW_SMTP_HOST: "127.0.0.1", DEVFLOW_SMTP_FROM: "a@b.test" };
+      expect(startDevflowTriageFromEnv(db, { ...env, DEVFLOW_WORKERS_ENABLED: "false" }, () => false)).toBeNull();
+      expect(startDevflowEmailFromEnv(db, { ...env, DEVFLOW_WORKERS_ENABLED: "false" }, () => false)).toBeNull();
+      const triage = startDevflowTriageFromEnv(db, env, () => false);
+      const email = startDevflowEmailFromEnv(db, env, () => false);
+      expect(triage).not.toBeNull();
+      expect(email).not.toBeNull();
+      triage?.stop();
+      email?.stop();
+    });
   });
 
   describe("worker", () => {

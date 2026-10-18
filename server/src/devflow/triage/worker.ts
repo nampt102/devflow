@@ -32,6 +32,7 @@ export function createTriageWorker(db: Db, service: ReturnType<typeof triageServ
 
   const cases = new Map<string, { failures: number; nextAt: number; gaveUp: boolean }>();
   let consecutiveFailures = 0;
+  const budgetNoticed = new Set<string>(); // `${companyId}:${utc day}`: log the pause once per day
   let pausedUntil = 0;
 
   /** Process one case; returns false when the sweep should stop (rate limit or breaker opened). */
@@ -77,12 +78,22 @@ export function createTriageWorker(db: Db, service: ReturnType<typeof triageServ
     await db.transaction(async (lockTx) => {
       const [lock] = await lockTx.execute<{ ok: boolean }>(sql`select pg_try_advisory_xact_lock(hashtext(${LOCK_KEY})) as ok`);
       if (!lock?.ok) return;
-      for (const item of await service.findPending(batchSize)) {
+      const over = await service.overBudgetCompanies();
+      const day = new Date(now()).toISOString().slice(0, 10);
+      for (const o of over) {
+        const key = `${o.companyId}:${day}`;
+        if (budgetNoticed.has(key)) continue;
+        budgetNoticed.add(key);
+        logger.warn({ companyId: o.companyId, tokens: o.tokens }, "devflow triage: daily token cap reached, company paused until UTC midnight");
+        await service.recordBudgetPause(o.companyId, o.tokens).catch((e) => logger.warn({ err: e }, "devflow triage: budget pause not logged"));
+      }
+      const skip = over.map((o) => o.companyId);
+      for (const item of await service.findPending(batchSize, skip)) {
         attempted += 1;
         if (!(await handle(item))) break;
       }
       // Backfill vectors for older requests (no-op without an embedding config or pgvector).
-      await service.embedPending(embedBatch).catch((e) => logger.warn({ err: e }, "devflow triage: embed backfill failed"));
+      await service.embedPending(embedBatch, skip).catch((e) => logger.warn({ err: e }, "devflow triage: embed backfill failed"));
     });
     return attempted;
   }

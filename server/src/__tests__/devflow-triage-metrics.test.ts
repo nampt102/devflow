@@ -114,8 +114,12 @@ describeEmbeddedPostgres("devflow triage metrics", () => {
     for (const [field, a, b] of o.overrides ?? []) {
       await db.insert(drOverrides).values({ companyId: ctx.company.id, caseId: created.id, outputId: out.id, stageKey: "triage", field, agentValue: a, finalValue: b, actorUserId: ctx.userId });
     }
+    keys.set(created.id as string, `REQ-${n}`);
     return { id: created.id as string, outputId: out.id as string };
   }
+
+  const caseKeyOf = (id: string) => keys.get(id);
+  const keys = new Map<string, string>();
 
   const reviewEvent = (ctx: Awaited<ReturnType<typeof seedCompany>>, caseId: string, decision: string, minutesAgo = 5) =>
     db.insert(pipelineCaseEvents).values({
@@ -137,7 +141,8 @@ describeEmbeddedPostgres("devflow triage metrics", () => {
     expect(m.decisions).toEqual({ approve: 0, reject: 0, requestChanges: 0 });
     expect(m.flow.secondsToProposal).toEqual({ p50: null, p90: null });
     expect(m.queue).toEqual({ waiting: 0, oldestSince: null });
-    expect(m.agent).toMatchObject({ proposed: 0, failed: 0, calls: 0, inputTokens: 0 });
+    expect(m.agent).toMatchObject({ proposed: 0, failed: 0, budgetPaused: 0, calls: 0, inputTokens: 0 });
+    expect(m.recentFailures).toEqual([]);
   });
 
   it("override rate, per field and per prompt version, inside the window only", async () => {
@@ -226,14 +231,15 @@ describeEmbeddedPostgres("devflow triage metrics", () => {
     const b = await seedCompany();
     const caseA = await seedOutput(a, { status: "proposed" });
     const caseB = await seedOutput(b, { status: "proposed" });
-    const log = (ctx: typeof a, caseId: string, action: string, minutesAgo = 5) =>
-      db.insert(activityLog).values({ companyId: ctx.company.id, actorType: "system", actorId: "devflow-triage", action, entityType: "pipeline_case", entityId: caseId, createdAt: ago(minutesAgo) });
+    const log = (ctx: typeof a, caseId: string, action: string, minutesAgo = 5, details: Record<string, unknown> | null = null) =>
+      db.insert(activityLog).values({ companyId: ctx.company.id, actorType: "system", actorId: "devflow-triage", action, entityType: "pipeline_case", entityId: caseId, details, createdAt: ago(minutesAgo) });
     await log(a, caseA.id, "agent.triage_proposed");
     await log(a, caseA.id, "agent.triage_proposed");
-    await log(a, caseA.id, "agent.triage_failed");
-    await log(a, caseA.id, "agent.triage_gave_up");
-    await log(a, caseA.id, "agent.embed_failed");
-    await log(a, caseA.id, "email.failed");
+    await log(a, caseA.id, "agent.triage_failed", 4, { kind: "timeout" });
+    await log(a, caseA.id, "agent.triage_gave_up", 3, { kind: "invalid_output" });
+    await log(a, caseA.id, "agent.embed_failed", 2, { kind: "server_error" });
+    await log(a, caseA.id, "email.failed", 1, { kind: "rejected" });
+    await log(a, caseA.id, "agent.triage_budget_paused", 0);
     await log(a, caseA.id, "agent.triage_failed", 60 * DAY); // outside the window
     await log(b, caseB.id, "agent.triage_failed");
     const [agentA] = await db.insert(agents).values({ companyId: a.company.id, name: "DevFlow Triage" }).returning();
@@ -247,7 +253,15 @@ describeEmbeddedPostgres("devflow triage metrics", () => {
     const [agentB] = await db.insert(agents).values({ companyId: b.company.id, name: "DevFlow Triage" }).returning();
     await cost(agentB.id, b.company.id, "devflow:triage", 5000, 5000);
     const m = await triageMetricsService(db).metrics(a.company.id, 30);
-    expect(m.agent).toEqual({ proposed: 2, failed: 1, gaveUp: 1, embedFailed: 1, emailFailed: 1, calls: 2, inputTokens: 1050, outputTokens: 900 });
+    expect(m.agent).toEqual({ proposed: 2, failed: 1, gaveUp: 1, embedFailed: 1, emailFailed: 1, budgetPaused: 1, calls: 2, inputTokens: 1050, outputTokens: 900 });
+    // newest first, with the request and the kind, without proposals, other companies or old entries
+    expect(m.recentFailures.map((f) => [f.action, f.kind, f.caseKey])).toEqual([
+      ["agent.triage_budget_paused", null, caseKeyOf(caseA.id)],
+      ["email.failed", "rejected", caseKeyOf(caseA.id)],
+      ["agent.embed_failed", "server_error", caseKeyOf(caseA.id)],
+      ["agent.triage_gave_up", "invalid_output", caseKeyOf(caseA.id)],
+      ["agent.triage_failed", "timeout", caseKeyOf(caseA.id)],
+    ]);
   });
 
   it("route: staff only, days clamped, other companies not found", async () => {

@@ -215,77 +215,85 @@ export function triageReviewService(db: Db, deps: { reviewCase: ReviewCase }) {
       (body.decision === "reject" && duplicateKey ? `Duplicate of ${duplicateKey}` : undefined);
 
     const overridden: string[] = [];
-    await deps.reviewCase({
-      companyId,
-      caseId,
-      decision: body.decision,
-      reason,
-      expectedVersion: body.expectedVersion,
-      actor: { type: "user", userId },
-      beforeCommit: async (txRaw: unknown) => {
-        const tx = txRaw as Db;
-        const [live] = await tx
-          .select({ status: drAgentOutputs.status })
-          .from(drAgentOutputs)
-          .where(eq(drAgentOutputs.id, output.id))
-          .for("update");
-        if (live?.status !== "proposed") throw conflict("The proposal changed; reload and review again");
+    try {
+      await deps.reviewCase({
+        companyId,
+        caseId,
+        decision: body.decision,
+        reason,
+        expectedVersion: body.expectedVersion,
+        actor: { type: "user", userId },
+        beforeCommit: async (txRaw: unknown) => {
+          const tx = txRaw as Db;
+          const [live] = await tx
+            .select({ status: drAgentOutputs.status })
+            .from(drAgentOutputs)
+            .where(eq(drAgentOutputs.id, output.id))
+            .for("update");
+          if (live?.status !== "proposed") throw conflict("The proposal changed; reload and review again");
 
-        // Only fields the reviewer actually changed become overrides; approve covers every field, reject only the duplicate link.
-        const diffs: Array<[string, unknown, unknown]> = [];
-        const check = (field: string, a: unknown, b: unknown) => {
-          if (!same(a, b)) diffs.push([field, a, b]);
-        };
-        if (body.decision === "approve") {
-          check("classification", agent.classification, final.classification);
-          check("priority", agent.priority, final.priority);
-          check("difficulty", agent.difficulty, final.difficulty);
-          check("requiresHuman", agent.requiresHuman, final.requiresHuman);
-          check("requiresHumanReasons", agent.requiresHumanReasons, final.requiresHumanReasons);
-        }
-        if (body.decision !== "request_changes") check("duplicateOf", keyOf(agent.duplicateOfCaseId), duplicateKey);
-        for (const [field, a, b] of diffs) {
-          await tx.insert(drOverrides).values({ companyId, caseId, outputId: output.id, stageKey: "triage", field, agentValue: a ?? null, finalValue: b ?? null, actorUserId: userId });
-          overridden.push(field);
-        }
-        await tx
-          .update(drAgentOutputs)
-          .set({
-            status: body.decision === "approve" ? (overridden.length ? "overridden" : "accepted") : "superseded",
-            decidedAt: new Date(),
-            decidedByUserId: userId,
-          })
-          .where(eq(drAgentOutputs.id, output.id));
-        if (body.decision === "approve") {
+          // Only fields the reviewer actually changed become overrides; approve covers every field, reject only the duplicate link.
+          const diffs: Array<[string, unknown, unknown]> = [];
+          const check = (field: string, a: unknown, b: unknown) => {
+            if (!same(a, b)) diffs.push([field, a, b]);
+          };
+          if (body.decision === "approve") {
+            check("classification", agent.classification, final.classification);
+            check("priority", agent.priority, final.priority);
+            check("difficulty", agent.difficulty, final.difficulty);
+            check("requiresHuman", agent.requiresHuman, final.requiresHuman);
+            check("requiresHumanReasons", agent.requiresHumanReasons, final.requiresHumanReasons);
+          }
+          if (body.decision !== "request_changes") check("duplicateOf", keyOf(agent.duplicateOfCaseId), duplicateKey);
+          for (const [field, a, b] of diffs) {
+            await tx.insert(drOverrides).values({ companyId, caseId, outputId: output.id, stageKey: "triage", field, agentValue: a ?? null, finalValue: b ?? null, actorUserId: userId });
+            overridden.push(field);
+          }
           await tx
-            .update(drRequests)
+            .update(drAgentOutputs)
             .set({
-              classification: final.classification,
-              priority: final.priority,
-              difficulty: final.difficulty,
-              requiresHuman: final.requiresHuman,
-              requiresHumanReasons: final.requiresHumanReasons,
-              duplicateOfCaseId: null,
-              updatedAt: new Date(),
+              status: body.decision === "approve" ? (overridden.length ? "overridden" : "accepted") : "superseded",
+              decidedAt: new Date(),
+              decidedByUserId: userId,
             })
-            .where(and(eq(drRequests.caseId, caseId), eq(drRequests.companyId, companyId)));
-        } else if (body.decision === "reject" && final.duplicateOfCaseId) {
-          await tx
-            .update(drRequests)
-            .set({ duplicateOfCaseId: final.duplicateOfCaseId, updatedAt: new Date() })
-            .where(and(eq(drRequests.caseId, caseId), eq(drRequests.companyId, companyId)));
-        }
-        await logActivity(tx, {
-          companyId,
-          actorType: "user",
-          actorId: userId,
-          action: "triage.decided",
-          entityType: "pipeline_case",
-          entityId: caseId,
-          details: { decision: body.decision, outputId: output.id, overriddenFields: overridden },
-        });
-      },
-    });
+            .where(eq(drAgentOutputs.id, output.id));
+          if (body.decision === "approve") {
+            await tx
+              .update(drRequests)
+              .set({
+                classification: final.classification,
+                priority: final.priority,
+                difficulty: final.difficulty,
+                requiresHuman: final.requiresHuman,
+                requiresHumanReasons: final.requiresHumanReasons,
+                duplicateOfCaseId: null,
+                updatedAt: new Date(),
+              })
+              .where(and(eq(drRequests.caseId, caseId), eq(drRequests.companyId, companyId)));
+          } else if (body.decision === "reject" && final.duplicateOfCaseId) {
+            await tx
+              .update(drRequests)
+              .set({ duplicateOfCaseId: final.duplicateOfCaseId, updatedAt: new Date() })
+              .where(and(eq(drRequests.caseId, caseId), eq(drRequests.companyId, companyId)));
+          }
+          await logActivity(tx, {
+            companyId,
+            actorType: "user",
+            actorId: userId,
+            action: "triage.decided",
+            entityType: "pipeline_case",
+            entityId: caseId,
+            details: { decision: body.decision, outputId: output.id, overriddenFields: overridden },
+          });
+        },
+      });
+    } catch (err) {
+      // Another reviewer got in between our checks and the core transaction: report that as a conflict, not as
+      // the core's "not in a review stage" validation error.
+      const now = await loadReviewable(companyId, caseId);
+      if (!now || now.stage_key !== "triage_review") throw conflict("This request is no longer waiting for triage review");
+      throw err;
+    }
     return { ok: true as const, decision: body.decision, overriddenFields: overridden };
   }
 

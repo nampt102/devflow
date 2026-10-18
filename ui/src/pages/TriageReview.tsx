@@ -378,6 +378,14 @@ function Notes({ title, lines }: { title: string; lines: string[] }) {
   );
 }
 
+const PROBLEM_LABELS: Record<string, string> = {
+  "agent.triage_failed": "Triage failed",
+  "agent.triage_gave_up": "Triage gave up",
+  "agent.embed_failed": "Embedding failed",
+  "email.failed": "Email not sent",
+  "agent.triage_budget_paused": "Daily token cap reached",
+};
+
 function MetricsPanel({ companyId }: { companyId: string }) {
   const [open, setOpen] = useState(false);
   const metricsQuery = useQuery({
@@ -458,6 +466,20 @@ function MetricsBody({ m }: { m: TriageMetrics }) {
               ))}
             </ul>
           )}
+          {m.recentFailures.length ? (
+            <div className="mt-3">
+              <p className="mb-1 text-xs font-medium text-muted-foreground">Recent problems</p>
+              <ul className="space-y-0.5 text-sm text-foreground">
+                {m.recentFailures.slice(0, 5).map((f, i) => (
+                  <li key={i}>
+                    {PROBLEM_LABELS[f.action] ?? f.action}
+                    {f.caseKey ? ` on ${f.caseKey}` : ""}
+                    {f.kind ? ` (${f.kind})` : ""} <span className="text-muted-foreground">{ageLabel(f.at)} ago</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           <p className="mt-2 text-xs text-muted-foreground">
             Duplicates: agent named {m.duplicates.namedByAgent}, reviewers added {m.duplicates.addedByReviewer}, closed as duplicate {m.duplicates.closedAsDuplicate}. Tokens: {m.agent.inputTokens} in, {m.agent.outputTokens} out over {m.agent.calls} calls.
           </p>

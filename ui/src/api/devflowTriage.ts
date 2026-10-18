@@ -97,7 +97,8 @@ export interface TriageMetrics {
   duplicates: { namedByAgent: number; addedByReviewer: number; closedAsDuplicate: number };
   flow: { secondsToProposal: { p50: number | null; p90: number | null }; secondsInReview: { p50: number | null; p90: number | null }; secondsToApproval: { p50: number | null } };
   queue: { waiting: number; oldestSince: string | null };
-  agent: { proposed: number; failed: number; gaveUp: number; embedFailed: number; emailFailed: number; calls: number; inputTokens: number; outputTokens: number };
+  recentFailures: Array<{ action: string; kind: string | null; caseKey: string | null; at: string }>;
+  agent: { proposed: number; failed: number; gaveUp: number; embedFailed: number; emailFailed: number; budgetPaused: number; calls: number; inputTokens: number; outputTokens: number };
 }
 
 export const devflowTriageApi = {

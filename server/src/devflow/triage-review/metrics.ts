@@ -88,9 +88,16 @@ export function triageMetricsService(db: Db) {
     // Agent health: failures from the activity log, tokens from the cost events (no prices exist for them yet).
     const health = await rows(sql`
       select action, count(*)::int as n from activity_log
-      where company_id = ${companyId} and created_at >= ${sinceIso}::timestamptz and action in ('agent.triage_proposed', 'agent.triage_failed', 'agent.triage_gave_up', 'agent.embed_failed', 'email.failed')
+      where company_id = ${companyId} and created_at >= ${sinceIso}::timestamptz and action in ('agent.triage_proposed', 'agent.triage_failed', 'agent.triage_gave_up', 'agent.embed_failed', 'email.failed', 'agent.triage_budget_paused')
       group by action`);
     const healthCount = new Map(health.map((r) => [r.action as string, r.n as number]));
+    // The latest problems, so an operator sees which request and what kind (never the request text).
+    const failures = await rows(sql`
+      select a.action, a.created_at, a.details->>'kind' as kind, c.case_key
+      from activity_log a left join pipeline_cases c on c.id::text = a.entity_id and c.company_id = a.company_id
+      where a.company_id = ${companyId} and a.created_at >= ${sinceIso}::timestamptz
+        and a.action in ('agent.triage_failed', 'agent.triage_gave_up', 'agent.embed_failed', 'email.failed', 'agent.triage_budget_paused')
+      order by a.created_at desc, a.id desc limit 10`);
     const [tokens] = await rows(sql`
       select coalesce(sum(input_tokens), 0)::bigint as input_tokens, coalesce(sum(output_tokens), 0)::bigint as output_tokens, count(*)::int as calls
       from cost_events where company_id = ${companyId} and billing_code in ('devflow:triage', 'devflow:embed') and occurred_at >= ${sinceIso}::timestamptz`);
@@ -118,12 +125,19 @@ export function triageMetricsService(db: Db) {
         secondsToApproval: { p50: num(timing?.total_p50) },
       },
       queue: { waiting: queue?.waiting ?? 0, oldestSince: queue?.oldest ? new Date(queue.oldest).toISOString() : null },
+      recentFailures: failures.map((f) => ({
+        action: f.action as string,
+        kind: (f.kind as string | null) ?? null,
+        caseKey: (f.case_key as string | null) ?? null,
+        at: new Date(f.created_at).toISOString(),
+      })),
       agent: {
         proposed: healthCount.get("agent.triage_proposed") ?? 0,
         failed: healthCount.get("agent.triage_failed") ?? 0,
         gaveUp: healthCount.get("agent.triage_gave_up") ?? 0,
         embedFailed: healthCount.get("agent.embed_failed") ?? 0,
         emailFailed: healthCount.get("email.failed") ?? 0,
+        budgetPaused: healthCount.get("agent.triage_budget_paused") ?? 0,
         calls: tokens?.calls ?? 0,
         inputTokens: Number(tokens?.input_tokens ?? 0),
         outputTokens: Number(tokens?.output_tokens ?? 0),

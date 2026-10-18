@@ -8,18 +8,18 @@
 **P1**: Intake Portal + Workflow Core + Triage agent, pilot 1 công ty. P0 (khám phá Paperclip/Plane, docs, khung project-kit) đã xong.
 
 ## Bước đang làm
-Bước 4 (Intake Portal) đang triển khai theo change OpenSpec `add-intake-portal` (đã duyệt A1+B1+C1, ADR 0011). Các nhóm 1–5 đã xong: API requester, file đính kèm, lời mời một lần (migration 0355 và 0356 đã áp dụng vào DB của stack Docker), web `portal/` tiếng Việt phục vụ ở `/portal`. Kiểm chứng: 36 test server DevFlow và 12 test portal pass, đã chạy luồng thật trong trình duyệt (mời, đăng ký, nhận lời mời, gửi yêu cầu kèm tệp, xem chi tiết). Task 3.4 (đăng ký qua lời mời, chạy cả khi đăng ký công khai đóng) đã xong và kiểm chứng bằng test. Task 3.5 (instance admin tạo tài khoản và đặt lại mật khẩu) đã xong và kiểm chứng ở mức HTTP khi đăng ký đóng (15/15). Còn lại: màn hình quản trị cho admin và nhân viên tạo link (hiện chỉ có API) và quyết định bật `PAPERCLIP_AUTH_DISABLE_SIGN_UP=true` cho môi trường thật; change chưa archive.
+Các bước 0–10 của P1 đã code, kiểm bằng test và chạy thử trên stack Docker thật (portal, Triage với Claude, dedupe, màn hình duyệt, số liệu, smoke `scripts/devflow/smoke-p1.mjs` 17/17). **Chưa có pilot thật**: còn các việc chuẩn bị ở `kb/runbook.md` mục 12. Change OpenSpec `add-intake-portal` chưa archive (hỏi chủ dự án trước khi `/opsx:archive`).
 
 ## Bước tiếp theo
-1. Chủ dự án quyết định: có bật `PAPERCLIP_AUTH_DISABLE_SIGN_UP=true` cho môi trường thật không (điều kiện trong `kb/admin-accounts.md`), và có cần màn hình quản trị / màn hình nhân viên tạo link mời hay không.
-2. Bước 6-7: chạy thử với model thật: điền vào `docker/.env` `DEVFLOW_LLM_BASE_URL`, `DEVFLOW_LLM_MODEL` (đúng tên vLLM phục vụ), `DEVFLOW_EMBED_BASE_URL`, `DEVFLOW_EMBED_MODEL` (bge-m3 qua TEI); build lại image; cần ~20 yêu cầu mẫu và vài cặp trùng thật để hiệu chỉnh ngưỡng; chủ dự án xác nhận định nghĩa mức ưu tiên/độ khó (prompt v3). Kiểm vLLM có bật reasoning parser/thinking không.
-3. Bước 7 (dedupe) dùng `dr_embeddings` nên phải kiểm bảng tồn tại và lùi về pg_trgm khi thiếu pgvector; bước 7b cần thông tin SMTP.
+1. Chuẩn bị pilot theo danh sách kiểm tra `kb/runbook.md` mục 12: chọn công ty, SMTP Gmail (mật khẩu ứng dụng) và gửi thử một email thật, LLM theo chính sách dữ liệu (local cho dữ liệu thật), ~20 yêu cầu mẫu thật và vài cặp trùng để hiệu chỉnh ngưỡng dedupe, xác nhận sao lưu tự động.
+2. Quyết định của chủ dự án: định nghĩa ưu tiên và độ khó của công ty (prompt v4 thay bản TEMPORARY); có bật `PAPERCLIP_AUTH_DISABLE_SIGN_UP=true` không (và kiểm thử luồng bootstrap); có cần màn hình quản trị tài khoản và màn hình tạo link mời cho nhân viên không.
+3. P2 (BA Spec + Planner agent, các gate còn lại, email mở rộng) chỉ bắt đầu khi P1 chạy pilot ổn; role BA/Tech Lead cho approver là bản vá chờ làm.
 
 ## Việc bị chặn / chờ quyết định
-- Còn thiếu (chưa chặn bước 0–2): model embedding, endpoint/model vLLM, thông tin SMTP (chủ dự án tự tạo/cập nhật env khi test).
-- Telemetry của Paperclip (mặc định bật, gửi về endpoint của Paperclip): **để mở**, chưa quyết định tắt hay giữ; cần tìm cách tắt trong code trước khi quyết.
-- Agent chưa được thử ở runtime (chưa có agent/adapter, chưa thử vLLM qua opencode_local/pi_local/http); quyền agent trên pipeline mới xác nhận qua code và test, chưa qua runtime.
-- Model embedding: chưa chọn; số chiều vector không còn là điều kiện chặn vì `dr_embeddings` không cố định số chiều (chỉ mục HNSW tạo riêng cho từng model sau khi chọn, ADR 0013).
+- Còn thiếu cho pilot: thông tin SMTP thật; vLLM local (đã chạy thử bằng API Claude và OpenAI embedding, chưa với vLLM/TEI).
+- Telemetry của Paperclip: **đã chốt tắt** trong cấu hình Docker (`PAPERCLIP_TELEMETRY_DISABLED=1`, ADR 0019); chưa quan sát lưu lượng ra ngoài thực tế.
+- Triage chạy thật bằng worker nội bộ (không qua adapter của Paperclip); các agent adapter (BA, Dev, QA) chưa thử ở runtime vì thuộc P2 trở đi.
+- Model embedding: đang thử `text-embedding-3-small` (OpenAI); bge-m3 qua TEI là lựa chọn local, chưa thử. Số chiều không chặn vì `dr_embeddings` không cố định số chiều (chỉ mục HNSW tạo riêng sau khi chọn model, ADR 0013).
 
 ## Bảng tiến độ P1
 
@@ -36,7 +36,7 @@ Bước 4 (Intake Portal) đang triển khai theo change OpenSpec `add-intake-po
 | 7b | Email requester khi đổi trạng thái (SMTP qua env) | done (chưa gửi thử qua SMTP thật): migration 0358 `dr_email_outbox`, worker xếp hàng + gửi bằng nodemailer, SMTP giả khi test; 18 test pass, 8 đột biến bị bắt; ADR 0016 | | Chủ dự án sẽ tạo SMTP Gmail (mật khẩu ứng dụng); chưa có giới hạn tần suất theo người nhận |
 | 8 | Màn hình duyệt triage cho Lead/BA (hàng chờ, sửa field, approve/reject/request_changes, đánh dấu trùng), ghi override | done (đã kiểm thủ công trên trình duyệt với stack thật): API `/devflow/triage-*`, hook `beforeCommit` ở core (nguyên tử), prompt v3 (lý do request_changes), trang Board UI `triage`; 198 test server + 7 test UI pass, 8 đột biến bị bắt; ADR 0017 | | Chưa có role BA/Tech Lead, snooze, duyệt hàng loạt; UI tiếng Anh |
 | 9 | Số liệu cơ bản: tỷ lệ override theo field, thời gian ở triage | done (đã xem trên stack thật với dữ liệu thử, chưa có dữ liệu pilot): `GET /devflow/triage-metrics` + mục "Quality" trong trang Triage review; không có migration; 8 test server + test UI pass, 7 đột biến bị bắt; ADR 0018 | | Mẫu nhỏ, chưa có độ tin cậy thống kê hay biểu đồ theo thời gian |
-| 10 | Pilot hardening: log lỗi agent, ngân sách token, tài liệu vận hành | todo | | Chủ dự án tự chọn công ty và tự chạy test |
+| 10 | Pilot hardening: log lỗi agent, ngân sách token, tài liệu vận hành | done (kiểm bằng test và smoke trên stack thật; chưa có pilot): trần token ngày mỗi công ty, công tắc `DEVFLOW_WORKERS_ENABLED`, Telemetry tắt mặc định, lỗi gần đây trong mục Quality, `smoke-p1.mjs` 17/17, runbook, quét bí mật sạch, diễn tập khôi phục DB; ADR 0019 | | Còn thiếu để pilot thật: SMTP Gmail, LLM theo chính sách dữ liệu, mẫu thật hiệu chỉnh ngưỡng, xác nhận sao lưu tự động, quyết định đóng đăng ký (xem `kb/runbook.md` mục 12) |
 
 Thứ tự: 0 → 1 → 2 → 3 → {4, 5} → 6 → 7 → 7b → 8 → 9 → 10.
 
@@ -59,6 +59,7 @@ Thứ tự: 0 → 1 → 2 → 3 → {4, 5} → 6 → 7 → 7b → 8 → 9 → 10
 - 0016 Email trạng thái: outbox theo sự kiện, nodemailer
 - 0017 Màn hình duyệt triage: trang Board UI, quyết định nguyên tử qua hook của core
 - 0018 Số liệu triage: tính từ dữ liệu có sẵn, tỷ lệ override trên đề xuất được duyệt
+- 0019 Pilot hardening: Telemetry tắt, trần token ngày, công tắc dừng worker
 - D7 (không phải ADR): chủ dự án tự chọn công ty pilot và tự chạy test; Claude bàn giao code, test tự động, hướng dẫn chạy.
 
 ## Kết quả spike Pipelines (đọc code + smoke API; chi tiết `kb/spike-pipelines.md`)
@@ -71,12 +72,13 @@ Kết luận: **cần vá, không phải viết lại state machine**. Chưa th�
 3. UI board gần như chưa có i18n (chỉ 5 key): portal tách riêng.
 4. Cách ly dữ liệu công ty chỉ ở tầng ứng dụng (không RLS): test bắt buộc, cân nhắc RLS ở P4.
 5. AGPL ở phần port từ Plane: hoãn xét đến sau bản test; phải xem lại trước khi triển khai thật (ADR 0002).
-6. Telemetry mặc định bật của Paperclip (xem mục chờ quyết định).
+6. Telemetry của Paperclip: đã tắt mặc định trong cấu hình Docker (ADR 0019); chưa quan sát lưu lượng thực tế.
 
 ## Lộ trình tổng
 P1 (đang chuẩn bị) → P2 BA Spec + Planner agent, gate còn lại, email mở rộng → P3 Dev agent (worktree/PR), QA agent, dashboard → P4 Governance đầy đủ, SSO, mở rộng toàn group.
 
 ## Gần đây
+- 2026-10-18: Bước 10 xong: trần token ngày mỗi công ty (`overBudgetCompanies`, worker bỏ qua công ty đã chạm trần), `DEVFLOW_WORKERS_ENABLED`, Telemetry tắt mặc định, `recentFailures` trong metrics và UI, `scripts/devflow/smoke-p1.mjs` (chạy 17/17 trên stack thật; lần đầu lộ ra việc duyệt phải gỡ dấu trùng khi agent đã nêu bản trùng), runbook, quét bí mật (sạch), diễn tập pg_dump/pg_restore (số dòng khớp); 14 test mới, 7 đột biến bị bắt (ADR 0019, `kb/runbook.md`). **P1 hoàn tất về mặt code**; còn các việc chuẩn bị pilot ở runbook mục 12.
 - 2026-10-18: Bước 9 xong: `triage-review/metrics.ts` (tỷ lệ override theo field và phiên bản prompt, sửa đổi hay gặp, quyết định, trùng, p50/p90 thời gian, hàng chờ, lỗi agent và token), route `triage-metrics`, mục Quality ở trang Triage review; 8 test server pass, 7 đột biến bị bắt (ADR 0018, `kb/triage-metrics.md`).
 - 2026-10-18: Bước 8 xong (đã duyệt thử REQ-8 trên trình duyệt thật: override, `dr_requests`, `ba_spec` đúng; cờ `enablePipelines` không có nút trong UI, bật bằng API, xem `kb/tech-stack.md`): `devflow/triage-review/` (hàng chờ, chi tiết, quyết định), vá `reviewCase` thêm `beforeCommit` (4 dòng), prompt v3, `ui/src/pages/TriageReview.tsx` + `lib/triage-review.ts`; 198 test server (gồm hồi quy `pipelines-*`) + 7 test UI pass, 8 đột biến bị bắt (ADR 0017, `kb/triage-review.md`).
 - 2026-10-17: Bước 7b xong: migration 0358 `dr_email_outbox`, `devflow/email/` (mailer nodemailer, soạn thư tiếng Việt, worker xếp hàng + gửi với backoff, SMTP giả), dependency `nodemailer@10.1.2` (lockfile +19 dòng); 18 test (12 server + 6 db) pass, 8 đột biến bị bắt. Chưa thử Gmail thật; image Docker chưa build lại (ADR 0016, `kb/email-notifications.md`).

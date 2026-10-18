@@ -1,10 +1,15 @@
 import type { Db } from "@paperclipai/db";
 import { logger } from "../../middleware/logger.js";
+import { devflowWorkersDisabled } from "../kill-switch.js";
 import { createEmailWorker } from "./email-worker.js";
 import { createSender, loadMailConfig } from "./mailer.js";
 
 /** Starts the status-email worker when SMTP is configured; returns null otherwise. */
 export function startDevflowEmailFromEnv(db: Db, env: NodeJS.ProcessEnv, shouldRun: () => boolean) {
+  if (devflowWorkersDisabled(env)) {
+    logger.info("devflow email worker disabled by DEVFLOW_WORKERS_ENABLED");
+    return null;
+  }
   const config = loadMailConfig(env);
   if (!config) return null;
   const worker = createEmailWorker(db, createSender(config), {

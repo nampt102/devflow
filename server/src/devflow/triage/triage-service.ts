@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNull, notExists, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, notExists, notInArray, sql } from "drizzle-orm";
 import {
   agents,
   assets,
@@ -52,7 +52,7 @@ type PipelineTransitions = { transitionCase: (input: any) => Promise<unknown> };
 
 export function triageService(
   db: Db,
-  deps: { pipelines: PipelineTransitions; cost: CostService; llm: LlmConfig; embed?: EmbedConfig | null; dedupe?: DedupeConfig; fetchImpl?: typeof fetch },
+  deps: { pipelines: PipelineTransitions; cost: CostService; llm: LlmConfig; embed?: EmbedConfig | null; dedupe?: DedupeConfig; maxTokensPerDay?: number; fetchImpl?: typeof fetch },
 ) {
   const dedupe = dedupeService(db, deps.dedupe ?? loadDedupeConfig({}));
   /** One idle agent row per company, only to attribute cost and budget; heartbeat stays disabled. */
@@ -122,11 +122,40 @@ export function triageService(
     }
   }
 
+  /**
+   * Companies that used up today's token allowance (UTC day, Triage and embedding calls together). Costs are
+   * "unpriced", so Paperclip's money budgets cannot stop a runaway; this cap counts tokens instead.
+   */
+  async function overBudgetCompanies(): Promise<Array<{ companyId: string; tokens: number }>> {
+    const cap = deps.maxTokensPerDay ?? 0;
+    if (cap <= 0) return [];
+    const rows = (await db.execute(sql`
+      select company_id, sum(input_tokens + output_tokens)::bigint as tokens
+      from cost_events
+      where billing_code in ('devflow:triage', 'devflow:embed')
+        and occurred_at >= (date_trunc('day', now() at time zone 'UTC') at time zone 'UTC')
+      group by company_id having sum(input_tokens + output_tokens) >= ${cap}`)) as unknown as Array<{ company_id: string; tokens: string | number }>;
+    return rows.map((r) => ({ companyId: r.company_id, tokens: Number(r.tokens) }));
+  }
+
+  async function recordBudgetPause(companyId: string, tokens: number) {
+    await logActivity(db, {
+      companyId,
+      actorType: "system",
+      actorId: "devflow-triage",
+      action: "agent.triage_budget_paused",
+      entityType: "company",
+      entityId: companyId,
+      details: { tokensToday: tokens, maxTokensPerDay: deps.maxTokensPerDay ?? 0 },
+    });
+  }
+
   /** Backfill: embed requests that have no vector for the configured model. Stops at the first failure. */
-  async function embedPending(limit: number): Promise<number> {
+  async function embedPending(limit: number, excludeCompanyIds: readonly string[] = []): Promise<number> {
     if (!deps.embed) return 0;
     let done = 0;
     for (const r of await dedupe.missingEmbeddings(deps.embed.model, limit)) {
+      if (excludeCompanyIds.includes(r.company_id)) continue;
       const agentId = await ensureTriageAgent(r.company_id);
       const text = embedSource(r.title, r.description, r.business_impact);
       if (!(await embedRequest(r.company_id, agentId, r.case_id, text))) break;
@@ -157,7 +186,7 @@ export function triageService(
   }
 
   /** Cases waiting in `triage` with no live proposal (also re-picks cases sent back by request_changes). */
-  async function findPending(limit: number) {
+  async function findPending(limit: number, excludeCompanyIds: readonly string[] = []) {
     return db
       .select({ caseId: pipelineCases.id, companyId: pipelineCases.companyId })
       .from(pipelineCases)
@@ -167,6 +196,7 @@ export function triageService(
       .where(
         and(
           eq(pipelines.key, TRIAGE_PIPELINE_KEY),
+          excludeCompanyIds.length ? notInArray(pipelineCases.companyId, [...excludeCompanyIds]) : undefined,
           isNull(pipelines.archivedAt),
           eq(pipelineStages.key, "triage"),
           isNull(pipelineCases.terminalKind),
@@ -392,5 +422,5 @@ export function triageService(
     });
   }
 
-  return { ensureTriageAgent, findPending, triageCase, recordFailure, embedPending };
+  return { ensureTriageAgent, findPending, triageCase, recordFailure, embedPending, overBudgetCompanies, recordBudgetPause };
 }

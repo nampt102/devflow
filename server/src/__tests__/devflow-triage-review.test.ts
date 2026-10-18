@@ -354,6 +354,33 @@ describeEmbeddedPostgres("devflow triage review", () => {
     expect((await decide(ctx, r, { decision: "approve" })).status).toBe(200);
   });
 
+  it("a decision that loses the race after our checks is a 409, not the core's validation error", async () => {
+    const ctx = await seedCompany();
+    const r = await seedRequest(ctx);
+    const [baSpec] = await db.select().from(pipelineStages).where(and(eq(pipelineStages.pipelineId, ctx.pipeline.id), eq(pipelineStages.key, "ba_spec")));
+    const racing = express();
+    racing.use(express.json());
+    racing.use((req, _res, next) => {
+      req.actor = staff(ctx.reviewer, ctx.company.id);
+      next();
+    });
+    racing.use(
+      "/api",
+      triageReviewRoutes(db, {
+        // someone else's decision lands right after our checks and before the core transaction
+        reviewCase: async (input) => {
+          await db.update(pipelineCases).set({ stageId: baSpec.id }).where(eq(pipelineCases.id, r.id));
+          return svc().reviewCase(input);
+        },
+      }),
+    );
+    racing.use(errorHandler);
+    const res = await request(racing)
+      .post(`/api/companies/${ctx.company.id}/devflow/triage-cases/${r.id}/decision`)
+      .send({ outputId: r.outputId, expectedVersion: await versionOf(r.id), decision: "approve" });
+    expect(res.status).toBe(409);
+  });
+
   it("two reviewers deciding at once: one wins, one gets 409", async () => {
     const ctx = await seedCompany();
     const r = await seedRequest(ctx);
