@@ -16,7 +16,7 @@ Các bước 0–10 của P1 đã code, kiểm bằng test và chạy thử trê
 3. P2 (BA Spec + Planner agent, các gate còn lại, email mở rộng) chỉ bắt đầu khi P1 chạy pilot ổn; role BA/Tech Lead cho approver là bản vá chờ làm.
 
 ## Việc bị chặn / chờ quyết định
-- Còn thiếu cho pilot: thông tin SMTP thật; vLLM local (đã chạy thử bằng API Claude và OpenAI embedding, chưa với vLLM/TEI).
+- Còn thiếu cho pilot: xác nhận người nhận thấy thư (SMTP đã gửi thật); vLLM local (đã chạy thử bằng API Claude và OpenAI embedding, chưa với vLLM/TEI).
 - Telemetry của Paperclip: **đã chốt tắt** trong cấu hình Docker (`PAPERCLIP_TELEMETRY_DISABLED=1`, ADR 0019); chưa quan sát lưu lượng ra ngoài thực tế.
 - Triage chạy thật bằng worker nội bộ (không qua adapter của Paperclip); các agent adapter (BA, Dev, QA) chưa thử ở runtime vì thuộc P2 trở đi.
 - Model embedding: đang thử `text-embedding-3-small` (OpenAI); bge-m3 qua TEI là lựa chọn local, chưa thử. Số chiều không chặn vì `dr_embeddings` không cố định số chiều (chỉ mục HNSW tạo riêng sau khi chọn model, ADR 0013).

@@ -60,7 +60,7 @@ export function loadLlmConfig(env: NodeJS.ProcessEnv): LlmConfig | null {
     apiKey: env.DEVFLOW_LLM_API_KEY?.trim() || undefined,
     model,
     timeoutMs: Number(env.DEVFLOW_LLM_TIMEOUT_MS) || 60_000,
-    maxOutputTokens: Number(env.DEVFLOW_LLM_MAX_OUTPUT_TOKENS) || 1_500,
+    maxOutputTokens: Number(env.DEVFLOW_LLM_MAX_OUTPUT_TOKENS) || 4_000, // 1500 truncated long Vietnamese answers
     responseFormat: format,
   };
 }

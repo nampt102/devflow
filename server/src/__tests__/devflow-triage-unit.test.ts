@@ -161,6 +161,8 @@ describe("llm client against the fake server", () => {
   it("loadLlmConfig needs base url and model, validates the response format", () => {
     expect(loadLlmConfig({})).toBeNull();
     expect(loadLlmConfig({ DEVFLOW_LLM_BASE_URL: "http://x/v1/", DEVFLOW_LLM_MODEL: "m" })?.baseUrl).toBe("http://x/v1");
+    expect(loadLlmConfig({ DEVFLOW_LLM_BASE_URL: "http://x", DEVFLOW_LLM_MODEL: "m" })?.maxOutputTokens).toBe(4000);
+    expect(loadLlmConfig({ DEVFLOW_LLM_BASE_URL: "http://x", DEVFLOW_LLM_MODEL: "m", DEVFLOW_LLM_MAX_OUTPUT_TOKENS: "2500" })?.maxOutputTokens).toBe(2500);
     expect(() => loadLlmConfig({ DEVFLOW_LLM_BASE_URL: "http://x", DEVFLOW_LLM_MODEL: "m", DEVFLOW_LLM_RESPONSE_FORMAT: "xml" })).toThrow();
   });
 });

@@ -11,7 +11,7 @@ Cho người chạy pilot (D7: chủ dự án tự chọn công ty và tự ch�
 ## 2. Cấu hình (`docker/.env`, mẫu `docker/.env.example`; không đưa bí mật vào repo)
 | Nhóm | Biến | Ghi chú |
 |---|---|---|
-| Triage | `DEVFLOW_LLM_BASE_URL`, `_MODEL`, `_API_KEY`, `_RESPONSE_FORMAT`, `_EXTRA_BODY`, `_TEMPERATURE` | Thiếu BASE_URL hoặc MODEL thì worker không chạy. Claude qua endpoint tương thích OpenAI: `RESPONSE_FORMAT=none`, không đặt temperature. |
+| Triage | `DEVFLOW_LLM_BASE_URL`, `_MODEL`, `_API_KEY`, `_RESPONSE_FORMAT`, `_EXTRA_BODY`, `_TEMPERATURE`, `_MAX_OUTPUT_TOKENS`, `_TIMEOUT_MS` | Thiếu BASE_URL hoặc MODEL thì worker không chạy. Claude qua endpoint tương thích OpenAI: `RESPONSE_FORMAT=none`, không đặt temperature. |
 | Embedding | `DEVFLOW_EMBED_BASE_URL`, `_MODEL`, `_API_KEY` | Thiếu thì dedupe chỉ dùng trigram. |
 | Email | `DEVFLOW_SMTP_HOST/PORT/SECURE/USER/PASS/FROM`, `DEVFLOW_PORTAL_BASE_URL` | Thiếu HOST hoặc FROM thì không gửi email. |
 | Giới hạn | `DEVFLOW_TRIAGE_MAX_TOKENS_PER_DAY` | Mỗi công ty, theo ngày UTC, tính Triage + embedding. Compose mặc định 500000; `0` là không giới hạn. |
@@ -22,6 +22,9 @@ Sau khi đổi `.env`: `docker compose -f docker-compose.yml -f docker-compose.d
 
 ## 3. Kiểm tra nhanh sau khi chạy (hướng dẫn chạy cho D7)
 `node --env-file=docker/.env scripts/devflow/smoke-p1.mjs --wait 180` (cần `DEVFLOW_TEST_ADMIN_*` là nhân viên và `DEVFLOW_TEST_PORTAL_*` là requester của cùng công ty). Script gửi một yêu cầu "Smoke test", chờ Triage đề xuất, duyệt với một chỉnh sửa, và kiểm tra: requester không đọc được API nhân viên, đề xuất không lộ ra portal, trạng thái requester đổi đúng, quyết định thứ hai bị từ chối, số liệu tăng. In PASS/FAIL từng bước; thoát mã 1 nếu có FAIL. **Tạo yêu cầu thật** nên chạy trên công ty thử. Đã chạy thành công trên stack Docker ngày 2026-10-18 (17/17).
+
+### Bật email lần đầu trên instance đã có dữ liệu (đã gặp 2026-10-18)
+Worker email gửi thư cho mọi sự kiện đổi trạng thái trong `DEVFLOW_EMAIL_MAX_AGE_HOURS` giờ gần nhất (mặc định 24). Khi bật SMTP trên instance có dữ liệu thử, các yêu cầu cũ của tài khoản test sẽ bị gửi thư thật, và nếu tài khoản test dùng địa chỉ giả (`@devflow.test`) Gmail vẫn nhận gửi rồi trả thư báo lỗi về hộp thư của tài khoản SMTP. Lần bật đầu tiên đã gửi 10 thư như vậy tới địa chỉ giả. Cách tránh: trước khi bật, đổi email các tài khoản test sang địa chỉ thật của bạn, và đặt `DEVFLOW_EMAIL_MAX_AGE_HOURS=1` cho lần khởi động đầu (hoặc đánh dấu bỏ qua các dòng `dr_email_outbox` đang `pending` bằng `update dr_email_outbox set status='skipped', last_error='cutover' where status='pending'` ngay sau khi khởi động, trước khi sweep gửi).
 
 ## 4. Theo dõi hằng ngày
 - Màn hình **Triage review** → mục "Quality": hàng chờ, tỷ lệ override, thời gian, "Agent problems" và danh sách lỗi gần đây (mã REQ + loại lỗi).
@@ -37,6 +40,7 @@ Sau khi đổi `.env`: `docker compose -f docker-compose.yml -f docker-compose.d
 |---|---|---|
 | Yêu cầu nằm ở "Đã tiếp nhận", không có đề xuất | worker tắt (thiếu `DEVFLOW_LLM_*`, hoặc `DEVFLOW_WORKERS_ENABLED=false`), đạt trần token, circuit breaker mở, hoặc case bị bỏ cuộc | Xem log ("worker started", "daily token cap", "circuit breaker"). Bỏ cuộc và breaker nằm trong bộ nhớ: **khởi động lại server** để thử lại. |
 | `agent.triage_failed` kind `client_error` | model từ chối tham số (ví dụ `temperature`) hoặc key/model sai | Chạy thử endpoint từ trong container, đọc thông báo lỗi; chỉnh `.env`. |
+| kind `truncated` | câu trả lời của model dài hơn `DEVFLOW_LLM_MAX_OUTPUT_TOKENS` (mặc định 4000; 1500 đã gây lỗi này với tiếng Việt) | Tăng giá trị trong `.env` rồi `up -d`; xem thêm model có đang "suy nghĩ" dài không. |
 | kind `invalid_output` | model trả JSON sai schema hai lần | Xem model/`RESPONSE_FORMAT`; với Qwen đặt `DEVFLOW_LLM_EXTRA_BODY` tắt thinking. |
 | kind `rate_limited`, `timeout`, `server_error` | nhà cung cấp quá tải | Worker tự lùi và thử lại; kiểm tra hạn mức của nhà cung cấp. |
 | `agent.triage_budget_paused` | đạt trần token ngày | Tự mở lại lúc 0h UTC; hoặc tăng `DEVFLOW_TRIAGE_MAX_TOKENS_PER_DAY` rồi `up -d`. |
@@ -70,7 +74,7 @@ Quét 30 commit của DevFlow (từ `935c17b6e`) và cây tệp: không có giá
 ## 12. Danh sách kiểm tra trước pilot
 - [ ] Chọn công ty pilot, seed pipeline, bật Pipelines, tạo nhân viên và link mời requester.
 - [ ] Chọn nhà cung cấp LLM theo chính sách dữ liệu (mục 9); đặt `DEVFLOW_LLM_*`, thử bằng `smoke-p1.mjs`.
-- [ ] Gmail: tạo mật khẩu ứng dụng, đặt `DEVFLOW_SMTP_*`, gửi thử một email thật (chưa từng chạy với SMTP thật).
+- [x] Gmail: đã đặt `DEVFLOW_SMTP_*` và gửi thật thành công (2026-10-18, xem `email-notifications.md`); còn xác nhận người nhận thấy thư trong hộp thư.
 - [ ] Cung cấp ~20 yêu cầu mẫu thật và vài cặp trùng để hiệu chỉnh ngưỡng dedupe (0.3 trigram, 0.65 vector); xác nhận định nghĩa ưu tiên và độ khó (prompt v4 thay bản TEMPORARY).
 - [ ] Xác nhận vị trí và chu kỳ sao lưu tự động của Paperclip; sao lưu thư mục tệp đính kèm.
 - [ ] Quyết định bật đóng đăng ký công khai (mục 8) và kiểm thử luồng bootstrap.
