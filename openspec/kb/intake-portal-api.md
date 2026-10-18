@@ -1,6 +1,6 @@
 # Intake Portal: API requester (hiện trạng)
 
-Nguồn: `server/src/devflow/portal/`, change `openspec/changes/add-intake-portal`, ADR 0011. Đã kiểm chứng bằng `server/src/__tests__/devflow-portal.test.ts` (20 test trên Postgres nhúng: 13 portal + 7 lời mời). **Chưa chạy trên stack Docker đang chạy** (image cũ chưa chứa code này) và chưa có web.
+Nguồn: `server/src/devflow/portal/`, change `openspec/changes/archive/2026-10-18-add-intake-portal`, ADR 0011. Đã kiểm chứng bằng `server/src/__tests__/devflow-portal.test.ts` (20 test trên Postgres nhúng: 13 portal + 7 lời mời). **Chưa chạy trên stack Docker đang chạy** (image cũ chưa chứa code này) và chưa có web.
 
 ## Endpoint (đều sau guard `requireRequester`)
 | Method | Path | Ghi chú |

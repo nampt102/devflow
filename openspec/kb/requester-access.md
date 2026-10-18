@@ -10,7 +10,7 @@
 - Role `viewer` không dùng được cho requester: viewer đọc được **mọi** case của công ty (spike).
 
 ## Quyết định (đã duyệt 2026-10-17, ADR 0011)
-A1 link mời một lần, B1 `/api/portal/*` + guard, C1 app `portal/` riêng. Change: `openspec/changes/add-intake-portal`. API hiện trạng: `kb/intake-portal-api.md`.
+A1 link mời một lần, B1 `/api/portal/*` + guard, C1 app `portal/` riêng. Change: `openspec/changes/archive/2026-10-18-add-intake-portal`. API hiện trạng: `kb/intake-portal-api.md`.
 
 ## Kiểm chứng đăng ký khi `PAPERCLIP_AUTH_DISABLE_SIGN_UP=true` (task 3.3)
 Test đặc tính `server/src/__tests__/devflow-auth-signup.test.ts` (4 ca, Postgres nhúng, instance better-auth thật):

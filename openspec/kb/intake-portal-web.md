@@ -1,6 +1,6 @@
 # Intake Portal: web app `portal/` (hiện trạng)
 
-Nguồn: `portal/`, `server/src/devflow/portal/static.ts`, change `openspec/changes/add-intake-portal` (nhóm 4), ADR 0011. API phía sau: `kb/intake-portal-api.md`.
+Nguồn: `portal/`, `server/src/devflow/portal/static.ts`, change `openspec/changes/archive/2026-10-18-add-intake-portal` (nhóm 4), ADR 0011. API phía sau: `kb/intake-portal-api.md`.
 
 ## Cấu trúc
 - Workspace package `@devflow/portal` (private): React 19 + Vite + TypeScript, **chỉ tiếng Việt**, không dùng thư viện router/i18n/UI; phiên bản dependency trùng với `ui/` nên lockfile chỉ thêm một khối importer.

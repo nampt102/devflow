@@ -15,4 +15,4 @@ User nghiệp vụ cần gửi và theo dõi yêu cầu bằng tiếng Việt m�
 - Giới hạn: file ≤10 MB, ảnh/PDF/Office, ≤5 file, giới hạn tần suất gửi, chưa quét virus.
 
 ## Lý do và hệ quả
-Thêm bề mặt riêng thay vì nới quyền board; thay đổi nằm ở `server`, `portal`, một bảng mới. Đánh đổi: bù trừ thay cho giao dịch duy nhất khi tạo case + `dr_requests` (xem `changes/add-intake-portal/design.md`); đổi lockfile và Dockerfile. Chi tiết và danh sách việc ở change OpenSpec `add-intake-portal`.
+Thêm bề mặt riêng thay vì nới quyền board; thay đổi nằm ở `server`, `portal`, một bảng mới. Đánh đổi: bù trừ thay cho giao dịch duy nhất khi tạo case + `dr_requests` (xem `changes/archive/2026-10-18-add-intake-portal/design.md`); đổi lockfile và Dockerfile. Chi tiết và danh sách việc ở change OpenSpec `add-intake-portal`.

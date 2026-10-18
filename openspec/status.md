@@ -8,7 +8,7 @@
 **P1**: Intake Portal + Workflow Core + Triage agent, pilot 1 công ty. P0 (khám phá Paperclip/Plane, docs, khung project-kit) đã xong.
 
 ## Bước đang làm
-Các bước 0–10 của P1 đã code, kiểm bằng test và chạy thử trên stack Docker thật (portal, Triage với Claude, dedupe, màn hình duyệt, số liệu, smoke `scripts/devflow/smoke-p1.mjs` 17/17). **Chưa có pilot thật**: còn các việc chuẩn bị ở `kb/runbook.md` mục 12. Change OpenSpec `add-intake-portal` chưa archive (hỏi chủ dự án trước khi `/opsx:archive`).
+Các bước 0–10 của P1 đã code, kiểm bằng test và chạy thử trên stack Docker thật (portal, Triage với Claude, dedupe, màn hình duyệt, số liệu, smoke `scripts/devflow/smoke-p1.mjs` 17/17). **Chưa có pilot thật**: còn các việc chuẩn bị ở `kb/runbook.md` mục 12. Change OpenSpec `add-intake-portal` đã archive ngày 2026-10-18 (`openspec/changes/archive/2026-10-18-add-intake-portal`, spec chính ở `openspec/specs/intake-portal`).
 
 ## Bước tiếp theo
 1. Chuẩn bị pilot theo danh sách kiểm tra `kb/runbook.md` mục 12: chọn công ty, SMTP Gmail (mật khẩu ứng dụng) và gửi thử một email thật, LLM theo chính sách dữ liệu (local cho dữ liệu thật), ~20 yêu cầu mẫu thật và vài cặp trùng để hiệu chỉnh ngưỡng dedupe, xác nhận sao lưu tự động.
