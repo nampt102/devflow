@@ -4,6 +4,7 @@ import { notFound } from "../../errors.js";
 import { validate } from "../../middleware/validate.js";
 import { staffUser } from "../staff.js";
 import { baAgentSpec, DEFAULT_MAX_USD_PER_RUN, DEFAULT_MODEL, findBaAgent, unsafeBaAgentReason, DEFAULT_WORKSPACE_ROOT } from "./agent.js";
+import { baMetricsService } from "./metrics.js";
 import { baDecisionSchema, baReviewService } from "./review-service.js";
 
 type Env = Record<string, string | undefined>;
@@ -22,6 +23,7 @@ export function specFromEnv(env: Env) {
 export function baRoutes(db: Db, deps: { reviewCase: ReviewCase }, env: Env = process.env) {
   const router = Router();
   const review = baReviewService(db, deps);
+  const metrics = baMetricsService(db);
 
   // What the BA agent must look like and whether this company's agent matches (used by scripts/devflow/setup-ba-agent.mjs).
   router.get("/companies/:companyId/devflow/ba-agent", async (req, res) => {
@@ -47,6 +49,13 @@ export function baRoutes(db: Db, deps: { reviewCase: ReviewCase }, env: Env = pr
     const companyId = req.params.companyId as string;
     staffUser(req, companyId, "review BA specs");
     res.json(await review.count(companyId));
+  });
+
+  router.get("/companies/:companyId/devflow/ba-metrics", async (req, res) => {
+    const companyId = req.params.companyId as string;
+    staffUser(req, companyId, "see BA metrics");
+    const days = Math.min(Math.max(Math.trunc(Number(req.query.days)) || 30, 1), 365);
+    res.json(await metrics.metrics(companyId, days));
   });
 
   router.get("/companies/:companyId/devflow/ba-cases/:caseId", async (req, res) => {

@@ -80,7 +80,19 @@ export interface BaDecisionBody {
   final?: Partial<BaEditable>;
 }
 
+export interface BaMetrics {
+  windowDays: number;
+  approved: { total: number; overridden: number; overrideRate: number | null; byPromptVersion: Array<{ promptVersion: string; total: number; overridden: number; overrideRate: number | null }> };
+  fields: Array<{ field: string; overrides: number; rate: number | null }>;
+  decisions: { approve: number; reject: number; requestChanges: number };
+  flow: { secondsInReview: { p50: number | null; p90: number | null } };
+  queue: { waiting: number; oldestSince: string | null };
+  recentFailures: Array<{ action: string; kind: string | null; caseKey: string | null; at: string }>;
+  agent: { proposed: number; failed: number; gaveUp: number; budgetPaused: number; runs: number; failedRuns: number; spendUsd: number; avgUsdPerRun: number | null; inputTokens: number; outputTokens: number };
+}
+
 export const devflowBaApi = {
+  metrics: (companyId: string, days = 30) => api.get<BaMetrics>(`/companies/${companyId}/devflow/ba-metrics?days=${days}`),
   count: (companyId: string) => api.get<{ waiting: number; newest: string | null }>(`/companies/${companyId}/devflow/ba-count`),
   queue: (companyId: string) => api.get<{ items: BaQueueItem[] }>(`/companies/${companyId}/devflow/ba-queue`),
   detail: (companyId: string, caseId: string) => api.get<BaDetail>(`/companies/${companyId}/devflow/ba-cases/${caseId}`),

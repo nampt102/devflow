@@ -138,3 +138,11 @@ export function writeSeenAt(companyId: string, at: number = Date.now()): void {
     /* storage can be blocked; the labels just do not persist */
   }
 }
+
+export const usd = (v: number | null): string => (v === null ? "-" : `${v.toFixed(2)} USD`);
+
+export const FAILURE_LABELS: Record<string, string> = {
+  "agent.ba_failed": "Run failed",
+  "agent.ba_gave_up": "Gave up",
+  "agent.ba_budget_paused": "Paused: daily spend cap",
+};

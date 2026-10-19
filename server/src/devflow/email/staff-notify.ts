@@ -4,7 +4,8 @@ import { logger } from "../../middleware/logger.js";
 import { logActivity } from "../../services/activity-log.js";
 import { type SendMail } from "./mailer.js";
 
-// Email to staff when new Triage proposals wait for review (backlog B-01). One digest per company: the first new
+// Email to staff when new Triage proposals or BA specs wait for review (backlog B-01, change add-ba-spec-stage).
+// Each kind has its own digest and ledger. One digest per company and kind: the first new
 // proposal goes out at once, later ones are gathered until `intervalMinutes` have passed since the last digest.
 // Recipients: an explicit list (DEVFLOW_STAFF_NOTIFY_EMAILS), otherwise the company's active owners and admins.
 // No new table: the ledger is the activity log (`staff.notified` with the newest proposal time it covered).
@@ -30,11 +31,36 @@ export function parseRecipients(raw: string | undefined): string[] {
   return [...new Set((raw ?? "").split(/[,;\s]+/).map((s) => s.trim().toLowerCase()).filter((s) => EMAIL.test(s)))];
 }
 
-export function composeStaffDigest(input: { count: number; items: Array<{ key: string; title: string }>; link: string; more: number }): { subject: string; body: string } {
+export type DigestKind = "triage" | "ba";
+
+/** What each review queue is called in the mail, where its proposals live and how its digests are recorded. */
+const KINDS: Record<DigestKind, { stageKey: string; outputStage: string; path: string; notified: string; failed: string; subject: (n: number) => string; intro: (n: number) => string }> = {
+  triage: {
+    stageKey: "triage_review",
+    outputStage: "triage",
+    path: "triage",
+    notified: "staff.notified",
+    failed: "staff.notify_failed",
+    subject: (n) => `[DevFlow] ${n} yêu cầu mới chờ duyệt triage`,
+    intro: (n) => `Có ${n} yêu cầu mới đang chờ bạn duyệt phân loại:`,
+  },
+  ba: {
+    stageKey: "ba_review",
+    outputStage: "ba_spec",
+    path: "ba-review",
+    notified: "staff.notified_ba",
+    failed: "staff.notify_failed_ba",
+    subject: (n) => `[DevFlow] ${n} bản spec BA mới chờ duyệt`,
+    intro: (n) => `Có ${n} bản spec BA mới đang chờ bạn duyệt:`,
+  },
+};
+
+export function composeStaffDigest(input: { count: number; items: Array<{ key: string; title: string }>; link: string; more: number; kind?: DigestKind }): { subject: string; body: string } {
+  const kind = KINDS[input.kind ?? "triage"];
   return {
-    subject: `[DevFlow] ${input.count} yêu cầu mới chờ duyệt triage`,
+    subject: kind.subject(input.count),
     body: [
-      `Có ${input.count} yêu cầu mới đang chờ bạn duyệt phân loại:`,
+      kind.intro(input.count),
       "",
       ...input.items.map((i) => `- ${i.key}: ${i.title}`),
       ...(input.more > 0 ? [`- ... và ${input.more} yêu cầu khác`] : []),
@@ -61,16 +87,17 @@ export function createStaffNotifier(db: Db, send: SendMail, opts: StaffNotifyOpt
     return [...new Set(admins.map((a) => a.email).filter((e) => EMAIL.test(e)))];
   }
 
-  /** One pass over all companies; returns how many digests were sent. */
-  async function run(): Promise<number> {
+  /** One pass over all companies for one queue; returns how many digests were sent. */
+  async function runKind(kindName: DigestKind): Promise<number> {
+    const queue = KINDS[kindName];
     const waiting = await rows<Waiting>(sql`
       select o.id as output_id, o.created_at as at, c.company_id, c.case_key, c.title, co.issue_prefix as prefix
       from dr_agent_outputs o
       join pipeline_cases c on c.id = o.case_id and c.company_id = o.company_id
       join pipelines p on p.id = c.pipeline_id and p.key = 'dev-request'
-      join pipeline_stages st on st.id = c.stage_id and st.key = 'triage_review'
+      join pipeline_stages st on st.id = c.stage_id and st.key = ${queue.stageKey}
       join companies co on co.id = c.company_id
-      where o.status = 'proposed' and o.stage_key = 'triage' and c.terminal_kind is null
+      where o.status = 'proposed' and o.stage_key = ${queue.outputStage} and c.terminal_kind is null
         and o.created_at > now() - make_interval(hours => ${maxAge})
       order by c.company_id, o.created_at`);
     const byCompany = new Map<string, Waiting[]>();
@@ -80,9 +107,9 @@ export function createStaffNotifier(db: Db, send: SendMail, opts: StaffNotifyOpt
     for (const [companyId, items] of byCompany) {
       const [ledger] = await rows<{ up_to: string | null; last_at: string | null; failed_at: string | null }>(sql`
         select
-          (select max((details->>'upTo')::timestamptz) from activity_log where company_id = ${companyId} and action = 'staff.notified') as up_to,
-          (select max(created_at) from activity_log where company_id = ${companyId} and action = 'staff.notified') as last_at,
-          (select max(created_at) from activity_log where company_id = ${companyId} and action = 'staff.notify_failed') as failed_at`);
+          (select max((details->>'upTo')::timestamptz) from activity_log where company_id = ${companyId} and action = ${queue.notified}) as up_to,
+          (select max(created_at) from activity_log where company_id = ${companyId} and action = ${queue.notified}) as last_at,
+          (select max(created_at) from activity_log where company_id = ${companyId} and action = ${queue.failed}) as failed_at`);
       const upTo = ledger?.up_to ? new Date(ledger.up_to).getTime() : 0;
       const fresh = items.filter((i) => new Date(i.at).getTime() > upTo);
       if (fresh.length === 0) continue;
@@ -100,7 +127,8 @@ export function createStaffNotifier(db: Db, send: SendMail, opts: StaffNotifyOpt
         count: fresh.length,
         items: shown.map((i) => ({ key: i.case_key, title: oneLine(i.title, 120) })),
         more: fresh.length - shown.length,
-        link: `${opts.portalBaseUrl}/${items[0].prefix}/triage`,
+        link: `${opts.portalBaseUrl}/${items[0].prefix}/${queue.path}`,
+        kind: kindName,
       });
       let delivered = 0;
       let kind = "unknown";
@@ -117,7 +145,7 @@ export function createStaffNotifier(db: Db, send: SendMail, opts: StaffNotifyOpt
         companyId,
         actorType: "system",
         actorId: "devflow-email",
-        action: delivered > 0 ? "staff.notified" : "staff.notify_failed",
+        action: delivered > 0 ? queue.notified : queue.failed,
         entityType: "company",
         entityId: companyId,
         details: delivered > 0 ? { count: fresh.length, upTo: newest, recipients: delivered, failedRecipients: to.length - delivered } : { kind, recipients: to.length },
@@ -125,6 +153,11 @@ export function createStaffNotifier(db: Db, send: SendMail, opts: StaffNotifyOpt
       if (delivered > 0) digests += 1;
     }
     return digests;
+  }
+
+  /** One pass over both queues; returns how many digests were sent. */
+  async function run(): Promise<number> {
+    return (await runKind("triage")) + (await runKind("ba"));
   }
 
   return { run };

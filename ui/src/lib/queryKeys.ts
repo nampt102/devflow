@@ -469,6 +469,7 @@ export const queryKeys = {
   },
   devflowBa: {
     count: (companyId: string) => ["devflow-ba", companyId, "count"] as const,
+    metrics: (companyId: string) => ["devflow-ba", companyId, "metrics"] as const,
     queue: (companyId: string) => ["devflow-ba", companyId, "queue"] as const,
     detail: (companyId: string, caseId: string) => ["devflow-ba", companyId, "detail", caseId] as const,
   },

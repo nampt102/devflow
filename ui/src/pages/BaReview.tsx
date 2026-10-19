@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Check, ClipboardList, ExternalLink, Loader2, Paperclip, RotateCcw, X } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, ChevronRight, ClipboardList, ExternalLink, Loader2, Paperclip, RotateCcw, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -9,14 +9,13 @@ import { Link } from "@/lib/router";
 import { EmptyState } from "@/components/EmptyState";
 import { PageSkeleton } from "@/components/PageSkeleton";
 import { ApiError } from "../api/client";
-import { devflowBaApi, type BaDecision, type BaDetail } from "../api/devflowBa";
+import { devflowBaApi, type BaDecision, type BaDetail, type BaMetrics } from "../api/devflowBa";
 import { useBreadcrumbs } from "../context/BreadcrumbContext";
 import { useCompany } from "../context/CompanyContext";
 import { useToastActions } from "../context/ToastContext";
 import { queryKeys } from "../lib/queryKeys";
-import { ageLabel, agoLabel, isNewSince } from "../lib/triage-review";
-import { toggleSystem } from "../lib/triage-review";
-import { changedSpecFields, citationLabel, citationUrl, CONFIDENCE_LABEL, decisionBlocker, draftFromSpec, FIELD_LABELS, finalPatch, readSeenAt, writeSeenAt, type BaDraft } from "../lib/ba-review";
+import { ageLabel, agoLabel, durationLabel, isNewSince, pct, toggleSystem } from "../lib/triage-review";
+import { changedSpecFields, citationLabel, citationUrl, CONFIDENCE_LABEL, decisionBlocker, draftFromSpec, FAILURE_LABELS, FIELD_LABELS, finalPatch, readSeenAt, usd, writeSeenAt, type BaDraft } from "../lib/ba-review";
 
 // DevFlow BA review: staff read the agent's draft spec with its citations, correct it, and decide.
 // Fields the reviewer changes become overrides on the server; an untouched form accepts the spec as it is.
@@ -65,6 +64,8 @@ export function BaReview() {
         </p>
       </div>
       {queueQuery.error ? <p className="text-sm text-amber-700 dark:text-amber-300">The queue could not be loaded. Try again in a moment.</p> : null}
+
+      <MetricsPanel companyId={selectedCompanyId} />
 
       {items.length === 0 ? (
         <EmptyState icon={Check} message="No BA spec is waiting for review." description="A spec appears here after the BA agent has read the request and the systems assigned to it." />
@@ -305,6 +306,95 @@ function TextBox({ id, label, value, rows, onChange, edited }: { id: string; lab
         {edited ? <span className="ml-2 text-amber-700 dark:text-amber-300">Edited</span> : null}
       </label>
       <Textarea id={id} value={value} rows={rows} onChange={(e) => onChange(e.target.value)} />
+    </div>
+  );
+}
+
+function MetricsPanel({ companyId }: { companyId: string }) {
+  const [open, setOpen] = useState(false);
+  const metricsQuery = useQuery({
+    queryKey: queryKeys.devflowBa.metrics(companyId),
+    queryFn: () => devflowBaApi.metrics(companyId, 30),
+    refetchInterval: 60_000,
+  });
+  const m = metricsQuery.data;
+  return (
+    <section className="border border-border">
+      <button type="button" className="flex w-full items-center gap-2 p-3 text-left text-sm font-medium text-foreground" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+        {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        Quality and cost, last 30 days
+        {m ? (
+          <span className="font-normal text-muted-foreground">
+            {m.approved.total === 0 ? "no approved specs yet" : `${pct(m.approved.overrideRate)} of ${m.approved.total} approved specs were corrected`}; {usd(m.agent.spendUsd)} spent
+          </span>
+        ) : null}
+      </button>
+      {open ? (m ? <MetricsBody m={m} /> : <p className="p-3 text-sm text-muted-foreground">{metricsQuery.isLoading ? "Loading..." : "Metrics are not available right now."}</p>) : null}
+    </section>
+  );
+}
+
+function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <div className="space-y-0.5">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="text-lg font-semibold text-foreground">{value}</p>
+      {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
+    </div>
+  );
+}
+
+function MetricsBody({ m }: { m: BaMetrics }) {
+  const decided = m.decisions.approve + m.decisions.reject + m.decisions.requestChanges;
+  return (
+    <div className="space-y-4 border-t border-border p-3">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+        <Stat label="Waiting" value={String(m.queue.waiting)} hint={m.queue.oldestSince ? `oldest ${ageLabel(m.queue.oldestSince)}` : undefined} />
+        <Stat label="Corrected" value={pct(m.approved.overrideRate)} hint={`${m.approved.overridden} of ${m.approved.total} approved`} />
+        <Stat label="Time in review" value={durationLabel(m.flow.secondsInReview.p50)} hint={`p90 ${durationLabel(m.flow.secondsInReview.p90)}`} />
+        <Stat label="Decisions" value={String(decided)} hint={`${m.decisions.approve} approved, ${m.decisions.reject} rejected, ${m.decisions.requestChanges} sent back`} />
+        <Stat label="Spent" value={usd(m.agent.spendUsd)} hint={`${m.agent.runs} runs, ${usd(m.agent.avgUsdPerRun)} each`} />
+        <Stat label="Agent problems" value={String(m.agent.failed + m.agent.gaveUp)} hint={`${m.agent.failedRuns} failed runs, ${m.agent.gaveUp} given up`} />
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div>
+          <p className="mb-1 text-xs font-medium text-muted-foreground">Share of approved specs corrected, by field</p>
+          {m.fields.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No corrections yet.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <tbody>
+                {m.fields.map((f) => (
+                  <tr key={f.field} className="border-b border-border last:border-0">
+                    <td className="py-1 text-foreground">{FIELD_LABELS[f.field as keyof typeof FIELD_LABELS] ?? f.field}</td>
+                    <td className="py-1 text-right text-foreground">{pct(f.rate)}</td>
+                    <td className="py-1 text-right text-muted-foreground">{f.overrides}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {m.approved.byPromptVersion.length ? (
+            <p className="mt-2 text-xs text-muted-foreground">By prompt: {m.approved.byPromptVersion.map((v) => `${v.promptVersion} ${pct(v.overrideRate)} of ${v.total}`).join(", ")}</p>
+          ) : null}
+        </div>
+        <div>
+          <p className="mb-1 text-xs font-medium text-muted-foreground">Recent problems</p>
+          {m.recentFailures.length === 0 ? (
+            <p className="text-sm text-muted-foreground">None.</p>
+          ) : (
+            <ul className="space-y-1 text-sm text-foreground">
+              {m.recentFailures.map((f, i) => (
+                <li key={i}>
+                  {f.caseKey ? <span className="font-mono text-xs text-muted-foreground">{f.caseKey} </span> : null}
+                  {FAILURE_LABELS[f.action] ?? f.action}
+                  {f.kind ? `: ${f.kind}` : ""} <span className="text-muted-foreground">{agoLabel(f.at)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

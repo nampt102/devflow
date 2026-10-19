@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { BaEditable } from "../api/devflowBa";
-import { changedSpecFields, citationLabel, citationUrl, decisionBlocker, draftFromSpec, draftValues, finalPatch, parseStories, splitLines, storyToLine } from "./ba-review";
+import { changedSpecFields, citationLabel, citationUrl, decisionBlocker, draftFromSpec, draftValues, FAILURE_LABELS, finalPatch, parseStories, splitLines, storyToLine, usd } from "./ba-review";
 
 const spec = (over: Partial<BaEditable> = {}): BaEditable => ({
   summary: "Cho phép người yêu cầu thấy người xử lý.",
@@ -90,5 +90,17 @@ describe("citations", () => {
   it("labels a citation with path and line", () => {
     expect(citationLabel({ system: "portal", path: "a.ts", line: 3, why: "" })).toBe("a.ts:3");
     expect(citationLabel({ system: "portal", path: "a.ts", line: null, why: "" })).toBe("a.ts");
+  });
+});
+
+describe("cost and failure labels", () => {
+  it("shows money with two decimals and a dash when unknown", () => {
+    expect(usd(1.5)).toBe("1.50 USD");
+    expect(usd(0)).toBe("0.00 USD");
+    expect(usd(0.123)).toBe("0.12 USD");
+    expect(usd(null)).toBe("-");
+  });
+  it("names every problem the server records for the BA agent", () => {
+    expect(Object.keys(FAILURE_LABELS).sort()).toEqual(["agent.ba_budget_paused", "agent.ba_failed", "agent.ba_gave_up"]);
   });
 });
