@@ -15,7 +15,8 @@ Cho người chạy pilot (D7: chủ dự án tự chọn công ty và tự ch�
 | Embedding | `DEVFLOW_EMBED_BASE_URL`, `_MODEL`, `_API_KEY` | Thiếu thì dedupe chỉ dùng trigram. |
 | Email | `DEVFLOW_SMTP_HOST/PORT/SECURE/USER/PASS/FROM`, `DEVFLOW_PORTAL_BASE_URL` | Thiếu HOST hoặc FROM thì không gửi email. |
 | Giới hạn | `DEVFLOW_TRIAGE_MAX_TOKENS_PER_DAY` | Mỗi công ty, theo ngày UTC, tính Triage + embedding. Compose mặc định 500000; `0` là không giới hạn. |
-| Công tắc dừng | `DEVFLOW_WORKERS_ENABLED=false` | Dừng Triage, embedding và email cùng lúc (đặt rồi `up -d` lại). Portal và màn hình duyệt vẫn chạy. |
+| BA Spec | `DEVFLOW_BA_MODEL`, `DEVFLOW_BA_MAX_USD_PER_RUN`, `DEVFLOW_BA_MAX_USD_PER_DAY`, `DEVFLOW_BA_INTERVAL_MS`, `DEVFLOW_AGENT_WORKSPACE_ROOT`, `DEVFLOW_BA_ENABLED` | Mặc định haiku, 1 USD mỗi lượt, 20 USD mỗi ngày mỗi công ty (0 = không trần). Cần agent BA mỗi công ty: `node scripts/devflow/setup-ba-agent.mjs --company <id>` (đặt `DEVFLOW_AGENT_ANTHROPIC_API_KEY`, chạy lại sau mỗi lần đổi prompt BA). Xem `kb/ba-spec.md`. |
+| Công tắc dừng | `DEVFLOW_WORKERS_ENABLED=false` | Dừng Triage, embedding, BA và email cùng lúc (đặt rồi `up -d` lại). Portal và màn hình duyệt vẫn chạy. |
 | Telemetry | `PAPERCLIP_TELEMETRY_DISABLED` | Compose đặt mặc định `1` (tắt). Xem mục 7. |
 | Đăng ký | `PAPERCLIP_AUTH_DISABLE_SIGN_UP` | Xem mục 8. |
 Sau khi đổi `.env`: `docker compose -f docker-compose.yml -f docker-compose.devflow.yml up -d` để tạo lại container.
@@ -77,6 +78,7 @@ Quét 30 commit của DevFlow (từ `935c17b6e`) và cây tệp: không có giá
 
 ## 12. Danh sách kiểm tra trước pilot
 - [ ] Chọn công ty pilot, seed pipeline, bật Pipelines, tạo nhân viên và link mời requester.
+- [ ] P2: thêm hệ thống (repo GitHub + token chỉ đọc) ở trang Systems, chạy `setup-ba-agent.mjs` cho công ty pilot, thử `smoke-p2.mjs`; xem một spec thật ở trang BA review và chi phí ở panel "Quality and cost" (chủ dự án chưa xem giao diện).
 - [ ] Chọn nhà cung cấp LLM theo chính sách dữ liệu (mục 9); đặt `DEVFLOW_LLM_*`, thử bằng `smoke-p1.mjs`.
 - [x] Gmail: đã đặt `DEVFLOW_SMTP_*` và gửi thật thành công (2026-10-18, xem `email-notifications.md`); còn xác nhận người nhận thấy thư trong hộp thư.
 - [ ] Cung cấp ~20 yêu cầu mẫu thật và vài cặp trùng để hiệu chỉnh ngưỡng dedupe (0.3 trigram, 0.65 vector); xác nhận định nghĩa ưu tiên và độ khó (prompt v4 thay bản TEMPORARY).

@@ -95,6 +95,8 @@ if (!agentId) {
   );
   agentId = created.id;
   console.log(`created agent ${agentId}`);
+  // a new agent can start paused; DevFlow only runs agents that are on
+  if (created.status && created.status !== "idle") must(await call("PATCH", `/api/agents/${agentId}`, { status: "idle" }), "switch the agent on");
 } else {
   must(await call("PATCH", `/api/agents/${agentId}`, { adapterConfig, runtimeConfig: spec.runtimeConfig, metadata: spec.metadata, replaceAdapterConfig: true, status: "idle" }), "update agent");
   const file = must(await call("GET", `/api/agents/${agentId}/instructions-bundle/file?path=AGENTS.md`), "read instructions");

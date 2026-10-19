@@ -13,7 +13,7 @@ Các bước 0–10 của P1 đã code, kiểm bằng test và chạy thử trê
 ## Bước tiếp theo
 1. Chuẩn bị pilot theo danh sách kiểm tra `kb/runbook.md` mục 12: chọn công ty, SMTP Gmail (mật khẩu ứng dụng) và gửi thử một email thật, LLM theo chính sách dữ liệu (local cho dữ liệu thật), ~20 yêu cầu mẫu thật và vài cặp trùng để hiệu chỉnh ngưỡng dedupe, xác nhận sao lưu tự động.
 2. Quyết định của chủ dự án: định nghĩa ưu tiên và độ khó của công ty (prompt v4 thay bản TEMPORARY); có bật `PAPERCLIP_AUTH_DISABLE_SIGN_UP=true` không (và kiểm thử luồng bootstrap); có cần màn hình quản trị tài khoản và màn hình tạo link mời cho nhân viên không.
-3. P2 (BA Spec + Planner agent, các gate còn lại, email mở rộng): đang brainstorm. Đã chốt hướng ở ADR 0020 (adapter của Paperclip, repo GitHub, docs markdown trong `docs/`, danh mục Hệ thống gán ở Triage review). Spike xong (4 vòng, `kb/spike-p2-adapter.md`); chủ dự án duyệt Option 3 (chỉ tool đọc). **Change `add-ba-spec-stage` đã viết, chờ duyệt proposal + DDL** (`dr_systems`, `dr_request_systems`). Tech Plan là change sau. Role BA/Tech Lead cho approver là bản vá chờ làm.
+3. **P2 phần BA Spec: code xong, đã chạy thật** (change `add-ba-spec-stage`, `kb/ba-spec.md`, ADR 0020 và 0021, `scripts/devflow/smoke-p2.mjs` 25/25 với repo và key thật). Còn: chủ dự án xem giao diện (Systems, chọn hệ thống ở Triage review, BA review), thử với repo riêng có token, rồi archive change. Tech Plan là change sau (`add-tech-plan-stage`); role BA/Tech Lead cho approver là bản vá chờ làm.
 
 ## Backlog cải tiến
 Các vấn đề nhỏ và cải tiến chưa làm nằm ở `openspec/backlog.md` (mã số, nguồn, mức ưu tiên A/B/C). Chủ dự án báo trong chat, Claude ghi vào đó.
@@ -64,6 +64,7 @@ Thứ tự: 0 → 1 → 2 → 3 → {4, 5} → 6 → 7 → 7b → 8 → 9 → 10
 - 0018 Số liệu triage: tính từ dữ liệu có sẵn, tỷ lệ override trên đề xuất được duyệt
 - 0019 Pilot hardening: Telemetry tắt, trần token ngày, công tắc dừng worker
 - 0020 P2: BA Spec và Tech Plan qua adapter của Paperclip; repo và docs gán theo Hệ thống
+- 0021 BA Spec: DevFlow điều khiển agent chỉ có tool đọc; hệ thống gán ở Triage review
 - D7 (không phải ADR): chủ dự án tự chọn công ty pilot và tự chạy test; Claude bàn giao code, test tự động, hướng dẫn chạy.
 
 ## Kết quả spike Pipelines (đọc code + smoke API; chi tiết `kb/spike-pipelines.md`)
@@ -82,6 +83,7 @@ Kết luận: **cần vá, không phải viết lại state machine**. Chưa th�
 P1 (đang chuẩn bị) → P2 BA Spec + Planner agent, gate còn lại, email mở rộng → P3 Dev agent (worktree/PR), QA agent, dashboard → P4 Governance đầy đủ, SSO, mở rộng toàn group.
 
 ## Gần đây
+- 2026-10-19: P2 BA Spec xong và chạy thật. Migration `0359` (`dr_systems`, `dr_request_systems`), trang Systems, Triage prompt v4 (đề xuất hệ thống) + chọn hệ thống ở Triage review, agent BA (`claude_local`, chỉ Read/Grep/Glob, tạo bằng `setup-ba-agent.mjs`, bị từ chối nếu cấu hình đã đổi), worker BA (một lượt một lần toàn instance, thư mục dọn trước/sau, ngân sách theo lượt và theo ngày), duyệt BA (API + trang `/ba-review`, trích dẫn link theo SHA, đổi hệ thống, override, `data.approved`), email nhân viên cho spec chờ duyệt, metrics và chi phí. Kiểm: 300+ test mới (server, db, UI), đột biến bị bắt ở mọi nhóm, smoke thật 25/25 (11 trích dẫn đúng, 0,013 USD). Chưa: xem giao diện trên trình duyệt, repo riêng có token, push (nhánh `chore/project-kit` còn commit chưa đẩy).
 - 2026-10-19: Chốt Option 3 (agent chỉ có Read/Grep/Glob, chặn đường dẫn bằng `--disallowedTools`, đã thử bằng file mồi); DevFlow tự điều khiển lượt chạy (wakeup trực tiếp, không routine). Viết change `add-ba-spec-stage` (proposal, design kèm DDL, tasks, spec `ba-spec`), chờ duyệt. Dọn sạch tài nguyên spike.
 - 2026-10-19: Spike P2 vòng 2: mặc định engine ACP bỏ qua `extraArgs` (cần `engine: cli`); `--max-budget-usd` hiệu lực với cli; chặn tool Write không đủ chỉ-đọc (agent vòng qua Bash); bubblewrap chỉ chạy khi `seccomp=unconfined` (chưa tích hợp, chờ quyết định); case vào `ba_spec` tự tạo issue và chạy agent, kết quả JSON nằm ở bình luận của agent trên issue; Paperclip đánh thức lại 2 lần (disposition repair) vì agent không đóng issue.
 - 2026-10-19: Spike P2: agent `claude_local` chạy được trong image hiện tại, BA spec chất lượng tốt có trích dẫn file:dòng đúng (111 giây, ~1,3 USD với haiku); phát hiện: không có chế độ chỉ đọc mặc định (`--disallowedTools` không chặn được), cần token chỉ đọc + workspace dùng một lần + bubblewrap (chưa có trong image), đầu ra là markdown tự do, chưa gắn vào stage (`kb/spike-p2-adapter.md`).

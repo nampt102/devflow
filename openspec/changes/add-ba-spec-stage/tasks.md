@@ -31,5 +31,5 @@
 
 ## 6. Hoàn tất
 
-- [ ] 6.1 Smoke trên stack Docker với repo thật và key thật: yêu cầu → Triage → gán hệ thống → BA spec → BA review approve
-- [ ] 6.2 KB (`kb/ba-spec.md`), runbook (biến môi trường, chi phí), status, ADR
+- [x] 6.1 `scripts/devflow/smoke-p2.mjs` trên stack Docker thật (repo `nampt102/devflow`, key Claude): 25/25; **chưa xem giao diện trên trình duyệt**
+- [x] 6.2 KB `kb/ba-spec.md`, runbook, status, backlog, ADR 0021

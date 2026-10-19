@@ -59,6 +59,15 @@ Mức ưu tiên: **A** cần trước pilot, **B** nên làm sớm trong pilot, 
 - Quy tắc cờ nhầm "sập"/SAP, "lượng"/"lương" (commit `93a8fd34d`).
 - Model từ chối `temperature` → tùy chọn (commit `fix(devflow): send temperature only when configured`).
 
+## P2 BA Spec (theo dõi)
+| Mã | Nội dung | Ưu tiên | Nguồn |
+|---|---|---|---|
+| C-32 | Chạy BA song song (workspace theo lượt) khi một spec mỗi 1 đến 3 phút không đủ | C | `kb/ba-spec.md` |
+| C-33 | Cách ly agent mạnh hơn: bubblewrap với profile seccomp riêng hoặc runner tách (P4) | B | ADR 0020 |
+| C-34 | Chưa kiểm: repo riêng có token, repo lớn, model local cho agent adapter; xem giao diện trên trình duyệt | B | smoke P2 |
+| C-35 | Số liệu BA theo hệ thống (override và chi phí mỗi hệ thống) | C | 2026-10-19 |
+| C-36 | Xóa được agent "Spike BA …" (API trả 409 vì có run); nút "Set up BA agent" trong UI thay cho script | C | spike |
+
 ## Giao diện portal (theo dõi)
 | Mã | Nội dung | Ưu tiên | Nguồn |
 |---|---|---|---|

@@ -1,0 +1,43 @@
+# BA Spec (P2, change `add-ba-spec-stage`)
+
+Trạng thái: code + test xong và đã chạy thật trên stack Docker với repo GitHub và key Claude thật (2026-10-19, `scripts/devflow/smoke-p2.mjs` 25/25); **giao diện chưa xem trên trình duyệt**. Quyết định: `decisions/0020-p2-agents-via-paperclip-adapter.md`, `decisions/0021-ba-spec-stage.md`. Spike: `kb/spike-p2-adapter.md`.
+
+## Luồng
+Yêu cầu qua Triage review (người duyệt chọn **hệ thống** liên quan) → stage `ba_spec` → worker BA chạy agent trên bản clone của các hệ thống đã gán → đề xuất spec (`dr_agent_outputs`, stage `ba_spec`) → stage `ba_review` → nhân viên duyệt (sửa, approve, request_changes, reject) → approve sang `tech_plan` (chưa có agent, đợi change sau).
+
+## Hệ thống (repo) theo công ty
+- Bảng `dr_systems` (khóa, tên, mô tả, **repo GitHub dạng `https://github.com/<owner>/<repo>`**, branch, thư mục docs, secret chứa token chỉ đọc, bật/tắt) và `dr_request_systems` (case ↔ hệ thống); migration `0359`, khóa ngoại kép theo ADR 0010. Hệ thống không bị xóa, chỉ tắt.
+- Trang Board UI **Systems** (`/systems`) và API `GET|POST /api/companies/:id/devflow/systems`, `PATCH …/:systemId` (mọi board user của công ty). Token nhập một lần, lưu thành **secret của công ty**, không bao giờ trả lại; xóa token thì xóa secret; mọi trường đi vào dòng lệnh `git` đều được kiểm (URL github.com, nhánh không bắt đầu bằng `-`, không `..`).
+- Triage **prompt v4** (`prompts/triage.v4.ts`) nhận danh sách hệ thống đang bật của công ty (trong ranh giới dữ liệu) và đề xuất tối đa 3 `suggestedSystemKeys` (phải thuộc danh sách). Triage review hiện ô chọn hệ thống điền sẵn đề xuất; khi approve, lựa chọn thay thế việc gán cũ; khác đề xuất thì ghi override `systems`. v1 đến v3 giữ nguyên hash.
+- Tài liệu nghiệp vụ là file markdown trong thư mục docs của repo (mặc định `docs`); agent đọc docs trước rồi mới đọc code.
+
+## Agent BA và an toàn (Option 3 của ADR 0020)
+- Agent `claude_local` tên "DevFlow BA" mỗi công ty, tạo bằng `node scripts/devflow/setup-ba-agent.mjs --company <id>` (qua API, vì tạo agent có nhiều tác dụng phụ không nên sao chép); cấu hình chuẩn lấy từ `GET /api/companies/:id/devflow/ba-agent` nên script không lệch với code. Chạy lại script sau mỗi lần đổi prompt BA (worker báo `agent_prompt_outdated`).
+- Cấu hình: `engine: "cli"` (engine ACP mặc định **bỏ qua** `extraArgs`), `--tools Read,Grep,Glob` (không có shell, không ghi, không web), `--disallowedTools` chặn đọc `/paperclip/instances`, `/proc`, `/etc`, `/root`, `/home`, `/var`… cho cả ba tool, `--max-budget-usd` mỗi lượt (mặc định 1), key Anthropic là secret công ty, heartbeat theo giờ tắt.
+- **Trước mỗi lượt** `unsafeBaAgentReason` từ chối agent đã bị đổi (adapter, engine, thư mục, tool, thiếu luật chặn, không có ngân sách, thêm lệnh/MCP/chrome, prompt cũ, tạm dừng); lỗi cấu hình thử lại sau 5 phút, không bỏ cuộc, ghi một lần.
+- Một thư mục workspace dùng chung `/paperclip/devflow/ws/ba`, **chạy tuần tự toàn instance** và dọn trước/sau mỗi lượt (kể cả khi lỗi): dữ liệu công ty khác không bao giờ nằm cạnh agent. Clone nông bằng `git` với token ở header của riêng tiến trình đó (không vào URL hay `.git/config`), chỉ https, không hook, môi trường tối thiểu, gỡ remote, xóa symlink (`systems/workspace.ts`).
+- Nội dung yêu cầu và repo là dữ liệu không tin cậy: `request.md` đặt yêu cầu giữa ranh giới ngẫu nhiên mỗi lượt; agent không có kênh gửi ra ngoài; còn lại rủi ro agent chép đoạn file trong workspace vào spec, người duyệt là chốt chặn. Bubblewrap/seccomp hoặc runner tách để P4.
+
+## Worker (`server/src/devflow/ba/`)
+`worker.ts` (quét 20 giây, khóa advisory toàn instance, backoff, bỏ cuộc sau 3 lần, breaker), `ba-service.ts` (dựng workspace và `request.md`, gọi `runner.ts` = wakeup của heartbeat Paperclip rồi đợi run, đọc `resultJson`, phân loại lỗi theo `subtype` vì `errorCode` báo nhầm `claude_auth_required` khi hết ngân sách, kiểm đầu ra bằng Zod strict, chạy lại một lần khi JSON sai không đưa lại chữ của agent, ghi đề xuất kèm SHA đã đọc và chi phí, chuyển `ba_review`). Đầu ra: tóm tắt, mục tiêu nghiệp vụ, trong/ngoài phạm vi, user story, tiêu chí nghiệm thu, vùng ảnh hưởng (`system`, `path`, `line`, `why` phải thuộc hệ thống đã gán và đường dẫn trong repo), thay đổi dữ liệu, rủi ro, câu hỏi mở, độ tin cậy; tiếng Việt.
+- **Chi phí:** `--max-budget-usd` mỗi lượt; trần ngày mỗi công ty `DEVFLOW_BA_MAX_USD_PER_DAY` (mặc định 20) tính từ sổ `agent.ba_run` của DevFlow (mỗi lượt, kể cả lỗi); tắt bằng `DEVFLOW_BA_ENABLED=false` hoặc `DEVFLOW_WORKERS_ENABLED=false`.
+- Biến môi trường: `DEVFLOW_BA_MODEL` (mặc định `claude-haiku-5-5`), `DEVFLOW_BA_MAX_USD_PER_RUN`, `DEVFLOW_BA_MAX_USD_PER_DAY`, `DEVFLOW_BA_INTERVAL_MS`, `DEVFLOW_AGENT_WORKSPACE_ROOT`; `DEVFLOW_AGENT_ANTHROPIC_API_KEY` chỉ dùng cho script setup.
+
+## Duyệt BA (`ba/review-service.ts`, trang `/ba-review`)
+API `GET …/devflow/ba-queue|ba-count|ba-metrics|ba-cases/:id`, `POST …/ba-cases/:id/decision`. Cùng khung với Triage review (quyết định nguyên tử qua `beforeCommit`, 409 khi thua đua, không tự duyệt yêu cầu của mình). Sửa được tóm tắt, mục tiêu, phạm vi, user story, tiêu chí, thay đổi dữ liệu, rủi ro, câu hỏi mở; trích dẫn và độ tin cậy là của agent (sai thì request_changes). Approve: `dr_overrides` theo trường đổi (stage `ba_spec`), spec đã duyệt giữ ở **`data.approved`** của đề xuất (đọc một chỗ cho stage sau), `comment_text` dựng lại; request_changes: đề xuất `superseded`, sửa tay bị bỏ, lý do vào lượt chạy sau; có thể đổi hệ thống khi approve hoặc request_changes (lượt sau đọc phạm vi mới). Trích dẫn trên giao diện là link GitHub theo đúng SHA agent đã đọc. Email nhân viên có thư riêng cho spec chờ duyệt; panel "Quality and cost" (tỷ lệ override theo trường, thời gian duyệt, số lượt, chi phí USD, lỗi gần đây).
+
+## Giới hạn đã biết
+- Chạy tuần tự toàn instance (khoảng một spec mỗi 1 đến 3 phút); nâng cấp bằng workspace theo lượt khi cần.
+- Một hệ thống = một repo; chỉ GitHub; chưa có đồng bộ docs ngoài repo (Confluence, SharePoint).
+- Model local cho agent adapter chưa kiểm chứng; Tech Plan, role BA/Tech Lead cho approver chưa làm.
+- Chi phí lượt chạy đầu với repo lớn có thể sát trần mỗi lượt (spike: 1,33 USD cho một lượt phân tích repo Paperclip với haiku); số thật sẽ thấy ở panel.
+- Giao diện Systems, Triage review (chọn hệ thống) và BA review chỉ được kiểm bằng test logic và API; chưa ai xem trên trình duyệt thật.
+- Dọn dẹp thủ công: agent "Spike BA …" đã terminate nhưng chưa xóa được (API trả 409 vì có run).
+
+## Kiểm chứng
+Test tự động (chạy trong container): `devflow-systems*`, `devflow-ba-unit`, `devflow-ba` (runner và clone giả, DB thật), `devflow-ba-review`, `devflow-ba-metrics`, `devflow-staff-notify`, `devflow-triage*`; migration `dr-systems-migration`; UI `systems`, `ba-review`, `triage-review`. Đột biến: tất cả các nhóm trên đã bị bắt (một đột biến tương đương ở review-service). 
+### Chạy thật trên stack (2026-10-19, công ty `DevFlow Verify`, image build từ HEAD `3b820a7aa`)
+- Migration `0359` áp dụng khi khởi động; worker BA khởi động cùng Triage và email. `setup-ba-agent.mjs` tạo agent và secret key; chạy lại để đồng bộ cũng đúng (cập nhật cấu hình, key, hướng dẫn). Lần chạy đầu in `agent_not_runnable` vì agent mới tạo chưa bật; script nay tự bật (`status: idle`) sau khi tạo.
+- Khi agent vừa có, worker nhặt luôn các yêu cầu cũ đang nằm ở `ba_spec` (không hệ thống nào được gán): spec ra sau vài chục giây, độ tin cậy `low`, nói rõ chưa có hệ thống (0,001 đến 0,002 USD mỗi lượt).
+- `smoke-p2.mjs` (kiểm thật từ cổng đến duyệt BA): yêu cầu → Triage thật → nhân viên duyệt và gán hệ thống `devflow` (repo `nampt102/devflow`, nhánh `chore/project-kit`, docs `openspec/kb`) → agent BA đọc repo, 11 trích dẫn đúng chỗ (ví dụ `server/src/devflow/portal/portal-service.ts:17`, `:40`, `:59`, `packages/db/src/schema/pipeline_cases.ts:54`), SHA `4043d97…` được ghi, chi phí 0,013 USD (39 nghìn token vào, 12 nghìn ra, haiku) → duyệt có sửa tóm tắt → `overridden`, `data.approved` có mặt, metrics đếm. Requester không đọc được Systems và hàng chờ BA, và không thấy spec.
+- Chưa kiểm: lượt chạy với repo riêng có token (chỉ repo công khai), repo lớn (chi phí sát trần mỗi lượt), vLLM/model local cho agent, giao diện trên trình duyệt.
