@@ -1,10 +1,10 @@
 ## 1. Duyệt
 
-- [ ] 1.1 Chủ dự án duyệt proposal, design và DDL `dr_systems`, `dr_request_systems`
+- [x] 1.1 Chủ dự án duyệt proposal, design và DDL (2026-10-19, theo mặc định: haiku, tiếng Việt, mọi nhân viên quản lý Systems)
 
 ## 2. Hệ thống (schema + API + UI)
 
-- [ ] 2.1 Migration + schema Drizzle + test cách ly công ty và các CHECK
+- [x] 2.1 Migration `0359_devflow_systems.sql` (unique index đặt trước khóa ngoại) + schema Drizzle + 9 test cách ly công ty và CHECK; 4 đột biến bị bắt
 - [ ] 2.2 API hệ thống (liệt kê, tạo, sửa, tắt; token lưu thành secret công ty) + test quyền và activity log
 - [ ] 2.3 Kiểm chứng đọc giá trị secret từ code DevFlow; hàm clone nông không lưu token (`http.extraHeader`, gỡ remote) + test với repo git cục bộ
 - [ ] 2.4 Trang Board UI "Systems"
