@@ -45,3 +45,7 @@ Mục tiêu (ADR 0020): xác nhận BA Spec/Tech Plan chạy được bằng ada
 1. Quyết định bubblewrap/seccomp (hoặc chấp nhận workspace dùng một lần + kiểm `git status`).
 2. Cách đóng vòng issue (agent đóng, hay DevFlow đóng) và cách DevFlow chuyển case sang `ba_review`.
 3. Tồn đọng dọn dẹp: agent "Spike BA …", pipeline "Spike BA …", routine và issue DEV-1 trong công ty `DevFlow Verify`.
+
+## Vòng 3: chỉ cấp tool đọc (2026-10-19)
+- `engine: "cli"` + `extraArgs: ["--tools","Read,Grep,Glob"]`: agent **chỉ có** Glob, Grep, Read (tự báo cáo, và thử nghiệm xác nhận): không tạo được file, không chạy shell, không có web fetch; đọc file vẫn được. Không cần bubblewrap hay tắt seccomp.
+- Còn hở: tool Read không bị giới hạn theo thư mục (có thể đọc file khác trong container, ví dụ dữ liệu `/paperclip` hay `/proc/self/environ`) và nội dung đọc được có thể lọt vào bình luận kết quả. Cách bịt dự kiến: luật `permissions.deny` của Claude Code cho các đường dẫn ngoài workspace, hoặc chạy agent ở runner tách riêng (Paperclip có execution target SSH và các sandbox provider trong `packages/plugins/sandbox-providers`). Chưa thử.
