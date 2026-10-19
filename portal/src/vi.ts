@@ -33,6 +33,12 @@ export const vi = {
     start: "Bắt đầu",
   },
 
+  company: {
+    pickTitle: "Chọn công ty",
+    pickHint: "Tài khoản của bạn thuộc nhiều công ty. Chọn công ty bạn muốn gửi và theo dõi yêu cầu.",
+    switchLabel: "Công ty",
+  },
+
   noAccess: {
     title: "Tài khoản chưa được cấp quyền",
     body: "Tài khoản này chưa được mời vào cổng yêu cầu. Hãy mở đường dẫn lời mời mà bộ phận IT đã gửi cho bạn.",

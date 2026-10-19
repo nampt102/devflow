@@ -1,4 +1,11 @@
+import { withCompany, type CompanyChoice } from "./company";
 import { vi } from "./vi";
+
+// The company the person is working in; set once the portal knows it (see company.ts). Sent on every call that acts inside a company.
+let activeCompany: string | null = null;
+export const setActiveCompany = (companyId: string | null): void => {
+  activeCompany = companyId;
+};
 
 export class ApiError extends Error {
   constructor(
@@ -37,7 +44,7 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
   const isForm = typeof FormData !== "undefined" && body instanceof FormData;
   let response: Response;
   try {
-    response = await fetch(path, {
+    response = await fetch(withCompany(path, activeCompany), {
       method,
       credentials: "same-origin",
       headers: body !== undefined && !isForm ? { "Content-Type": "application/json" } : undefined,
@@ -68,6 +75,7 @@ export const api = {
   signIn: (email: string, password: string) => call<unknown>("POST", "/api/auth/sign-in/email", { email, password }),
   signOut: () => call<unknown>("POST", "/api/auth/sign-out", {}),
   me: () => call<{ companyId: string; requesterId: string }>("GET", "/api/portal/me"),
+  companies: () => call<{ items: CompanyChoice[] }>("GET", "/api/portal/companies"),
   /** Creates the account and the requester in one step; the caller signs in afterwards. */
   registerWithInvite: (token: string, name: string, email: string, password: string) =>
     call<{ companyId: string; requesterId: string }>("POST", `/api/portal/invites/${token}/register`, { name, email, password }),
@@ -87,7 +95,7 @@ export const api = {
     for (const file of files) form.append("files", file);
     return call<RequestItem>("POST", `/api/portal/requests/${number}/attachments`, form);
   },
-  attachmentUrl: (number: number, id: string) => `/api/portal/requests/${number}/attachments/${id}`,
+  attachmentUrl: (number: number, id: string) => withCompany(`/api/portal/requests/${number}/attachments/${id}`, activeCompany),
 };
 
 /** Turns any thrown value into a Vietnamese sentence for the user. */

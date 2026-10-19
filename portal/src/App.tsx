@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { ApiError, api, describeError, type SessionUser } from "./api";
+import { ApiError, api, describeError, setActiveCompany, type SessionUser } from "./api";
+import { chooseCompany, readSavedCompany, saveCompany, type CompanyChoice } from "./company";
 import { EyeIcon, EyeOffIcon, LogoMark, MoonIcon, SunIcon } from "./icons";
 import { DetailPage, HomePage, NewRequestPage, NotFoundPage } from "./pages";
 import { parseRoute, pathFor, type Route } from "./route";
@@ -7,7 +8,7 @@ import { applyTheme, initialTheme, otherTheme, parseTheme, saveTheme, THEME_KEY,
 import { Alert, Spinner, type Navigate } from "./ui";
 import { vi } from "./vi";
 
-type Access = "checking" | "ok" | "none" | "error";
+type Access = "checking" | "ok" | "none" | "error" | "pick";
 type Auth = { state: "loading" } | { state: "out" } | { state: "in"; user: SessionUser };
 
 function useRoute(): [Route, Navigate, string | undefined] {
@@ -166,7 +167,7 @@ function InviteGate({ token, onAccepted, navigate }: { token: string; onAccepted
     if (started.current) return; // StrictMode runs effects twice; a link must be used once
     started.current = true;
     api.acceptInvite(token).then(
-      () => { onAccepted(); setState({ phase: "done" }); },
+      (joined) => { saveCompany(joined.companyId); onAccepted(); setState({ phase: "done" }); },
       (err) => {
         // already a requester here: nothing consumed, simply continue
         if (err instanceof ApiError && err.status === 409) { onAccepted(); setState({ phase: "done" }); return; }
@@ -209,6 +210,8 @@ export function App() {
   const [theme, toggleTheme] = useTheme();
   const [auth, setAuth] = useState<Auth>({ state: "loading" });
   const [access, setAccess] = useState<Access>("checking");
+  const [companies, setCompanies] = useState<CompanyChoice[]>([]);
+  const [companyId, setCompanyId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -220,8 +223,22 @@ export function App() {
       setAuth({ state: "in", user });
       setAccess("checking");
       try {
-        await api.me();
-        setAccess("ok");
+        // which company: the only one, the one used last time, or ask
+        const list = (await api.companies()).items;
+        setCompanies(list);
+        const picked = chooseCompany(list, readSavedCompany());
+        if (picked.kind === "none") {
+          setAccess("none");
+        } else if (picked.kind === "ask") {
+          setActiveCompany(null);
+          setCompanyId(null);
+          setAccess("pick");
+        } else {
+          setActiveCompany(picked.companyId);
+          setCompanyId(picked.companyId);
+          await api.me();
+          setAccess("ok");
+        }
       } catch (err) {
         setAccess(err instanceof ApiError && err.status === 403 ? "none" : "error");
       }
@@ -232,8 +249,18 @@ export function App() {
   useEffect(() => { void refresh(); }, [refresh]);
   useEffect(() => { document.title = vi.appName; }, []);
 
+  function chooseOne(next: string) {
+    saveCompany(next);
+    setActiveCompany(next);
+    setCompanyId(next);
+    setAccess("ok");
+    navigate({ name: "home" });
+  }
+
   async function signOut() {
     try { await api.signOut(); } catch { /* the session is gone either way */ }
+    setActiveCompany(null);
+    setCompanyId(null);
     setAuth({ state: "out" });
     navigate({ name: "home" });
   }
@@ -247,6 +274,20 @@ export function App() {
     body = <InviteGate token={route.token} onAccepted={() => void refresh()} navigate={navigate} />;
   } else if (access === "checking") {
     body = <Loading />;
+  } else if (access === "pick") {
+    body = (
+      <Centered>
+        <div className="auth card form-card">
+          <h1>{vi.company.pickTitle}</h1>
+          <p className="muted">{vi.company.pickHint}</p>
+          <div className="form">
+            {companies.map((c) => (
+              <button key={c.companyId} type="button" className="btn btn-secondary" onClick={() => chooseOne(c.companyId)}>{c.name}</button>
+            ))}
+          </div>
+        </div>
+      </Centered>
+    );
   } else if (access === "none") {
     body = (
       <Centered>
@@ -286,6 +327,16 @@ export function App() {
             <span className="brand-sub">{vi.brandSub}</span>
           </a>
           <div className="top-actions">
+            {auth.state === "in" && companies.length > 1 && access === "ok" && (
+              <label className="company-switch">
+                <span className="visually-hidden">{vi.company.switchLabel}</span>
+                <select value={companyId ?? ""} onChange={(e) => chooseOne(e.target.value)} aria-label={vi.company.switchLabel}>
+                  {companies.map((c) => (
+                    <option key={c.companyId} value={c.companyId}>{c.name}</option>
+                  ))}
+                </select>
+              </label>
+            )}
             {auth.state === "in" && <span className="who-email">{auth.user.email}</span>}
             <ThemeToggle theme={theme} onToggle={toggleTheme} />
             {auth.state === "in" && (
@@ -294,7 +345,7 @@ export function App() {
           </div>
         </div>
       </header>
-      <main id="main" className="container">{body}</main>
+      <main id="main" className="container" key={companyId ?? "none"}>{body}</main>
     </>
   );
 }

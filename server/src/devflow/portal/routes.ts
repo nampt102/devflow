@@ -1,7 +1,8 @@
 import { Router, type Request, type RequestHandler } from "express";
 import multer from "multer";
 import { z } from "zod";
-import type { Db } from "@paperclipai/db";
+import { and, eq, isNull } from "drizzle-orm";
+import { companies, drRequesters, type Db } from "@paperclipai/db";
 import { badRequest, forbidden, notFound, unauthorized, unprocessable } from "../../errors.js";
 import type { StorageService } from "../../storage/types.js";
 import { assertCompanyAccess } from "../../routes/authz.js";
@@ -106,6 +107,20 @@ export function portalRoutes(db: Db, storage: StorageService, options: PortalRou
   });
 
   // ---- requester API ----------------------------------------------------------------------------
+  // The companies this person is a requester of, so the portal can ask which one when there is more than one.
+  // Names only; a person who is not a requester anywhere gets an empty list.
+  router.get("/portal/companies", async (req, res) => {
+    const actor = req.actor;
+    if (!actor || actor.type !== "board" || actor.source !== "session" || !actor.userId) throw unauthorized("Sign in to use the portal");
+    const items = await db
+      .select({ companyId: drRequesters.companyId, name: companies.name })
+      .from(drRequesters)
+      .innerJoin(companies, eq(companies.id, drRequesters.companyId))
+      .where(and(eq(drRequesters.userId, actor.userId), isNull(drRequesters.deactivatedAt)))
+      .orderBy(companies.name, companies.id);
+    res.json({ items });
+  });
+
   router.get("/portal/me", guard, (_req, res) => {
     const { companyId, requesterId } = res.locals.requester!;
     res.json({ companyId, requesterId });

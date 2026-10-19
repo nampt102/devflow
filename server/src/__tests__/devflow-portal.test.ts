@@ -128,6 +128,51 @@ describeEmbeddedPostgres("devflow portal", () => {
     expect((await request(app({ type: "agent", agentId: randomUUID(), companyId: randomUUID() })).get("/api/portal/me")).status).toBe(401);
   });
 
+  it("lists the companies a person is a requester of, by name, without deactivated ones", async () => {
+    const a = await seedCompany("Zeta Co");
+    const b = await seedCompany("Alpha Co");
+    const c = await seedCompany("Gone Co");
+    const { userId } = await seedRequester(a.company.id);
+    const now = new Date();
+    await db.insert(drRequesters).values({ companyId: b.company.id, userId });
+    await db.insert(drRequesters).values({ companyId: c.company.id, userId, deactivatedAt: now });
+    const res = await request(app(sessionActor(userId))).get("/api/portal/companies");
+    expect(res.status).toBe(200);
+    expect(res.body.items).toEqual([
+      { companyId: b.company.id, name: "Alpha Co" },
+      { companyId: a.company.id, name: "Zeta Co" },
+    ]);
+    expect(JSON.stringify(res.body)).not.toContain(userId);
+    // another person sees only their own; a person who is no requester gets nothing
+    const other = await seedRequester(c.company.id);
+    expect((await request(app(sessionActor(other.userId))).get("/api/portal/companies")).body.items).toEqual([{ companyId: c.company.id, name: "Gone Co" }]);
+    expect((await request(app(sessionActor(`user-${randomUUID()}`))).get("/api/portal/companies")).body).toEqual({ items: [] });
+    expect((await request(app({ type: "none" })).get("/api/portal/companies")).status).toBe(401);
+    expect((await request(app({ type: "agent", agentId: randomUUID(), companyId: a.company.id })).get("/api/portal/companies")).status).toBe(401);
+  });
+
+  it("a requester of two companies must say which one, and each company keeps its own requests", async () => {
+    const a = await seedCompany("Two A Co");
+    const b = await seedCompany("Two B Co");
+    const { userId } = await seedRequester(a.company.id);
+    await db.insert(drRequesters).values({ companyId: b.company.id, userId });
+    const actor = sessionActor(userId);
+    expect((await request(app(actor)).get("/api/portal/me")).status).toBe(400);
+    expect((await request(app(actor)).get("/api/portal/requests")).status).toBe(400);
+    expect((await submit(actor)).status).toBe(400);
+    expect((await request(app(actor)).get(`/api/portal/me?companyId=${a.company.id}`)).body.companyId).toBe(a.company.id);
+    expect((await request(app(actor)).get(`/api/portal/me?companyId=${b.company.id}`)).body.companyId).toBe(b.company.id);
+    expect((await submit(actor, { title: "Cho công ty A" }, `?companyId=${a.company.id}`)).status).toBe(201);
+    expect((await submit(actor, { title: "Cho công ty B" }, `?companyId=${b.company.id}`)).status).toBe(201);
+    const inA = await request(app(actor)).get(`/api/portal/requests?companyId=${a.company.id}`);
+    const inB = await request(app(actor)).get(`/api/portal/requests?companyId=${b.company.id}`);
+    expect(inA.body.items.map((i: any) => i.title)).toEqual(["Cho công ty A"]);
+    expect(inB.body.items.map((i: any) => i.title)).toEqual(["Cho công ty B"]);
+    // a company the person does not belong to is refused even though they belong to two others
+    const c = await seedCompany("Two C Co");
+    expect((await request(app(actor)).get(`/api/portal/requests?companyId=${c.company.id}`)).status).toBe(403);
+  });
+
   it("rejects a deactivated requester", async () => {
     const { company } = await seedCompany("Deactivated Co");
     const { userId } = await seedRequester(company.id, { deactivated: true });
