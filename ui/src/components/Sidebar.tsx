@@ -11,6 +11,7 @@ import {
   Network,
   Boxes,
   Repeat,
+  Server,
   Layers,
   ClipboardCheck,
   UserPlus,
@@ -253,6 +254,9 @@ export function Sidebar({ children }: { children?: ReactNode }) {
           ) : null}
           {showPipelines ? (
             <SidebarNavItem to="/portal-access" label="Portal access" icon={UserPlus} />
+          ) : null}
+          {showPipelines ? (
+            <SidebarNavItem to="/systems" label="Systems" icon={Server} />
           ) : null}
           {showPipelines ? (
             <SidebarNavItem to="/triage" label="Triage review" icon={ClipboardCheck} badge={triageCount?.waiting || undefined} badgeLabel="waiting for review" />

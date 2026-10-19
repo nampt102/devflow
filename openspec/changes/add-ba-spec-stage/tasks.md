@@ -7,7 +7,7 @@
 - [x] 2.1 Migration `0359_devflow_systems.sql` (unique index đặt trước khóa ngoại) + schema Drizzle + 9 test cách ly công ty và CHECK; 4 đột biến bị bắt
 - [x] 2.2 API `GET|POST /companies/:id/devflow/systems`, `PATCH …/:systemId` (token lưu thành secret công ty, quay vòng, gỡ; không bao giờ trả lại; kiểm giá trị trước khi vào dòng lệnh git); 8 test (cách ly công ty, quyền, activity log); 7 đột biến bị bắt
 - [x] 2.3 `systems/workspace.ts`: clone nông bằng `git` (token chỉ ở header của tiến trình đó, chỉ https, không hook, môi trường tối thiểu, gỡ remote, xóa symlink, lỗi ngắn không lộ token, dọn clone dở); đọc token qua `secretService.resolveSecretValue` với `accessContext` hệ thống đã kiểm trên dịch vụ secret thật (đúng công ty, từ chối công ty khác, secret đã xóa); 11 test, 8 đột biến bị bắt
-- [ ] 2.4 Trang Board UI "Systems"
+- [x] 2.4 Trang Board UI "Systems" (`ui/src/pages/Systems.tsx`, `lib/systems.ts`): thêm, sửa, tắt/bật; token nhập một lần và không hiện lại; 5 test; token-gates không lỗi ở file mới; **chưa xem trên trình duyệt (cần build lại image)**
 
 ## 3. Agent và worker BA
 
