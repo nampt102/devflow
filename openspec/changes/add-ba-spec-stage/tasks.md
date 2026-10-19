@@ -5,7 +5,7 @@
 ## 2. Hệ thống (schema + API + UI)
 
 - [x] 2.1 Migration `0359_devflow_systems.sql` (unique index đặt trước khóa ngoại) + schema Drizzle + 9 test cách ly công ty và CHECK; 4 đột biến bị bắt
-- [ ] 2.2 API hệ thống (liệt kê, tạo, sửa, tắt; token lưu thành secret công ty) + test quyền và activity log
+- [x] 2.2 API `GET|POST /companies/:id/devflow/systems`, `PATCH …/:systemId` (token lưu thành secret công ty, quay vòng, gỡ; không bao giờ trả lại; kiểm giá trị trước khi vào dòng lệnh git); 8 test (cách ly công ty, quyền, activity log); 7 đột biến bị bắt
 - [ ] 2.3 Kiểm chứng đọc giá trị secret từ code DevFlow; hàm clone nông không lưu token (`http.extraHeader`, gỡ remote) + test với repo git cục bộ
 - [ ] 2.4 Trang Board UI "Systems"
 

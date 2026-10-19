@@ -1,21 +1,12 @@
-import { Router, type Request } from "express";
+import { Router } from "express";
 import type { Db } from "@paperclipai/db";
-import { forbidden, notFound, unauthorized } from "../../errors.js";
+import { notFound } from "../../errors.js";
 import { validate } from "../../middleware/validate.js";
-import { assertCompanyAccess, hasCompanyAccess } from "../../routes/authz.js";
+import { staffUser } from "../staff.js";
 import { triageMetricsService } from "./metrics.js";
 import { decisionSchema, triageReviewService } from "./service.js";
 
 type ReviewCase = (input: any) => Promise<unknown>;
-
-/** Staff-only: a signed-in board user with access to the company. Requesters and agent keys are refused. */
-function staffUser(req: Request, companyId: string): string {
-  if (req.actor.type === "none") throw unauthorized();
-  if (req.actor.type !== "board") throw forbidden("Only board users can review triage proposals");
-  if (!hasCompanyAccess(req, companyId)) throw notFound("Request not found");
-  assertCompanyAccess(req, companyId);
-  return req.actor.userId ?? "board";
-}
 
 export function triageReviewRoutes(db: Db, deps: { reviewCase: ReviewCase }) {
   const router = Router();

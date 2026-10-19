@@ -109,6 +109,7 @@ import { portalRoutes } from "./devflow/portal/routes.js";
 import { portalStaticRouter } from "./devflow/portal/static.js";
 import { adminAccountRoutes } from "./devflow/admin-accounts.js";
 import { triageReviewRoutes } from "./devflow/triage-review/routes.js";
+import { systemsRoutes } from "./devflow/systems/routes.js";
 import { environmentRoutes } from "./routes/environments.js";
 import { executionWorkspaceRoutes } from "./routes/execution-workspaces.js";
 import { goalRoutes } from "./routes/goals.js";
@@ -858,6 +859,7 @@ export async function createApp(
   api.use(portalRoutes(db, opts.storageService));
   api.use(adminAccountRoutes(db));
   api.use(triageReviewRoutes(db, { reviewCase: (input) => pipelineService(db).reviewCase(input) }));
+  api.use(systemsRoutes(db));
   api.use(
     environmentRoutes(db, {
       pluginWorkerManager: workerManager,
