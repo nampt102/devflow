@@ -18,3 +18,7 @@ Agent BA Spec và Tech Plan cần hiểu tài liệu nghiệp vụ và code. Đ�
 - Chi phí và thời gian mỗi lần chạy cao hơn worker; cần trần token/ngân sách cho agent adapter (ngân sách của Paperclip theo tiền, chi phí Claude Code có thể có giá).
 - Agent có quyền chạy lệnh trong workspace: phải giới hạn chỉ đọc (không push, không mạng ngoài trừ model) và coi nội dung repo/yêu cầu là dữ liệu không tin cậy.
 - Kết quả spike có thể buộc xem lại quyết định này (ví dụ không ép được schema output).
+
+## Cập nhật 2026-10-19 (sau spike)
+- **Cách chặn agent: Option 3** (chủ dự án duyệt): `engine: "cli"`, chỉ tool `Read,Grep,Glob` (`--tools`), chặn đọc thư mục instance và hệ thống bằng `--disallowedTools Read(//…/**)`, `--max-budget-usd` mỗi lượt, token GitHub chỉ đọc, clone không lưu token. Không tắt seccomp, không dùng bubblewrap; cách ly mạnh hơn (bubblewrap với profile seccomp riêng, hoặc runner tách) để P4.
+- Hệ quả: agent không gọi được API Paperclip, nên **DevFlow điều khiển toàn bộ lượt chạy** (dựng workspace, `wakeup`, đọc run, ghi output, chuyển stage); không dùng `onEnter`/routine. Thiết kế chi tiết: change `add-ba-spec-stage`.

@@ -49,3 +49,10 @@ Mục tiêu (ADR 0020): xác nhận BA Spec/Tech Plan chạy được bằng ada
 ## Vòng 3: chỉ cấp tool đọc (2026-10-19)
 - `engine: "cli"` + `extraArgs: ["--tools","Read,Grep,Glob"]`: agent **chỉ có** Glob, Grep, Read (tự báo cáo, và thử nghiệm xác nhận): không tạo được file, không chạy shell, không có web fetch; đọc file vẫn được. Không cần bubblewrap hay tắt seccomp.
 - Còn hở: tool Read không bị giới hạn theo thư mục (có thể đọc file khác trong container, ví dụ dữ liệu `/paperclip` hay `/proc/self/environ`) và nội dung đọc được có thể lọt vào bình luận kết quả. Cách bịt dự kiến: luật `permissions.deny` của Claude Code cho các đường dẫn ngoài workspace, hoặc chạy agent ở runner tách riêng (Paperclip có execution target SSH và các sandbox provider trong `packages/plugins/sandbox-providers`). Chưa thử.
+
+## Vòng 4: chặn đọc ngoài workspace, nguồn đầu ra (2026-10-19)
+- Tool Read từ chối `/proc/self/environ` (coi là file thiết bị). Nhưng user `node` của agent **đọc được dữ liệu instance** (ví dụ `/paperclip/instances/default/secrets/`, `data/backups`): phải chặn.
+- `--disallowedTools "Read(//đường/dẫn/**),Grep(//đường/dẫn/**),Glob(//đường/dẫn/**)"` (engine cli) **chặn được**: thử bằng file mồi giả `/paperclip/canary/fake-secret.txt`, không có luật thì đọc được, có luật thì lỗi "denied by your permission settings". Không thử trên file khóa thật.
+- Đầu ra đủ dài lấy từ `GET /api/heartbeat-runs/:id` (`resultJson.result`/`summary`); endpoint danh sách cắt 500 ký tự.
+- Đường đi không qua issue (DevFlow gọi `wakeup` trực tiếp) tránh được vòng "disposition repair"; `onEnter`/routine không cần dùng.
+- Dọn dẹp: các agent thử đã `terminate` (xóa trả 409 vì có run), mọi secret `spike-*` đã xóa, routine và pipeline thử đã archive, DEV-1 đã hủy, file mồi đã xóa.
