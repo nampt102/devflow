@@ -11,12 +11,12 @@
 
 ## 3. Agent và worker BA
 
-- [ ] 3.1 Prompt `ba.v1` (hash ghim), schema Zod strict, dựng `request.md` với ranh giới ngẫu nhiên, dựng `comment_text`
-- [ ] 3.2 `ensureBaAgent` (claude_local, engine cli, tool đọc, danh sách chặn, ngân sách mỗi lượt, secret key) + đồng bộ khi prompt đổi
-- [ ] 3.3 Worker: tìm case ở `ba_spec` chưa có đề xuất, khóa theo công ty, dựng workspace, wakeup, chờ run, đọc kết quả, phân loại lỗi theo `subtype`, chạy lại khi JSON sai, backoff, bỏ cuộc
-- [ ] 3.4 Ghi `dr_agent_outputs` và chuyển `ba_spec → ba_review` (kiểm có chung giao dịch được không)
-- [ ] 3.5 Trần USD mỗi ngày mỗi công ty; công tắc `DEVFLOW_WORKERS_ENABLED`
-- [ ] 3.6 Test bằng adapter giả + đột biến
+- [x] 3.1 Prompt `ba.v1` (hash ghim), schema Zod strict (đường dẫn và hệ thống được kiểm), `request.md` với ranh giới ngẫu nhiên, `comment_text` tiếng Việt; test không cần DB
+- [x] 3.2 Agent BA tạo bằng API qua `scripts/devflow/setup-ba-agent.mjs` (DevFlow không sao chép logic hire), cấu hình chuẩn lấy từ `GET /devflow/ba-agent`; trước mỗi lượt `unsafeBaAgentReason` từ chối agent bị đổi (engine, công cụ, thư mục, ngân sách, prompt cũ…); 1 thư mục workspace dùng chung, chạy tuần tự toàn instance và dọn trước/sau mỗi lượt (không để dữ liệu công ty khác cạnh agent)
+- [x] 3.3 Worker `ba/worker.ts` + `ba-service.ts` + `runner.ts`: quét `ba_spec`, wakeup qua heartbeat của Paperclip, đợi run, đọc `resultJson`, phân loại lỗi theo `subtype`, chạy lại một lần khi JSON sai (không đưa lại chữ của agent), backoff, bỏ cuộc sau 3 lần; lỗi cấu hình thử lại 5 phút, không bỏ cuộc
+- [x] 3.4 Ghi `dr_agent_outputs` (giữ SHA, chi phí, token) rồi `transitionCase` sang `ba_review` (không chung giao dịch: nếu chuyển lỗi thì đề xuất bị `superseded`, giống Triage); chặn đua bằng khóa dòng + so version
+- [x] 3.5 Trần USD mỗi ngày mỗi công ty tính từ sổ `agent.ba_run` của DevFlow, `DEVFLOW_BA_*`, tắt bằng `DEVFLOW_WORKERS_ENABLED`; biến môi trường trong compose và `.env.example`
+- [x] 3.6 69 test (unit + DB với runner và clone giả); 25 đột biến bị bắt
 
 ## 4. Gán hệ thống ở Triage
 

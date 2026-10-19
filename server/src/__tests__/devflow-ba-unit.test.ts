@@ -2,22 +2,10 @@ import { describe, expect, it } from "vitest";
 import { PROMPT_HASH, PROMPT_VERSION, SYSTEM_PROMPT, buildRequestFile, newBoundary } from "../devflow/prompts/ba.v1.js";
 import { baAgentSpec, baWorkspaceDir, BA_TOOLS, denyRules, unsafeBaAgentReason } from "../devflow/ba/agent.js";
 import { readRun } from "../devflow/ba/runner.js";
+import { VALID_BA_OUTPUT } from "./helpers/ba-fixtures.js";
 import { baCommentMarkdown, BaOutputError, extractJsonObject, parseBaOutput } from "../devflow/ba/schema.js";
 
 // BA Spec pieces that need no database (openspec/changes/add-ba-spec-stage, tasks 3.1 and 3.2).
-export const VALID_BA_OUTPUT = {
-  summary: "Cho phép người yêu cầu thấy ai đang xử lý yêu cầu của mình.",
-  businessGoal: "Giảm số email hỏi lại tiến độ.",
-  inScope: ["Hiển thị tên người xử lý trên cổng"],
-  outOfScope: ["Gửi tin nhắn trực tiếp cho nhân viên"],
-  userStories: [{ asA: "người yêu cầu", iWant: "biết ai đang xử lý", soThat: "tôi biết hỏi ai" }],
-  acceptanceCriteria: ["Trang chi tiết yêu cầu hiện tên người xử lý khi đã có"],
-  affectedAreas: [{ system: "portal", path: "server/src/devflow/portal/portal-service.ts", line: 17, why: "DTO của requester không có trường này" }],
-  dataChanges: [],
-  risks: ["Lộ tên nhân viên cho bên ngoài"],
-  openQuestions: ["Có hiển thị cho mọi trạng thái không?"],
-  confidence: "medium",
-};
 const ok = JSON.stringify(VALID_BA_OUTPUT);
 
 describe("BA prompt v1", () => {
