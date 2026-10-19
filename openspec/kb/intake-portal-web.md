@@ -22,6 +22,9 @@ Trình duyệt tích hợp, tài khoản test cục bộ (biến `DEVFLOW_TEST_P
 - Đăng ký mới hoàn chỉnh: tạo tài khoản, đăng nhập, "Đã xác nhận lời mời", vào danh sách trống; mở thẳng `/portal/requests/1` của người khác ra "Không tìm thấy".
 - **Lỗi tìm ra ở lần thử đầu:** đăng ký thành công nhưng màn hình báo "lời mời đã được sử dụng" vì giao diện gọi `accept` sau `register` và link đã bị dùng. Đã sửa ở server (accept idempotent cho đúng người dùng link, commit `3afb73947`); mở lại link đã dùng bằng đúng tài khoản giờ ra "Đã xác nhận lời mời". Test tự động không bắt được lỗi này khi chưa có ca "accept ngay sau register"; ca đó đã được thêm.
 
+## Nhiều công ty (2026-10-19)
+Một người có thể là requester của nhiều công ty (ví dụ nhận thêm link mời của công ty thứ hai). Portal gọi `GET /api/portal/companies`: một công ty thì dùng luôn; nhiều thì dùng công ty chọn lần trước (lưu `devflow.portal.company` trong trình duyệt, chỉ là id công ty) hoặc hiện màn "Chọn công ty"; trên thanh trên có ô chọn công ty để đổi. Mọi gọi `/api/portal/me` và `/api/portal/requests…` (kể cả link tệp đính kèm) kèm `?companyId=`; trang được dựng lại khi đổi công ty. Nhận link mời xong thì chuyển sang công ty vừa mời. Trước thay đổi này, người thuộc hai công ty thấy "Có lỗi xảy ra" vì API đòi `companyId` mà giao diện không gửi (lỗi tìm ra khi thử RESKI). Logic ở `portal/src/company.ts` (7 test), API có 2 test mới.
+
 ## Chưa làm / hạn chế
 - Đăng ký công khai vẫn mở; có thể đóng vì task 3.5 đã xong (ADR 0012, `kb/admin-accounts.md`). Màn hình đăng nhập không còn nút "Tạo tài khoản" khi không có link mời; với link mời, form mặc định là "Tạo tài khoản và nhận lời mời" (gọi `register` rồi đăng nhập), email đã có tài khoản thì tự chuyển sang đăng nhập.
 - Chưa có màn hình cho nhân viên tạo link mời (hiện dùng API `POST /api/companies/:id/portal/invites`).

@@ -6,6 +6,8 @@ Nguồn: `server/src/devflow/portal/`, change `openspec/changes/archive/2026-10-
 | Method | Path | Ghi chú |
 |---|---|---|
 | GET | `/api/portal/me` | `companyId`, `requesterId` của chính user |
+| GET | `/api/portal/companies` | Danh sách `{companyId, name}` các công ty mà user là requester đang hoạt động, xếp theo tên (rỗng nếu không phải requester ở đâu; 401 nếu chưa đăng nhập). Không cần `companyId`. Portal dùng để hỏi công ty khi user thuộc nhiều công ty |
+| (mọi gọi `/api/portal/me` và `/api/portal/requests…`) | | Người thuộc **nhiều công ty** phải gửi `?companyId=` (400 `companyId is required` nếu thiếu, 403 nếu không thuộc công ty đó). Portal luôn gửi sau khi đã biết công ty |
 | POST | `/api/portal/requests` | JSON hoặc multipart (`title`, `description`, `businessImpact`, `files` tối đa 5); trả 201 + DTO |
 | GET | `/api/portal/requests` | Danh sách yêu cầu của chính requester (`limit` ≤ 100, `offset`) |
 | GET | `/api/portal/requests/:number` | Chi tiết + `attachments` |
