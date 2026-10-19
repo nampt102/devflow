@@ -861,7 +861,7 @@ export async function createApp(
   api.use(adminAccountRoutes(db));
   api.use(triageReviewRoutes(db, { reviewCase: (input) => pipelineService(db).reviewCase(input) }));
   api.use(systemsRoutes(db));
-  api.use(baRoutes(db));
+  api.use(baRoutes(db, { reviewCase: (input) => pipelineService(db).reviewCase(input) }));
   api.use(
     environmentRoutes(db, {
       pluginWorkerManager: workerManager,
