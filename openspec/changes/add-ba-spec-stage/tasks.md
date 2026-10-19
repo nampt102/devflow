@@ -20,8 +20,8 @@
 
 ## 4. Gán hệ thống ở Triage
 
-- [ ] 4.1 Prompt `triage.v4` (`suggestedSystemKeys`) + test hash và schema
-- [ ] 4.2 Triage review: chọn hệ thống, ghi `dr_request_systems` khi approve + test
+- [x] 4.1 Prompt `triage.v4` (hash ghim; v1 đến v3 giữ nguyên) + `triageOutputSchemaV4` (`suggestedSystemKeys`, tối đa 3, phải thuộc danh sách được đưa) + Triage đưa hệ thống đang bật của đúng công ty vào prompt trong ranh giới dữ liệu; test unit và DB, đột biến bị bắt
+- [ ] 4.2 Triage review: API xong (chi tiết trả `systems`, quyết định nhận `systemIds`, approve thay thế gán trong `beforeCommit`, override `systems`, 422 với hệ thống lạ/đã tắt; 6 test, 12 đột biến bị bắt); **còn giao diện chọn hệ thống**
 
 ## 5. BA review
 

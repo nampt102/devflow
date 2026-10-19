@@ -32,6 +32,7 @@ export const VALID_TRIAGE_REPLY = {
   requiresHuman: false,
   requiresHumanReasons: [],
   duplicateCandidates: [],
+  suggestedSystemKeys: [],
   summary: "Cần báo cáo tồn kho theo kho.",
   confidence: 0.8,
   assumptions: [],

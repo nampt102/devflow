@@ -5,6 +5,7 @@ import {
   drAgentOutputs,
   drAttachments,
   drRequests,
+  drSystems,
   pipelineCases,
   pipelineStages,
   pipelines,
@@ -14,12 +15,12 @@ import { HttpError } from "../../errors.js";
 import { logActivity } from "../../services/activity-log.js";
 import { logger } from "../../middleware/logger.js";
 import { z } from "zod";
-import { PROMPT_HASH, PROMPT_ROLE, PROMPT_VERSION, SYSTEM_PROMPT, buildUserMessage, newBoundary } from "../prompts/triage.v3.js";
+import { PROMPT_HASH, PROMPT_ROLE, PROMPT_VERSION, SYSTEM_PROMPT, buildUserMessage, newBoundary } from "../prompts/triage.v4.js";
 import { chatJson, LlmError, type LlmConfig, type LlmErrorKind } from "./llm-client.js";
 import { contentHash, dedupeService, loadDedupeConfig, type DedupeConfig } from "./dedupe.js";
 import { embedText, type EmbedConfig } from "./embed-client.js";
 import { ruleFlags } from "./rules.js";
-import { parseTriageOutput, triageOutputSchema, TriageOutputError, REQUIRES_HUMAN_REASONS } from "./schema.js";
+import { parseTriageOutput, triageOutputSchemaV4, TriageOutputError, REQUIRES_HUMAN_REASONS } from "./schema.js";
 
 export const TRIAGE_PIPELINE_KEY = "dev-request";
 // The agent row only attributes token usage; Triage itself runs inside the server. Say so where people look.
@@ -27,6 +28,7 @@ export const TRIAGE_AGENT_NAME = "DevFlow Triage (internal)";
 export const TRIAGE_AGENT_NOTE =
   "Internal DevFlow worker: classifies intake requests and records token usage here. It has no runtime of its own, so the Test button under Runtime is expected to fail. Nothing to configure.";
 const MAX_ATTEMPTS = 2; // one retry when the model's JSON is rejected
+const MAX_SYSTEMS = 50; // systems offered to the model
 const caps = { title: 300, description: 8000, impact: 2000, fileName: 120, files: 10 };
 
 export class TriageFailure extends Error {
@@ -277,6 +279,14 @@ export function triageService(
     const candidateCaseKeys = found.candidates.map((c) => c.caseKey);
 
     const feedback = await loadFeedback(companyId, caseId);
+    // the company's switched-on systems: staff-written text, still sanitized because it goes into a prompt
+    const systemRows = await db
+      .select({ key: drSystems.key, name: drSystems.name, description: drSystems.description })
+      .from(drSystems)
+      .where(and(eq(drSystems.companyId, companyId), eq(drSystems.active, true)))
+      .orderBy(asc(drSystems.key))
+      .limit(MAX_SYSTEMS);
+    const systemKeys = systemRows.map((x) => x.key);
     const messages: Array<{ role: "system" | "user"; content: string }> = [
       { role: "system", content: SYSTEM_PROMPT },
       {
@@ -288,6 +298,7 @@ export function triageService(
           businessImpact: row.businessImpact ? sanitizeUntrusted(row.businessImpact, caps.impact) : null,
           attachmentNames,
           feedback,
+          systems: systemRows.map((x) => ({ key: x.key, name: sanitizeUntrusted(x.name, 200), description: sanitizeUntrusted(x.description, 300).replace(/\s+/g, " ") })),
           existing: found.candidates.map((c) => ({
             caseKey: c.caseKey,
             title: sanitizeUntrusted(c.title, 200),
@@ -299,13 +310,13 @@ export function triageService(
       },
     ];
 
-    let output: z.infer<typeof triageOutputSchema> | null = null;
+    let output: z.infer<typeof triageOutputSchemaV4> | null = null;
     let last: Awaited<ReturnType<typeof chatJson>> | null = null;
     let inputTokens = 0;
     let outputTokens = 0;
     for (let attempt = 1; attempt <= MAX_ATTEMPTS && !output; attempt++) {
       try {
-        last = await chatJson(deps.llm, messages, z.toJSONSchema(triageOutputSchema) as Record<string, unknown>, deps.fetchImpl);
+        last = await chatJson(deps.llm, messages, z.toJSONSchema(triageOutputSchemaV4) as Record<string, unknown>, deps.fetchImpl);
       } catch (err) {
         if (err instanceof LlmError) {
           if (err.kind === "truncated" && attempt < MAX_ATTEMPTS) continue;
@@ -317,7 +328,7 @@ export function triageService(
       outputTokens += last.outputTokens;
       await recordUsage(companyId, agentId, last);
       try {
-        output = parseTriageOutput(last.content, candidateCaseKeys);
+        output = parseTriageOutput(last.content, candidateCaseKeys, systemKeys);
       } catch (err) {
         if (!(err instanceof TriageOutputError)) throw err;
         if (attempt === MAX_ATTEMPTS) throw new TriageFailure("invalid_output");

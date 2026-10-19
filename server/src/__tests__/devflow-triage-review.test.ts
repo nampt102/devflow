@@ -11,7 +11,9 @@ import {
   drAgentOutputs,
   drOverrides,
   drRequesters,
+  drRequestSystems,
   drRequests,
+  drSystems,
   pipelineCases,
   pipelineStages,
   pipelines,
@@ -208,6 +210,104 @@ describeEmbeddedPostgres("devflow triage review", () => {
     expect(res.body.candidates).toEqual([
       expect.objectContaining({ caseKey: earlier.key, caseId: earlier.id, title: "Báo cáo công nợ", trigram: 0.6, namedByModel: true, modelReason: "Cùng nội dung" }),
     ]);
+  });
+
+  describe("systems", () => {
+    type Ctx = Awaited<ReturnType<typeof seedCompany>>;
+    const system = async (ctx: Ctx, key: string, over: Record<string, unknown> = {}) =>
+      (await db.insert(drSystems).values({ companyId: ctx.company.id, key, name: key.toUpperCase(), description: `${key} system`, repoUrl: `https://github.com/acme/${key}`, ...over }).returning())[0]!;
+    const assignedKeys = async (caseId: string) =>
+      (
+        await db
+          .select({ key: drSystems.key })
+          .from(drRequestSystems)
+          .innerJoin(drSystems, eq(drSystems.id, drRequestSystems.systemId))
+          .where(eq(drRequestSystems.caseId, caseId))
+      )
+        .map((r) => r.key)
+        .sort();
+
+    it("shows the detail with the company's active systems, the suggestion and what is selected", async () => {
+      const ctx = await seedCompany();
+      const portal = await system(ctx, "portal");
+      await system(ctx, "erp");
+      await system(ctx, "old", { active: false });
+      const other = await seedCompany();
+      await system(other, "theirs");
+      const r = await seedRequest(ctx, { data: { suggestedSystemKeys: ["portal"] } });
+      const res = await request(app(staff(ctx.reviewer, ctx.company.id))).get(`/api/companies/${ctx.company.id}/devflow/triage-cases/${r.id}`);
+      expect(res.body.systems.available.map((x: any) => x.key)).toEqual(["erp", "portal"]);
+      expect(res.body.systems.available[0]).toEqual({ id: expect.any(String), key: "erp", name: "ERP", description: "erp system" });
+      expect(res.body.systems.suggestedKeys).toEqual(["portal"]);
+      expect(res.body.systems.selectedIds).toEqual([portal.id]);
+      expect(JSON.stringify(res.body)).not.toContain("theirs");
+      expect(JSON.stringify(res.body)).not.toContain("repoUrl"); // the repository address and the token stay on the Systems page
+    });
+
+    it("approve stores the chosen systems, and an agent without a suggestion has nothing to be corrected", async () => {
+      const ctx = await seedCompany();
+      const portal = await system(ctx, "portal");
+      const r = await seedRequest(ctx); // proposal written by an older prompt: no suggestedSystemKeys
+      const res = await decide(ctx, r, { decision: "approve", systemIds: [portal.id] });
+      expect(res.status).toBe(200);
+      expect(await assignedKeys(r.id)).toEqual(["portal"]);
+      expect(res.body.overriddenFields).not.toContain("systems");
+      const [row] = await db.select().from(drRequestSystems).where(eq(drRequestSystems.caseId, r.id));
+      expect(row!.assignedByUserId).toBe(ctx.reviewer);
+    });
+
+    it("without a choice, approve keeps what the agent suggested, and that is not an override", async () => {
+      const ctx = await seedCompany();
+      await system(ctx, "portal");
+      await system(ctx, "erp");
+      const r = await seedRequest(ctx, { data: { suggestedSystemKeys: ["portal", "erp"] } });
+      const res = await decide(ctx, r, { decision: "approve" });
+      expect(res.status).toBe(200);
+      expect(await assignedKeys(r.id)).toEqual(["erp", "portal"]);
+      expect(await overridesOf(r.id)).toHaveLength(0);
+    });
+
+    it("a changed choice is one override with the system keys, and an empty choice is allowed", async () => {
+      const ctx = await seedCompany();
+      await system(ctx, "portal");
+      const erp = await system(ctx, "erp");
+      const r = await seedRequest(ctx, { data: { suggestedSystemKeys: ["portal"] } });
+      // an earlier assignment (e.g. from a first pass) is replaced, not added to
+      const portalRow = (await db.select().from(drSystems).where(and(eq(drSystems.companyId, ctx.company.id), eq(drSystems.key, "portal"))))[0]!;
+      await db.insert(drRequestSystems).values({ companyId: ctx.company.id, caseId: r.id, systemId: portalRow.id });
+      expect((await decide(ctx, r, { decision: "approve", systemIds: [erp.id] })).body.overriddenFields).toEqual(["systems"]);
+      const [ov] = await overridesOf(r.id);
+      expect(ov).toMatchObject({ field: "systems", stageKey: "triage", agentValue: ["portal"], finalValue: ["erp"] });
+      expect(await assignedKeys(r.id)).toEqual(["erp"]);
+      const none = await seedRequest(ctx, { data: { suggestedSystemKeys: ["portal"] } });
+      expect((await decide(ctx, none, { decision: "approve", systemIds: [] })).status).toBe(200);
+      expect(await assignedKeys(none.id)).toEqual([]);
+    });
+
+    it("refuses a system of another company or one that is switched off, and writes nothing", async () => {
+      const ctx = await seedCompany();
+      const other = await seedCompany();
+      const theirs = await system(other, "theirs");
+      const off = await system(ctx, "off", { active: false });
+      const r = await seedRequest(ctx);
+      for (const id of [theirs.id, off.id, randomUUID()]) {
+        const res = await decide(ctx, r, { decision: "approve", systemIds: [id] });
+        expect(res.status, id).toBe(422);
+      }
+      expect(await stageOf(r.id)).toBe("triage_review");
+      expect(await assignedKeys(r.id)).toEqual([]);
+      expect((await outputRow(r.outputId)).status).toBe("proposed");
+      expect((await decide(ctx, r, { decision: "approve", systemIds: ["not-a-uuid"] })).status).toBe(400);
+    });
+
+    it("reject and request changes leave the assignment alone", async () => {
+      const ctx = await seedCompany();
+      const portal = await system(ctx, "portal");
+      const r = await seedRequest(ctx, { data: { suggestedSystemKeys: ["portal"] } });
+      await db.insert(drRequestSystems).values({ companyId: ctx.company.id, caseId: r.id, systemId: portal.id });
+      expect((await decide(ctx, r, { decision: "request_changes", reason: "thiếu thông tin", systemIds: [] })).status).toBe(200);
+      expect(await assignedKeys(r.id)).toEqual(["portal"]);
+    });
   });
 
   it("approve without changes: output accepted, no overrides, final values copied, case moves on", async () => {

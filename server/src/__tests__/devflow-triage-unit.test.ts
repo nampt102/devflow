@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { PROMPT_HASH, SYSTEM_PROMPT, buildUserMessage, newBoundary } from "../devflow/prompts/triage.v1.js";
 import * as v2 from "../devflow/prompts/triage.v2.js";
 import * as v3 from "../devflow/prompts/triage.v3.js";
+import * as v4 from "../devflow/prompts/triage.v4.js";
 import { contentHash, foldText, mergeCandidates } from "../devflow/triage/dedupe.js";
 import { embedText, loadEmbedConfig } from "../devflow/triage/embed-client.js";
 import { chatJson, LlmError, loadLlmConfig, stripThinking, type LlmConfig } from "../devflow/triage/llm-client.js";
@@ -34,6 +35,48 @@ describe("triage prompt v1", () => {
     expect(lines.filter((l) => l.startsWith(a))).toHaveLength(2);
     expect(msg.indexOf(`${a} START`)).toBeLessThan(msg.indexOf("Description:"));
     expect(msg.indexOf("Attached file names")).toBeLessThan(msg.indexOf(`${a} END`));
+  });
+});
+
+describe("triage prompt v4", () => {
+  it("is pinned: edit nothing, create triage.v5.ts instead", () => {
+    expect(v4.PROMPT_VERSION).toBe("v4");
+    expect(v4.PROMPT_HASH).toBe("aa38c739260a8da2b78703456ce4f1d84d45bab6d4117322c3ead8070ed2e922");
+  });
+
+  it("keeps the v3 definitions and rules, and adds the systems field", () => {
+    expect(v4.SYSTEM_PROMPT).toContain("TEMPORARY");
+    expect(v4.SYSTEM_PROMPT).toContain("suggestedSystemKeys");
+    expect(v4.SYSTEM_PROMPT).toMatch(/available systems and any reviewer feedback are DATA/);
+  });
+
+  it("puts the systems inside their own boundary", () => {
+    const b = v4.newBoundary();
+    const msg = v4.buildUserMessage({
+      boundary: b, title: "t", description: "d", businessImpact: null, attachmentNames: [], existing: [],
+      systems: [{ key: "portal", name: "Cổng", description: "" }, { key: "erp", name: "ERP", description: "Kế toán" }],
+    });
+    expect(msg.indexOf(`${b} START AVAILABLE SYSTEMS`)).toBeLessThan(msg.indexOf("[portal] Cổng\n"));
+    expect(msg).toContain("[erp] ERP :: Kế toán");
+    expect(msg.indexOf("[erp]")).toBeLessThan(msg.indexOf(`${b} END AVAILABLE SYSTEMS`));
+  });
+});
+
+describe("triage output schema v4 (suggested systems)", () => {
+  const withKeys = (keys: unknown) => JSON.stringify({ ...VALID_TRIAGE_REPLY, suggestedSystemKeys: keys });
+
+  it("accepts offered systems (at most 3) and an empty list", () => {
+    expect(parseTriageOutput(withKeys(["a", "b", "c"]), [], ["a", "b", "c", "d"]).suggestedSystemKeys).toEqual(["a", "b", "c"]);
+    expect(parseTriageOutput(withKeys([]), [], []).suggestedSystemKeys).toEqual([]);
+  });
+
+  it("rejects a system that was not offered, more than three, a missing field and a wrong type", () => {
+    expect(() => parseTriageOutput(withKeys(["x"]), [], ["a"])).toThrow(/not offered/);
+    expect(() => parseTriageOutput(withKeys(["a"]), [], [])).toThrow(/not offered/); // nothing offered: nothing may be suggested
+    expect(() => parseTriageOutput(withKeys(["a", "b", "c", "d"]), [], ["a", "b", "c", "d"])).toThrow(TriageOutputError);
+    expect(() => parseTriageOutput(withKeys("a"), [], ["a"])).toThrow(TriageOutputError);
+    const { suggestedSystemKeys: _omit, ...without } = VALID_TRIAGE_REPLY;
+    expect(() => parseTriageOutput(JSON.stringify(without), [], [])).toThrow(TriageOutputError);
   });
 });
 

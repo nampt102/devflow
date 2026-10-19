@@ -35,6 +35,12 @@ export const triageOutputSchema = z.strictObject({
 });
 export type TriageOutput = z.infer<typeof triageOutputSchema>;
 
+/** v4 adds the systems the request is about. v1 to v3 keep the schema above: their prompt hashes include it. */
+export const triageOutputSchemaV4 = triageOutputSchema.extend({
+  suggestedSystemKeys: z.array(z.string().trim().min(1).max(64)).max(3),
+});
+export type TriageOutputV4 = z.infer<typeof triageOutputSchemaV4>;
+
 export class TriageOutputError extends Error {
   constructor(message: string) {
     super(message);
@@ -46,14 +52,14 @@ export class TriageOutputError extends Error {
  * Parse the model's text. Error messages carry paths and rule names only, never the model's text,
  * because they are fed back to the model on retry and logged.
  */
-export function parseTriageOutput(text: string, allowedCaseKeys: readonly string[]): TriageOutput {
+export function parseTriageOutput(text: string, allowedCaseKeys: readonly string[], allowedSystemKeys: readonly string[] = []): TriageOutputV4 {
   let raw: unknown;
   try {
     raw = JSON.parse(text);
   } catch {
     throw new TriageOutputError("output is not valid JSON");
   }
-  const parsed = triageOutputSchema.safeParse(raw);
+  const parsed = triageOutputSchemaV4.safeParse(raw);
   if (!parsed.success) {
     const issues = parsed.error.issues.slice(0, 8).map((i) => `${i.path.join(".") || "(root)"}: ${i.code}`);
     throw new TriageOutputError(`output does not match the schema (${issues.join("; ")})`);
@@ -61,6 +67,10 @@ export function parseTriageOutput(text: string, allowedCaseKeys: readonly string
   const allowed = new Set(allowedCaseKeys);
   for (const c of parsed.data.duplicateCandidates) {
     if (!allowed.has(c.caseKey)) throw new TriageOutputError("duplicateCandidates names a caseKey that was not offered");
+  }
+  const systems = new Set(allowedSystemKeys);
+  for (const key of parsed.data.suggestedSystemKeys) {
+    if (!systems.has(key)) throw new TriageOutputError("suggestedSystemKeys names a system that was not offered");
   }
   return parsed.data;
 }

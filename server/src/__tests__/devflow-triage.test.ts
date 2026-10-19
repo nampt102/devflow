@@ -11,6 +11,7 @@ import {
   drAgentOutputs,
   drRequesters,
   drRequests,
+  drSystems,
   pipelineCases,
   pipelineStages,
   pipelines,
@@ -18,7 +19,7 @@ import {
 import { getEmbeddedPostgresTestSupport, startEmbeddedPostgresTestDatabase } from "./helpers/embedded-postgres.js";
 import { costService } from "../services/costs.js";
 import { pipelineService } from "../services/pipelines.js";
-import { PROMPT_HASH } from "../devflow/prompts/triage.v3.js";
+import { PROMPT_HASH } from "../devflow/prompts/triage.v4.js";
 import { startFakeLlm, VALID_TRIAGE_REPLY, type FakeLlm } from "../devflow/triage/fake-llm.js";
 import type { LlmConfig } from "../devflow/triage/llm-client.js";
 import { triageService, TriageFailure } from "../devflow/triage/triage-service.js";
@@ -123,6 +124,42 @@ describeEmbeddedPostgres("devflow triage", () => {
   const activities = (caseId: string, action: string) =>
     db.select().from(activityLog).where(and(eq(activityLog.entityId, caseId), eq(activityLog.action, action)));
 
+  it("offers the company's switched-on systems to the model and keeps what it suggests", async () => {
+    const ctx = await seedCompany();
+    await db.insert(drSystems).values([
+      { companyId: ctx.company.id, key: "portal", name: "Cổng khách hàng", description: "Website cho khách đặt hàng", repoUrl: "https://github.com/acme/portal" },
+      { companyId: ctx.company.id, key: "erp", name: "ERP kế toán", repoUrl: "https://github.com/acme/erp" },
+      { companyId: ctx.company.id, key: "old", name: "Hệ thống cũ", repoUrl: "https://github.com/acme/old", active: false },
+    ]);
+    const other = await seedCompany();
+    await db.insert(drSystems).values({ companyId: other.company.id, key: "secret-other", name: "Của công ty khác", repoUrl: "https://github.com/acme/other" });
+    const caseId = await seedRequest(ctx);
+    fake.requests.length = 0;
+    fake.queue.push({ reply: { ...VALID_TRIAGE_REPLY, suggestedSystemKeys: ["portal"] } });
+    expect(await service().triageCase(ctx.company.id, caseId)).toBe("proposed");
+    const prompt = fake.requests[0].body.messages[1].content as string;
+    expect(prompt).toContain("[erp] ERP kế toán");
+    expect(prompt).toContain("[portal] Cổng khách hàng :: Website cho khách đặt hàng");
+    expect(prompt).not.toContain("[old]"); // switched off
+    expect(prompt).not.toContain("secret-other"); // another company's
+    expect(prompt.indexOf("START AVAILABLE SYSTEMS")).toBeLessThan(prompt.indexOf("[portal]"));
+    expect(prompt.indexOf("[portal]")).toBeLessThan(prompt.indexOf("END AVAILABLE SYSTEMS"));
+    const [out] = await outputsOf(caseId);
+    expect((out.data as any).suggestedSystemKeys).toEqual(["portal"]);
+  });
+
+  it("says (none) when the company has no systems, and refuses a suggestion that was not offered", async () => {
+    const ctx = await seedCompany();
+    const caseId = await seedRequest(ctx);
+    fake.requests.length = 0;
+    const bad = { reply: { ...VALID_TRIAGE_REPLY, suggestedSystemKeys: ["invented"] } };
+    fake.queue.push(bad, bad);
+    await expect(service().triageCase(ctx.company.id, caseId)).rejects.toMatchObject({ kind: "invalid_output" });
+    expect((fake.requests[0].body.messages[1].content as string)).toMatch(/START AVAILABLE SYSTEMS\n\(none\)\n/);
+    expect(await outputsOf(caseId)).toHaveLength(0);
+    expect(await stageOf(caseId)).toBe("triage");
+  });
+
   it("writes a proposal, submits the case to review, records usage on an idle agent", async () => {
     const ctx = await seedCompany();
     const caseId = await seedRequest(ctx);
@@ -131,7 +168,7 @@ describeEmbeddedPostgres("devflow triage", () => {
 
     expect(await stageOf(caseId)).toBe("triage_review");
     const [out] = await outputsOf(caseId);
-    expect(out).toMatchObject({ status: "proposed", stageKey: "triage", promptRole: "triage", promptVersion: "v3", promptHash: PROMPT_HASH });
+    expect(out).toMatchObject({ status: "proposed", stageKey: "triage", promptRole: "triage", promptVersion: "v4", promptHash: PROMPT_HASH });
     expect((out.data as any).classification).toBe("feature");
     expect((out.data as any).inputTokens).toBe(120);
     expect(out.agentId).toBeTruthy();

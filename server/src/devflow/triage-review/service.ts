@@ -1,6 +1,6 @@
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
-import { drAgentOutputs, drOverrides, drRequests, type Db } from "@paperclipai/db";
+import { drAgentOutputs, drOverrides, drRequestSystems, drRequests, drSystems, type Db } from "@paperclipai/db";
 import { conflict, forbidden, notFound, unprocessable } from "../../errors.js";
 import { logActivity } from "../../services/activity-log.js";
 import { statusLabelVi } from "../portal/status-labels.js";
@@ -15,6 +15,8 @@ export const decisionSchema = z.strictObject({
   expectedVersion: z.number().int().min(1),
   decision: z.enum(["approve", "reject", "request_changes"]),
   reason: z.string().trim().max(4000).optional(),
+  // the systems this request is about (ids from the Systems page); on approve they are stored, and the BA agent reads their repositories
+  systemIds: z.array(z.string().uuid()).max(10).optional(),
   final: z
     .strictObject({
       classification: FIELD_ENUMS.classification,
@@ -145,6 +147,23 @@ export function triageReviewService(db: Db, deps: { reviewCase: ReviewCase }) {
     });
   }
 
+  /** The company's switched-on systems, what the agent suggested, and what is selected for the request now. */
+  async function systemsFor(companyId: string, caseId: string, data: Row) {
+    const available = await db
+      .select({ id: drSystems.id, key: drSystems.key, name: drSystems.name, description: drSystems.description })
+      .from(drSystems)
+      .where(and(eq(drSystems.companyId, companyId), eq(drSystems.active, true)))
+      .orderBy(drSystems.name, drSystems.key);
+    const suggestedKeys: string[] = Array.isArray(data.suggestedSystemKeys) ? data.suggestedSystemKeys : [];
+    const assigned = await db
+      .select({ systemId: drRequestSystems.systemId })
+      .from(drRequestSystems)
+      .where(and(eq(drRequestSystems.caseId, caseId), eq(drRequestSystems.companyId, companyId)));
+    const assignedIds = new Set(assigned.map((a) => a.systemId));
+    const selected = assignedIds.size ? available.filter((a) => assignedIds.has(a.id)) : available.filter((a) => suggestedKeys.includes(a.key));
+    return { available, suggestedKeys, selectedIds: selected.map((a) => a.id) };
+  }
+
   async function detail(companyId: string, caseId: string) {
     const c = await loadReviewable(companyId, caseId);
     if (!c || c.stage_key !== "triage_review") return null;
@@ -180,6 +199,7 @@ export function triageReviewService(db: Db, deps: { reviewCase: ReviewCase }) {
         dedupeMode: data.dedupeMode ?? null,
       },
       candidates: await candidatesFor(companyId, data),
+      systems: await systemsFor(companyId, caseId, data),
     };
   }
 
@@ -223,6 +243,16 @@ export function triageReviewService(db: Db, deps: { reviewCase: ReviewCase }) {
       if (!dup) throw unprocessable("The duplicate target is not a request of this company", { code: "validation" });
       duplicateKey = dup.case_key;
     }
+    // systems: what the reviewer chose, else what the agent suggested; only the company's switched-on ones count
+    const suggestedKeys: string[] | null = Array.isArray(data.suggestedSystemKeys) ? data.suggestedSystemKeys : null;
+    const companySystems = await db
+      .select({ id: drSystems.id, key: drSystems.key })
+      .from(drSystems)
+      .where(and(eq(drSystems.companyId, companyId), eq(drSystems.active, true)));
+    const chosen = body.systemIds !== undefined ? uniqueSorted(body.systemIds) : companySystems.filter((x) => (suggestedKeys ?? []).includes(x.key)).map((x) => x.id).sort();
+    const chosenSystems = chosen.map((id) => companySystems.find((x) => x.id === id));
+    if (body.decision === "approve" && chosenSystems.some((x) => !x)) throw unprocessable("A chosen system is not an active system of this company", { code: "validation" });
+    const finalSystemKeys = uniqueSorted(chosenSystems.flatMap((x) => (x ? [x.key] : [])));
     const reason =
       body.reason?.trim() ||
       (body.decision === "reject" && duplicateKey ? `Duplicate of ${duplicateKey}` : undefined);
@@ -256,6 +286,8 @@ export function triageReviewService(db: Db, deps: { reviewCase: ReviewCase }) {
             check("difficulty", agent.difficulty, final.difficulty);
             check("requiresHuman", agent.requiresHuman, final.requiresHuman);
             check("requiresHumanReasons", agent.requiresHumanReasons, final.requiresHumanReasons);
+            // an agent that did not offer systems (older prompts) has nothing to be corrected
+            if (suggestedKeys) check("systems", uniqueSorted(suggestedKeys), finalSystemKeys);
           }
           if (body.decision !== "request_changes") check("duplicateOf", keyOf(agent.duplicateOfCaseId), duplicateKey);
           for (const [field, a, b] of diffs) {
@@ -283,6 +315,9 @@ export function triageReviewService(db: Db, deps: { reviewCase: ReviewCase }) {
                 updatedAt: new Date(),
               })
               .where(and(eq(drRequests.caseId, caseId), eq(drRequests.companyId, companyId)));
+            // the chosen systems replace any earlier assignment (the BA agent reads exactly these repositories)
+            await tx.delete(drRequestSystems).where(and(eq(drRequestSystems.caseId, caseId), eq(drRequestSystems.companyId, companyId)));
+            if (chosen.length) await tx.insert(drRequestSystems).values(chosen.map((systemId) => ({ companyId, caseId, systemId, assignedByUserId: userId })));
           } else if (body.decision === "reject" && final.duplicateOfCaseId) {
             await tx
               .update(drRequests)
