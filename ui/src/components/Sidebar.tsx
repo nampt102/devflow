@@ -14,6 +14,7 @@ import {
   Server,
   Layers,
   ClipboardCheck,
+  FileText,
   UserPlus,
   GitBranch,
   Package,
@@ -42,6 +43,7 @@ import { attentionApi } from "../api/attention";
 import { heartbeatsApi } from "../api/heartbeats";
 import { instanceSettingsApi } from "../api/instanceSettings";
 import { queryKeys } from "../lib/queryKeys";
+import { devflowBaApi } from "../api/devflowBa";
 import { devflowTriageApi } from "../api/devflowTriage";
 import { attentionBadgeCount } from "../lib/attention";
 import { useInboxBadge } from "../hooks/useInboxBadge";
@@ -108,6 +110,13 @@ export function Sidebar({ children }: { children?: ReactNode }) {
   const { data: triageCount } = useQuery({
     queryKey: queryKeys.devflowTriage.count(selectedCompanyId!),
     queryFn: () => devflowTriageApi.count(selectedCompanyId!),
+    enabled: !!selectedCompanyId && showPipelines,
+    refetchInterval: 30_000,
+    retry: false,
+  });
+  const { data: baCount } = useQuery({
+    queryKey: queryKeys.devflowBa.count(selectedCompanyId!),
+    queryFn: () => devflowBaApi.count(selectedCompanyId!),
     enabled: !!selectedCompanyId && showPipelines,
     refetchInterval: 30_000,
     retry: false,
@@ -260,6 +269,9 @@ export function Sidebar({ children }: { children?: ReactNode }) {
           ) : null}
           {showPipelines ? (
             <SidebarNavItem to="/triage" label="Triage review" icon={ClipboardCheck} badge={triageCount?.waiting || undefined} badgeLabel="waiting for review" />
+          ) : null}
+          {showPipelines ? (
+            <SidebarNavItem to="/ba-review" label="BA review" icon={FileText} badge={baCount?.waiting || undefined} badgeLabel="waiting for review" />
           ) : null}
           {showGoalsLink ? (
             <SidebarNavItem to="/goals" label="Goals" icon={Target} />

@@ -26,7 +26,7 @@
 ## 5. BA review
 
 - [x] 5.1 `ba/review-service.ts` + routes `ba-queue|ba-count|ba-cases/:id|…/decision` (+ `ba-agent`): hàng chờ, chi tiết (spec, SHA đã đọc, liên kết repo), sửa các trường cho phép (trích dẫn và độ tin cậy là của agent), `dr_overrides` theo trường, spec đã duyệt giữ ở `data.approved`, đổi hệ thống khi approve hoặc request_changes, 422 với hệ thống lạ, 409 khi thua đua, không tự duyệt yêu cầu của mình; 17 test (gồm vòng quay lại agent với hệ thống mới và lý do), 16 đột biến bị bắt (1 đột biến tương đương)
-- [ ] 5.2 Trang Board UI "BA review" (trích dẫn link GitHub theo SHA), số đếm sidebar
+- [x] 5.2 Trang Board UI "BA review" (`pages/BaReview.tsx`, `lib/ba-review.ts`, `api/devflowBa.ts`): hàng chờ có nhãn New, sửa spec thành văn bản từng dòng, trích dẫn link GitHub theo SHA đã đọc, đổi hệ thống, approve/request_changes/reject, số đếm trên sidebar; 10 test, 11 đột biến bị bắt; **chưa xem trên trình duyệt (cần build lại image)**
 - [ ] 5.3 Số liệu Quality cho BA (tỷ lệ override, thời gian, lỗi, chi phí) và email nhân viên gom `ba_review`
 
 ## 6. Hoàn tất

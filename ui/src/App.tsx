@@ -11,6 +11,7 @@ import { PipelinesExperimentalGate } from "./components/PipelinesExperimentalGat
 import { TriageReview } from "./pages/TriageReview";
 import { PortalAccess } from "./pages/PortalAccess";
 import { Systems } from "./pages/Systems";
+import { BaReview } from "./pages/BaReview";
 import { CasesExperimentalGate } from "./components/CasesExperimentalGate";
 import { StatusCardsExperimentalGate } from "./components/StatusCardsExperimentalGate";
 import { CloudManagedPageGate } from "./components/CloudManagedPageGate";
@@ -375,6 +376,10 @@ function boardRoutes(streamlinedUiEnabled: boolean, combinedInboxTasksEnabled: b
       <Route
         path="systems"
         element={<PipelinesExperimentalGate><Systems /></PipelinesExperimentalGate>}
+      />
+      <Route
+        path="ba-review"
+        element={<PipelinesExperimentalGate><BaReview /></PipelinesExperimentalGate>}
       />
       <Route
         path="learnings"
@@ -853,6 +858,7 @@ export function App() {
           <Route path="triage" element={<UnprefixedBoardRedirect />} />
           <Route path="portal-access" element={<UnprefixedBoardRedirect />} />
           <Route path="systems" element={<UnprefixedBoardRedirect />} />
+          <Route path="ba-review" element={<UnprefixedBoardRedirect />} />
           <Route path="learnings" element={<UnprefixedBoardRedirect />} />
           <Route path="cases" element={<UnprefixedBoardRedirect />} />
           <Route path="cases/:caseIdentifier" element={<UnprefixedBoardRedirect />} />
