@@ -76,6 +76,8 @@ export function unsafeBaAgentReason(agent: AgentRow, workspaceRoot: string = DEF
   const cfg = asRecord(agent.adapterConfig);
   if (cfg.engine !== "cli") return "agent_wrong_engine";
   if (cfg.cwd !== baWorkspaceDir(workspaceRoot)) return "agent_wrong_workspace";
+  // the instructions are what makes the model write the spec; without a bundle bound to the agent it just chats
+  if (typeof cfg.instructionsFilePath !== "string" || cfg.instructionsFilePath.trim() === "") return "agent_no_instructions";
   if (cfg.command !== undefined || cfg.chrome === true || cfg.mcpServers !== undefined) return "agent_extra_capability";
   const args = Array.isArray(cfg.extraArgs) ? cfg.extraArgs.map(String) : [];
   const valueOf = (flag: string) => {

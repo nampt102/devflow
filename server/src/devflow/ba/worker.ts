@@ -28,6 +28,7 @@ const CONFIG_KINDS = new Set<BaFailureKind>([
   "agent_wrong_adapter",
   "agent_wrong_engine",
   "agent_wrong_workspace",
+  "agent_no_instructions",
   "agent_extra_capability",
   "agent_tools_not_read_only",
   "agent_instance_not_denied",

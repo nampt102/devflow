@@ -103,7 +103,7 @@ describeEmbeddedPostgres("devflow BA review", () => {
     const spec = baAgentSpec({ workspaceRoot: root });
     const [agent] = await db
       .insert(agents)
-      .values({ companyId: company!.id, name: spec.name, role: "general", adapterType: spec.adapterType, adapterConfig: spec.adapterConfig, runtimeConfig: spec.runtimeConfig, metadata: spec.metadata, status: "idle" })
+      .values({ companyId: company!.id, name: spec.name, role: "general", adapterType: spec.adapterType, adapterConfig: { ...spec.adapterConfig, instructionsFilePath: "/x/AGENTS.md" }, runtimeConfig: spec.runtimeConfig, metadata: spec.metadata, status: "idle" })
       .returning();
     return { company: company!, pipeline: pipeline!, requesterUser, requester: requester!, reviewer, agentId: agent!.id };
   }

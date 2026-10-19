@@ -113,8 +113,10 @@ describe("BA output schema", () => {
 
 describe("BA agent spec and safety check", () => {
   const spec = baAgentSpec();
-  const row = (over: Record<string, unknown> = {}) => ({ adapterType: spec.adapterType, adapterConfig: { ...spec.adapterConfig }, metadata: { ...spec.metadata }, status: "idle", ...over }) as any;
-  const withConfig = (patch: Record<string, unknown>) => row({ adapterConfig: { ...spec.adapterConfig, ...patch } });
+  // Paperclip adds the instructions binding when it creates the agent
+  const bound = { ...spec.adapterConfig, instructionsFilePath: "/paperclip/instances/default/companies/c/agents/a/instructions/AGENTS.md", instructionsRootPath: "/x", instructionsEntryFile: "AGENTS.md", instructionsBundleMode: "managed" };
+  const row = (over: Record<string, unknown> = {}) => ({ adapterType: spec.adapterType, adapterConfig: { ...bound }, metadata: { ...spec.metadata }, status: "idle", ...over }) as any;
+  const withConfig = (patch: Record<string, unknown>) => row({ adapterConfig: { ...bound, ...patch } });
   const args = (...a: string[]) => withConfig({ extraArgs: a });
 
   it("describes a read-only agent in its own folder with a spend limit", () => {
@@ -145,6 +147,8 @@ describe("BA agent spec and safety check", () => {
     ["the ACP engine (it ignores the tool list)", withConfig({ engine: "acp" }), "agent_wrong_engine"],
     ["no engine set", withConfig({ engine: undefined }), "agent_wrong_engine"],
     ["another folder", withConfig({ cwd: "/paperclip/devflow/ws/other" }), "agent_wrong_workspace"],
+    ["no instructions bound (a full config replace drops them)", row({ adapterConfig: { ...spec.adapterConfig } }), "agent_no_instructions"],
+    ["an empty instructions path", withConfig({ instructionsFilePath: "  " }), "agent_no_instructions"],
     ["a command override", withConfig({ command: "/bin/sh" }), "agent_extra_capability"],
     ["browser access", withConfig({ chrome: true }), "agent_extra_capability"],
     ["MCP servers", withConfig({ mcpServers: {} }), "agent_extra_capability"],

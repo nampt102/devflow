@@ -107,13 +107,21 @@ if (!agentId) {
     if (on.status >= 300 && on.status !== 409) must(on, "switch the agent on");
   }
 } else {
-  must(await call("PATCH", `/api/agents/${agentId}`, { adapterConfig, runtimeConfig: spec.runtimeConfig, metadata: spec.metadata, replaceAdapterConfig: true, status: "idle" }), "update agent");
+  // merge, never replace: Paperclip keeps the binding of the instructions file in the same config
+  must(await call("PATCH", `/api/agents/${agentId}`, { adapterConfig, runtimeConfig: spec.runtimeConfig, metadata: spec.metadata, status: "idle" }), "update agent");
   const file = must(await call("GET", `/api/agents/${agentId}/instructions-bundle/file?path=AGENTS.md`), "read instructions");
   if (file.content !== spec.instructions) {
     must(await call("PUT", `/api/agents/${agentId}/instructions-bundle/file`, { path: "AGENTS.md", content: spec.instructions, baseHash: file.contentHash ?? null }), "update instructions");
     console.log("updated the instructions");
   }
   console.log(`updated agent ${agentId}`);
+}
+
+// an agent whose instructions are not bound to it ignores them (an earlier version of this script could drop the binding)
+const current = must(await call("GET", `/api/agents/${agentId}`), "read the agent");
+if (!current.adapterConfig?.instructionsFilePath) {
+  must(await call("PATCH", `/api/agents/${agentId}/instructions-bundle`, { mode: "managed", entryFile: "AGENTS.md" }), "bind the instructions");
+  console.log("bound the instructions file to the agent");
 }
 
 const after = must(await call("GET", `/api/companies/${companyId}/devflow/ba-agent`), "check BA agent");

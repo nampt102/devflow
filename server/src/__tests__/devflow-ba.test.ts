@@ -117,7 +117,7 @@ describeEmbeddedPostgres("devflow BA spec", () => {
     if (withAgent) {
       const [agent] = await db
         .insert(agents)
-        .values({ companyId: company!.id, name: spec.name, role: "general", adapterType: spec.adapterType, adapterConfig: spec.adapterConfig, runtimeConfig: spec.runtimeConfig, metadata: spec.metadata, status: "idle" })
+        .values({ companyId: company!.id, name: spec.name, role: "general", adapterType: spec.adapterType, adapterConfig: { ...spec.adapterConfig, instructionsFilePath: "/x/AGENTS.md" }, runtimeConfig: spec.runtimeConfig, metadata: spec.metadata, status: "idle" })
         .returning();
       agentId = agent!.id;
     }
@@ -304,14 +304,15 @@ describeEmbeddedPostgres("devflow BA spec", () => {
     const spec = baAgentSpec({ workspaceRoot: root });
     const t = make();
     const cases: Array<[string, Record<string, unknown>, string]> = [
-      ["engine", { adapterConfig: { ...spec.adapterConfig, engine: "acp" } }, "agent_wrong_engine"],
-      ["tools", { adapterConfig: { ...spec.adapterConfig, extraArgs: ["--tools", "Read,Grep,Glob,Bash", "--disallowedTools", "Read(//paperclip/instances/**)", "--max-budget-usd", "1"] } }, "agent_tools_not_read_only"],
-      ["folder", { adapterConfig: { ...spec.adapterConfig, cwd: "/paperclip" } }, "agent_wrong_workspace"],
+      ["engine", { adapterConfig: { ...spec.adapterConfig, instructionsFilePath: "/x/AGENTS.md", engine: "acp" } }, "agent_wrong_engine"],
+      ["tools", { adapterConfig: { ...spec.adapterConfig, instructionsFilePath: "/x/AGENTS.md", extraArgs: ["--tools", "Read,Grep,Glob,Bash", "--disallowedTools", "Read(//paperclip/instances/**)", "--max-budget-usd", "1"] } }, "agent_tools_not_read_only"],
+      ["folder", { adapterConfig: { ...spec.adapterConfig, instructionsFilePath: "/x/AGENTS.md", cwd: "/paperclip" } }, "agent_wrong_workspace"],
       ["prompt", { metadata: { ...spec.metadata, devflowPromptHash: "old" } }, "agent_prompt_outdated"],
+      ["instructions", { adapterConfig: { ...spec.adapterConfig } }, "agent_no_instructions"],
       ["paused", { status: "paused" }, "agent_not_runnable"],
     ];
     for (const [, patch, kind] of cases) {
-      await db.update(agents).set({ adapterConfig: spec.adapterConfig, metadata: spec.metadata, status: "idle" }).where(eq(agents.id, ctx.agentId!));
+      await db.update(agents).set({ adapterConfig: { ...spec.adapterConfig, instructionsFilePath: "/x/AGENTS.md" }, metadata: spec.metadata, status: "idle" }).where(eq(agents.id, ctx.agentId!));
       await db.update(agents).set(patch as any).where(eq(agents.id, ctx.agentId!));
       await expect(t.service.baCase(ctx.company.id, caseId), kind).rejects.toMatchObject({ kind });
     }
@@ -547,7 +548,7 @@ describeEmbeddedPostgres("devflow BA spec", () => {
       expect(await activities(ctx.company.id, "agent.ba_gave_up")).toHaveLength(0);
       // the agent is set up: the very next retry works
       const spec = baAgentSpec({ workspaceRoot: root });
-      await db.insert(agents).values({ companyId: ctx.company.id, name: spec.name, role: "general", adapterType: spec.adapterType, adapterConfig: spec.adapterConfig, runtimeConfig: spec.runtimeConfig, metadata: spec.metadata, status: "idle" });
+      await db.insert(agents).values({ companyId: ctx.company.id, name: spec.name, role: "general", adapterType: spec.adapterType, adapterConfig: { ...spec.adapterConfig, instructionsFilePath: "/x/AGENTS.md" }, runtimeConfig: spec.runtimeConfig, metadata: spec.metadata, status: "idle" });
       const t2 = make([{ text: JSON.stringify({ ...VALID_BA_OUTPUT, affectedAreas: [] }) }]);
       await worker(t2.service, clock).sweep();
       expect(await stageOf(caseId)).toBe("ba_review");
