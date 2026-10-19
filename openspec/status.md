@@ -2,7 +2,7 @@
 
 > Đọc file này đầu tiên mỗi phiên. Cập nhật cuối mỗi bước/phiên. Lịch sử chi tiết ở `changes/archive/` và git log.
 
-**Cập nhật lần cuối:** 2026-10-17
+**Cập nhật lần cuối:** 2026-10-19
 
 ## Phase hiện tại
 **P1**: Intake Portal + Workflow Core + Triage agent, pilot 1 công ty. P0 (khám phá Paperclip/Plane, docs, khung project-kit) đã xong.
@@ -13,7 +13,7 @@ Các bước 0–10 của P1 đã code, kiểm bằng test và chạy thử trê
 ## Bước tiếp theo
 1. Chuẩn bị pilot theo danh sách kiểm tra `kb/runbook.md` mục 12: chọn công ty, SMTP Gmail (mật khẩu ứng dụng) và gửi thử một email thật, LLM theo chính sách dữ liệu (local cho dữ liệu thật), ~20 yêu cầu mẫu thật và vài cặp trùng để hiệu chỉnh ngưỡng dedupe, xác nhận sao lưu tự động.
 2. Quyết định của chủ dự án: định nghĩa ưu tiên và độ khó của công ty (prompt v4 thay bản TEMPORARY); có bật `PAPERCLIP_AUTH_DISABLE_SIGN_UP=true` không (và kiểm thử luồng bootstrap); có cần màn hình quản trị tài khoản và màn hình tạo link mời cho nhân viên không.
-3. P2 (BA Spec + Planner agent, các gate còn lại, email mở rộng) chỉ bắt đầu khi P1 chạy pilot ổn; role BA/Tech Lead cho approver là bản vá chờ làm.
+3. P2 (BA Spec + Planner agent, các gate còn lại, email mở rộng): đang brainstorm. Đã chốt hướng ở ADR 0020 (adapter của Paperclip, repo GitHub, docs markdown trong `docs/`, danh mục Hệ thống gán ở Triage review). Việc kế tiếp: spike `claude_local` trong Docker, rồi change proposal P2. Role BA/Tech Lead cho approver là bản vá chờ làm.
 
 ## Backlog cải tiến
 Các vấn đề nhỏ và cải tiến chưa làm nằm ở `openspec/backlog.md` (mã số, nguồn, mức ưu tiên A/B/C). Chủ dự án báo trong chat, Claude ghi vào đó.
@@ -63,6 +63,7 @@ Thứ tự: 0 → 1 → 2 → 3 → {4, 5} → 6 → 7 → 7b → 8 → 9 → 10
 - 0017 Màn hình duyệt triage: trang Board UI, quyết định nguyên tử qua hook của core
 - 0018 Số liệu triage: tính từ dữ liệu có sẵn, tỷ lệ override trên đề xuất được duyệt
 - 0019 Pilot hardening: Telemetry tắt, trần token ngày, công tắc dừng worker
+- 0020 P2: BA Spec và Tech Plan qua adapter của Paperclip; repo và docs gán theo Hệ thống
 - D7 (không phải ADR): chủ dự án tự chọn công ty pilot và tự chạy test; Claude bàn giao code, test tự động, hướng dẫn chạy.
 
 ## Kết quả spike Pipelines (đọc code + smoke API; chi tiết `kb/spike-pipelines.md`)
@@ -81,6 +82,7 @@ Kết luận: **cần vá, không phải viết lại state machine**. Chưa th�
 P1 (đang chuẩn bị) → P2 BA Spec + Planner agent, gate còn lại, email mở rộng → P3 Dev agent (worktree/PR), QA agent, dashboard → P4 Governance đầy đủ, SSO, mở rộng toàn group.
 
 ## Gần đây
+- 2026-10-19: Brainstorm P2: chốt chạy BA/Tech Plan qua adapter của Paperclip (không dùng worker nội bộ), repo GitHub + docs markdown trong `docs/`, danh mục Hệ thống theo công ty gán ở Triage review (ADR 0020). Chưa code; spike adapter là bước tiếp theo.
 - 2026-10-18: A-11 xong: trang Board UI "Portal access" (link mời requester, tạo tài khoản nhân viên và reset mật khẩu cho instance admin; bí mật hiện một lần), thêm `GET /api/admin/users?companyId=`; không đổi schema (`kb/admin-accounts.md`). Hết các việc backlog trước P2.
 - 2026-10-18: Làm các mục backlog trước P2: B-01 (số đếm sidebar, nhãn New và sắp xếp, email nhân viên gom 5 phút tới `DEVFLOW_STAFF_NOTIFY_EMAILS` hoặc owner/admin), B-08 (agent Triage ghi rõ là nội bộ), B-22 (lần chạy email đầu bỏ qua lịch sử), A-13 (kiểm bootstrap khi đóng đăng ký: phải bootstrap trước rồi mới đóng), A-24 (sao lưu tự động xác nhận và khôi phục thử); 226 test server pass. Chờ: A-11 (màn hình mời và tài khoản, cần duyệt thiết kế); A-19 và A-25 được chủ dự án cho bỏ qua lúc này; A-14 (định nghĩa ưu tiên/độ khó) chờ nội dung từ chủ dự án.
 - 2026-10-18: Portal làm lại giao diện (skill ui-ux-pro-max): token và phông giống Board, chuyển sáng/tối chung khóa `paperclip.theme`, form có kiểm tra khi rời ô, kéo thả tệp, khung xương khi tải, trạng thái rỗng; logic và API không đổi; 18 test portal pass, xem trên trình duyệt ở sáng, tối và 375px (`kb/intake-portal-web.md`).
