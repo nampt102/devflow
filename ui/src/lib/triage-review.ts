@@ -1,4 +1,4 @@
-import type { TriageDecision, TriageDetail, TriageFinalPatch, TriageQueueItem } from "../api/devflowTriage";
+import type { TriageDecision, TriageDetail, TriageFinalPatch, TriageQueueItem, TriageSystems } from "../api/devflowTriage";
 
 // Pure helpers for the DevFlow triage review screen.
 
@@ -116,7 +116,24 @@ export const FIELD_LABELS: Record<string, string> = {
   requiresHuman: "Needs a developer",
   requiresHumanReasons: "Developer reasons",
   duplicateOf: "Duplicate of",
+  systems: "Systems",
 };
+
+/** Keys of the selected systems, in the order the company lists them. */
+export function selectedSystemKeys(systems: TriageSystems, selectedIds: readonly string[]): string[] {
+  return systems.available.filter((x) => selectedIds.includes(x.id)).map((x) => x.key);
+}
+
+/** The reviewer's selection differs from what the agent suggested (compared as sets of keys). */
+export function systemsDiffer(systems: TriageSystems, selectedIds: readonly string[]): boolean {
+  const now = new Set(selectedSystemKeys(systems, selectedIds));
+  const was = new Set(systems.suggestedKeys.filter((k) => systems.available.some((x) => x.key === k)));
+  return now.size !== was.size || [...now].some((k) => !was.has(k));
+}
+
+/** Turn a checkbox change into the next selection, keeping each id once. */
+export const toggleSystem = (selectedIds: readonly string[], id: string, on: boolean): string[] =>
+  on ? (selectedIds.includes(id) ? [...selectedIds] : [...selectedIds, id]) : selectedIds.filter((x) => x !== id);
 
 export type QueueOrder = "newest" | "oldest";
 

@@ -4,6 +4,7 @@ import { AlertTriangle, Check, ChevronDown, ChevronRight, ClipboardCheck, Copy, 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Link } from "@/lib/router";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/EmptyState";
@@ -40,6 +41,9 @@ import {
   scoreLabel,
   type QueueFilter,
   type TriageDraft,
+  selectedSystemKeys,
+  systemsDiffer,
+  toggleSystem,
 } from "../lib/triage-review";
 
 // DevFlow triage review (step 8): staff look at the agent's proposal, correct it, and decide.
@@ -179,7 +183,9 @@ function ReviewForm({ companyId, detail, onDecided }: { companyId: string; detai
   const base = useMemo(() => draftFromDetail(detail), [detail]);
   const [draft, setDraft] = useState<TriageDraft>(base);
   const [reason, setReason] = useState("");
+  const [systemIds, setSystemIds] = useState<string[]>(detail.systems.selectedIds);
   const changed = changedFields(base, draft);
+  const systemsChanged = systemsDiffer(detail.systems, systemIds);
   const proposal = detail.proposal;
 
   const set = <K extends keyof TriageDraft>(key: K, value: TriageDraft[K]) => setDraft((d) => ({ ...d, [key]: value }));
@@ -194,6 +200,8 @@ function ReviewForm({ companyId, detail, onDecided }: { companyId: string; detai
         decision,
         reason: reason.trim() || undefined,
         final: decision === "request_changes" ? undefined : finalPatch(base, draft),
+        // the choice only counts when approving: it decides which repositories the BA agent reads
+        ...(decision === "approve" ? { systemIds } : {}),
       }),
     onSuccess: async (result) => {
       pushToast({
@@ -307,6 +315,29 @@ function ReviewForm({ companyId, detail, onDecided }: { companyId: string; detai
           {changed.includes("requiresHumanReasons") ? <p className="pl-6 text-xs text-amber-700 dark:text-amber-300">Agent proposed: {base.requiresHumanReasons.map((r) => HUMAN_REASON_LABELS[r] ?? r).join(", ") || "none"}</p> : null}
         </div>
 
+        <div className="space-y-1">
+          <p className="text-xs font-medium text-muted-foreground">
+            Systems this request is about
+            {systemsChanged ? <span className="ml-2 text-amber-700 dark:text-amber-300">Agent suggested: {detail.systems.suggestedKeys.join(", ") || "none"}</span> : null}
+          </p>
+          {detail.systems.available.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No systems are set up yet. <Link to="/systems" className="text-primary underline-offset-4 hover:underline">Add them</Link> so the BA agent can read their repositories.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              {detail.systems.available.map((x) => (
+                <label key={x.id} className="flex items-center gap-2 text-sm text-foreground" title={x.description || undefined}>
+                  <Checkbox checked={systemIds.includes(x.id)} onCheckedChange={(v) => setSystemIds((cur) => toggleSystem(cur, x.id, v === true))} aria-label={x.name} />
+                  {x.name}
+                  {detail.systems.suggestedKeys.includes(x.key) ? <Badge variant="outline">suggested</Badge> : null}
+                </label>
+              ))}
+            </div>
+          )}
+          {systemIds.length === 0 && detail.systems.available.length > 0 ? <p className="text-xs text-muted-foreground">None selected: the BA agent will write the spec from the request alone.</p> : null}
+        </div>
+
         {proposal.assumptions.length ? <Notes title="Assumptions" lines={proposal.assumptions} /> : null}
         {proposal.openQuestions.length ? <Notes title="Open questions" lines={proposal.openQuestions} /> : null}
       </section>
@@ -365,7 +396,7 @@ function ReviewForm({ companyId, detail, onDecided }: { companyId: string; detai
           </div>
           <Button type="button" disabled={decide.isPending || !!blocker("approve")} title={blocker("approve") ?? undefined} onClick={() => decide.mutate("approve")}>
             {decide.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-            {changed.length ? `Approve with ${changed.length} correction${changed.length === 1 ? "" : "s"}` : "Approve"}
+            {changed.length + (systemsChanged ? 1 : 0) ? `Approve with ${changed.length + (systemsChanged ? 1 : 0)} correction${changed.length + (systemsChanged ? 1 : 0) === 1 ? "" : "s"}` : "Approve"}
           </Button>
         </div>
       </section>

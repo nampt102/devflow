@@ -21,7 +21,7 @@
 ## 4. Gán hệ thống ở Triage
 
 - [x] 4.1 Prompt `triage.v4` (hash ghim; v1 đến v3 giữ nguyên) + `triageOutputSchemaV4` (`suggestedSystemKeys`, tối đa 3, phải thuộc danh sách được đưa) + Triage đưa hệ thống đang bật của đúng công ty vào prompt trong ranh giới dữ liệu; test unit và DB, đột biến bị bắt
-- [ ] 4.2 Triage review: API xong (chi tiết trả `systems`, quyết định nhận `systemIds`, approve thay thế gán trong `beforeCommit`, override `systems`, 422 với hệ thống lạ/đã tắt; 6 test, 12 đột biến bị bắt); **còn giao diện chọn hệ thống**
+- [x] 4.2 Triage review: API (chi tiết trả `systems`, quyết định nhận `systemIds`, approve thay thế gán trong `beforeCommit`, override `systems`, 422 với hệ thống lạ/đã tắt; 6 test, 12 đột biến bị bắt) và giao diện chọn hệ thống (ô chọn điền sẵn đề xuất, ghi chú khi khác đề xuất, liên kết sang trang Systems; 3 test); **chưa xem trên trình duyệt (cần build lại image)**
 
 ## 5. BA review
 

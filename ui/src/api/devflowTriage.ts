@@ -70,6 +70,14 @@ export interface TriageDetail {
     dedupeMode: string | null;
   };
   candidates: TriageCandidate[];
+  systems: TriageSystems;
+}
+
+/** The company's switched-on systems, what the agent suggested (keys) and what is selected now (ids). */
+export interface TriageSystems {
+  available: Array<{ id: string; key: string; name: string; description: string }>;
+  suggestedKeys: string[];
+  selectedIds: string[];
 }
 
 export interface TriageFinalPatch {
@@ -87,6 +95,8 @@ export interface TriageDecisionBody {
   decision: TriageDecision;
   reason?: string;
   final?: TriageFinalPatch;
+  /** only sent with approve: the systems the BA agent will read */
+  systemIds?: string[];
 }
 
 export interface TriageMetrics {

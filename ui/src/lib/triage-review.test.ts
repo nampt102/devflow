@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TriageDetail, TriageQueueItem } from "../api/devflowTriage";
-import { ageLabel, agoLabel, changedFields, decisionBlocker, draftFromDetail, durationLabel, filterQueue, finalPatch, isNewSince, pct, readOrder, readSeenAt, scoreLabel, sortQueue } from "./triage-review";
+import { ageLabel, agoLabel, changedFields, decisionBlocker, draftFromDetail, durationLabel, filterQueue, finalPatch, isNewSince, pct, readOrder, readSeenAt, scoreLabel, selectedSystemKeys, sortQueue, systemsDiffer, toggleSystem } from "./triage-review";
 
 const detail = (over: Partial<TriageDetail["proposal"]> = {}, candidates: TriageDetail["candidates"] = []): TriageDetail => ({
   caseId: "c1",
@@ -36,6 +36,7 @@ const detail = (over: Partial<TriageDetail["proposal"]> = {}, candidates: Triage
     ...over,
   },
   candidates,
+  systems: { available: [], suggestedKeys: [], selectedIds: [] },
 });
 
 const candidate = (over: Partial<TriageDetail["candidates"][number]> = {}) => ({
@@ -160,5 +161,37 @@ describe("new-arrival helpers", () => {
   it("falls back quietly when browser storage is unavailable", () => {
     expect(readSeenAt("c")).toBeNull();
     expect(readOrder()).toBe("newest");
+  });
+});
+
+describe("systems selection", () => {
+  const systems = {
+    available: [
+      { id: "s-erp", key: "erp", name: "ERP", description: "" },
+      { id: "s-portal", key: "portal", name: "Portal", description: "" },
+      { id: "s-hr", key: "hr", name: "HR", description: "" },
+    ],
+    suggestedKeys: ["portal", "gone"],
+    selectedIds: ["s-portal"],
+  };
+
+  it("lists the selected keys in the company's order", () => {
+    expect(selectedSystemKeys(systems, ["s-portal", "s-erp"])).toEqual(["erp", "portal"]);
+    expect(selectedSystemKeys(systems, ["unknown"])).toEqual([]);
+  });
+
+  it("says whether the selection differs from the suggestion (sets of keys; a suggestion that no longer exists is ignored)", () => {
+    expect(systemsDiffer(systems, ["s-portal"])).toBe(false);
+    expect(systemsDiffer(systems, ["s-erp"])).toBe(true);
+    expect(systemsDiffer(systems, ["s-portal", "s-erp"])).toBe(true);
+    expect(systemsDiffer(systems, [])).toBe(true);
+    expect(systemsDiffer({ ...systems, suggestedKeys: [] }, [])).toBe(false);
+  });
+
+  it("toggles one system without duplicating or reordering the others", () => {
+    expect(toggleSystem(["a"], "b", true)).toEqual(["a", "b"]);
+    expect(toggleSystem(["a", "b"], "b", true)).toEqual(["a", "b"]);
+    expect(toggleSystem(["a", "b"], "a", false)).toEqual(["b"]);
+    expect(toggleSystem(["a"], "z", false)).toEqual(["a"]);
   });
 });
