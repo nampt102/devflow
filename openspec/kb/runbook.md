@@ -77,8 +77,8 @@ Key LLM/embedding/SMTP chỉ nằm trong `docker/.env` (gitignore). Đổi key: 
 Quét 30 commit của DevFlow (từ `935c17b6e`) và cây tệp: không có giá trị nào trong `docker/.env` xuất hiện trong commit hay tệp được theo dõi; không có khóa dạng Anthropic, OpenAI, Google, GitHub, Slack, AWS hay khối private key trong commit của DevFlow. Các mẫu khớp trong cây tệp đều là dữ liệu giả trong test kế thừa từ Paperclip. Một cảnh báo là biến `password` trong `admin-accounts.ts` (không phải giá trị cố định). Kho `nampt102/devflow` **công khai**: không đẩy `docker/.env`, không dán key vào issue hay PR. Chưa quét lịch sử upstream của Paperclip (không phải của DevFlow).
 
 ## 12. Danh sách kiểm tra trước pilot
-- [ ] Chọn công ty pilot, seed pipeline, bật Pipelines, tạo nhân viên và link mời requester.
-- [ ] P2: thêm hệ thống (repo GitHub + token chỉ đọc) ở trang Systems, chạy `setup-ba-agent.mjs` cho công ty pilot, thử `smoke-p2.mjs`; xem một spec thật ở trang BA review và chi phí ở panel "Quality and cost" (chủ dự án chưa xem giao diện).
+- [x] Chọn công ty pilot (2026-10-19): **RESKI** (`bef2beba-1090-4d3f-a99c-6f932b9066ea`, tiền tố `RES`), pipeline `dev-request` đã seed (`--verify` 8/8; bước verify để lại một case thử `verify …` trong công ty), có requester thử. Còn: tạo tài khoản nhân viên thật.
+- [x] P2 (2026-10-19): hệ thống `reski` (repo riêng `MotivesSystem/reski_membership`, docs `knowledge-base`, token chỉ đọc), agent BA đã tạo, REQ-1 ra spec thật (xem `ba-spec.md`). Còn: duyệt spec ở trang BA review. Người duyệt phải đăng nhập GitHub có quyền đọc repo thì link trích dẫn mới mở được (repo riêng trả 404).
 - [ ] Chọn nhà cung cấp LLM theo chính sách dữ liệu (mục 9); đặt `DEVFLOW_LLM_*`, thử bằng `smoke-p1.mjs`.
 - [x] Gmail: đã đặt `DEVFLOW_SMTP_*` và gửi thật thành công (2026-10-18, xem `email-notifications.md`); còn xác nhận người nhận thấy thư trong hộp thư.
 - [ ] Cung cấp ~20 yêu cầu mẫu thật và vài cặp trùng để hiệu chỉnh ngưỡng dedupe (0.3 trigram, 0.65 vector); xác nhận định nghĩa ưu tiên và độ khó (prompt v4 thay bản TEMPORARY).

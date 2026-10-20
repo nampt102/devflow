@@ -1,6 +1,6 @@
 # BA Spec (P2, change `add-ba-spec-stage`)
 
-Trạng thái: code + test xong và đã chạy thật trên stack Docker với repo GitHub và key Claude thật (2026-10-19, `scripts/devflow/smoke-p2.mjs` 25/25); **giao diện chưa xem trên trình duyệt**. Quyết định: `decisions/0020-p2-agents-via-paperclip-adapter.md`, `decisions/0021-ba-spec-stage.md`. Spike: `kb/spike-p2-adapter.md`.
+Trạng thái: code + test xong và đã chạy thật trên stack Docker với repo GitHub và key Claude thật (2026-10-19, `scripts/devflow/smoke-p2.mjs` 25/25); đã chạy với repo riêng có token ở công ty pilot RESKI (mục "Chạy thật với RESKI"); chủ dự án đã mở giao diện BA review, chưa duyệt spec nào. Quyết định: `decisions/0020-p2-agents-via-paperclip-adapter.md`, `decisions/0021-ba-spec-stage.md`. Spike: `kb/spike-p2-adapter.md`.
 
 ## Luồng
 Yêu cầu qua Triage review (người duyệt chọn **hệ thống** liên quan) → stage `ba_spec` → worker BA chạy agent trên bản clone của các hệ thống đã gán → đề xuất spec (`dr_agent_outputs`, stage `ba_spec`) → stage `ba_review` → nhân viên duyệt (sửa, approve, request_changes, reject) → approve sang `tech_plan` (chưa có agent, đợi change sau).
@@ -14,7 +14,8 @@ Yêu cầu qua Triage review (người duyệt chọn **hệ thống** liên qua
 ## Agent BA và an toàn (Option 3 của ADR 0020)
 - Agent `claude_local` tên "DevFlow BA" mỗi công ty, tạo bằng `node scripts/devflow/setup-ba-agent.mjs --company <id>` (qua API, vì tạo agent có nhiều tác dụng phụ không nên sao chép); cấu hình chuẩn lấy từ `GET /api/companies/:id/devflow/ba-agent` nên script không lệch với code. Chạy lại script sau mỗi lần đổi prompt BA (worker báo `agent_prompt_outdated`).
 - Cấu hình: `engine: "cli"` (engine ACP mặc định **bỏ qua** `extraArgs`), `--tools Read,Grep,Glob` (không có shell, không ghi, không web), `--disallowedTools` chặn đọc `/paperclip/instances`, `/proc`, `/etc`, `/root`, `/home`, `/var`… cho cả ba tool, `--max-budget-usd` mỗi lượt (mặc định 1), key Anthropic là secret công ty, heartbeat theo giờ tắt.
-- **Trước mỗi lượt** `unsafeBaAgentReason` từ chối agent đã bị đổi (adapter, engine, thư mục, tool, thiếu luật chặn, không có ngân sách, thêm lệnh/MCP/chrome, prompt cũ, tạm dừng); lỗi cấu hình thử lại sau 5 phút, không bỏ cuộc, ghi một lần.
+- Hướng dẫn BA (`AGENTS.md`) chỉ có tác dụng khi bundle được **gắn vào agent** (`adapterConfig.instructionsFilePath` và các khóa `instructions*` do Paperclip quản lý). Thiếu gắn kết thì Paperclip không tạo bản sao hướng dẫn cho lượt chạy (`agent_instruction_working_copies` trống), prompt không có dòng "Agent instructions for this run were loaded from …", và model chỉ trò chuyện ("tin nhắn là null") thay vì viết spec. Vì vậy script **gộp** cấu hình (không dùng `replaceAdapterConfig`, vì thay toàn bộ sẽ xóa gắn kết) và tự gắn lại bằng `PATCH /api/agents/:id/instructions-bundle` (`mode: managed`) khi thiếu.
+- **Trước mỗi lượt** `unsafeBaAgentReason` từ chối agent đã bị đổi (adapter, engine, thư mục, tool, thiếu luật chặn, không có ngân sách, thêm lệnh/MCP/chrome, prompt cũ, tạm dừng, chưa gắn hướng dẫn `agent_no_instructions`); lỗi cấu hình thử lại sau 5 phút, không bỏ cuộc, ghi một lần.
 - Một thư mục workspace dùng chung `/paperclip/devflow/ws/ba`, **chạy tuần tự toàn instance** và dọn trước/sau mỗi lượt (kể cả khi lỗi): dữ liệu công ty khác không bao giờ nằm cạnh agent. Clone nông bằng `git` với token ở header của riêng tiến trình đó (không vào URL hay `.git/config`), chỉ https, không hook, môi trường tối thiểu, gỡ remote, xóa symlink (`systems/workspace.ts`).
 - Nội dung yêu cầu và repo là dữ liệu không tin cậy: `request.md` đặt yêu cầu giữa ranh giới ngẫu nhiên mỗi lượt; agent không có kênh gửi ra ngoài; còn lại rủi ro agent chép đoạn file trong workspace vào spec, người duyệt là chốt chặn. Bubblewrap/seccomp hoặc runner tách để P4.
 
@@ -31,7 +32,8 @@ API `GET …/devflow/ba-queue|ba-count|ba-metrics|ba-cases/:id`, `POST …/ba-ca
 - Một hệ thống = một repo; chỉ GitHub; chưa có đồng bộ docs ngoài repo (Confluence, SharePoint).
 - Model local cho agent adapter chưa kiểm chứng; Tech Plan, role BA/Tech Lead cho approver chưa làm.
 - Chi phí lượt chạy đầu với repo lớn có thể sát trần mỗi lượt (spike: 1,33 USD cho một lượt phân tích repo Paperclip với haiku); số thật sẽ thấy ở panel.
-- Giao diện Systems, Triage review (chọn hệ thống) và BA review chỉ được kiểm bằng test logic và API; chưa ai xem trên trình duyệt thật.
+- Link trích dẫn trỏ thẳng GitHub: với repo riêng, người duyệt phải đăng nhập GitHub có quyền đọc repo (và xác thực SSO của org nếu có), nếu không GitHub trả 404. Token của hệ thống chỉ dùng để agent clone, không giúp trình duyệt.
+- Claude Code ghi vùng nhớ tự động theo thư mục làm việc (`/paperclip/.claude/projects/-paperclip-devflow-ws-ba/memory/`), dùng chung cho mọi công ty vì workspace BA dùng chung; worker dọn workspace nhưng không dọn vùng này. Đến 2026-10-19 thư mục này trống (chưa thấy rò rỉ), chưa xác nhận agent có ghi vào đó không.
 - Dọn dẹp thủ công: agent "Spike BA …" đã terminate nhưng chưa xóa được (API trả 409 vì có run).
 
 ## Kiểm chứng
@@ -40,4 +42,9 @@ Test tự động (chạy trong container): `devflow-systems*`, `devflow-ba-unit
 - Migration `0359` áp dụng khi khởi động; worker BA khởi động cùng Triage và email. `setup-ba-agent.mjs` tạo agent và secret key; chạy lại để đồng bộ cũng đúng (cập nhật cấu hình, key, hướng dẫn). Lần chạy đầu in `agent_not_runnable` vì agent mới tạo chưa bật; script nay tự bật (`status: idle`) sau khi tạo.
 - Khi agent vừa có, worker nhặt luôn các yêu cầu cũ đang nằm ở `ba_spec` (không hệ thống nào được gán): spec ra sau vài chục giây, độ tin cậy `low`, nói rõ chưa có hệ thống (0,001 đến 0,002 USD mỗi lượt).
 - `smoke-p2.mjs` (kiểm thật từ cổng đến duyệt BA): yêu cầu → Triage thật → nhân viên duyệt và gán hệ thống `devflow` (repo `nampt102/devflow`, nhánh `chore/project-kit`, docs `openspec/kb`) → agent BA đọc repo, 11 trích dẫn đúng chỗ (ví dụ `server/src/devflow/portal/portal-service.ts:17`, `:40`, `:59`, `packages/db/src/schema/pipeline_cases.ts:54`), SHA `4043d97…` được ghi, chi phí 0,013 USD (39 nghìn token vào, 12 nghìn ra, haiku) → duyệt có sửa tóm tắt → `overridden`, `data.approved` có mặt, metrics đếm. Requester không đọc được Systems và hàng chờ BA, và không thấy spec.
-- Chưa kiểm: lượt chạy với repo riêng có token (chỉ repo công khai), repo lớn (chi phí sát trần mỗi lượt), vLLM/model local cho agent, giao diện trên trình duyệt.
+- Chưa kiểm: repo lớn (chi phí sát trần mỗi lượt), vLLM/model local cho agent.
+
+### Chạy thật với RESKI (2026-10-19, công ty pilot, repo riêng)
+- Hệ thống `reski`: `https://github.com/MotivesSystem/reski_membership` (repo riêng, token chỉ đọc), docs `knowledge-base`. Yêu cầu REQ-1 "thêm cột mã kas" qua Triage thật (v4, không gợi ý hệ thống vì chưa rõ "app staff" thuộc hệ thống nào; người duyệt gán `reski`).
+- Lần đầu: 6 lượt chạy (3 lần thử, mỗi lần 2 lượt) đều `invalid_output` rồi bỏ cuộc, mỗi lượt khoảng 0,0002 đến 0,0008 USD. Nguyên nhân: agent tạo lại bằng bản script cũ (`replaceAdapterConfig: true`) bị mất gắn kết hướng dẫn, nên không biết phải đọc `request.md` (xem mục "Agent BA và an toàn"). Agent của `DevFlow Verify` có cùng cấu hình và cùng `AGENTS.md` nhưng còn gắn kết nên chạy đúng. Sửa ở commit `58e670330`.
+- Sau khi sửa: một lượt, clone được repo riêng bằng token (SHA `419a743f…`, nhánh `test`), 46 nghìn token vào, 10,5 nghìn ra, **0,013 USD**; spec tiếng Việt, độ tin cậy `medium`, 11 trích dẫn trải cả mobile (Flutter), backend (.NET) và docs nghiệp vụ (backlog, ADR của dự án). Chủ dự án mở được link trích dẫn sau khi đăng nhập GitHub.

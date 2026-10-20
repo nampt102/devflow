@@ -2,18 +2,18 @@
 
 > Đọc file này đầu tiên mỗi phiên. Cập nhật cuối mỗi bước/phiên. Lịch sử chi tiết ở `changes/archive/` và git log.
 
-**Cập nhật lần cuối:** 2026-10-19
+**Cập nhật lần cuối:** 2026-10-20
 
 ## Phase hiện tại
 **P1**: Intake Portal + Workflow Core + Triage agent, pilot 1 công ty. P0 (khám phá Paperclip/Plane, docs, khung project-kit) đã xong.
 
 ## Bước đang làm
-Các bước 0–10 của P1 đã code, kiểm bằng test và chạy thử trên stack Docker thật (portal, Triage với Claude, dedupe, màn hình duyệt, số liệu, smoke `scripts/devflow/smoke-p1.mjs` 17/17). **Chưa có pilot thật**: còn các việc chuẩn bị ở `kb/runbook.md` mục 12. Change OpenSpec `add-intake-portal` đã archive ngày 2026-10-18 (`openspec/changes/archive/2026-10-18-add-intake-portal`, spec chính ở `openspec/specs/intake-portal`).
+Các bước 0–10 của P1 đã code, kiểm bằng test và chạy thử trên stack Docker thật (portal, Triage với Claude, dedupe, màn hình duyệt, số liệu, smoke `scripts/devflow/smoke-p1.mjs` 17/17). **Pilot đã bắt đầu với công ty RESKI** (2026-10-19): pipeline đã seed, hệ thống `reski` (repo riêng), agent BA; REQ-1 đã qua Triage và có spec BA chờ duyệt. Còn các việc ở `kb/runbook.md` mục 12. Change OpenSpec `add-intake-portal` đã archive ngày 2026-10-18 (`openspec/changes/archive/2026-10-18-add-intake-portal`, spec chính ở `openspec/specs/intake-portal`).
 
 ## Bước tiếp theo
-1. Chuẩn bị pilot theo danh sách kiểm tra `kb/runbook.md` mục 12: chọn công ty, SMTP Gmail (mật khẩu ứng dụng) và gửi thử một email thật, LLM theo chính sách dữ liệu (local cho dữ liệu thật), ~20 yêu cầu mẫu thật và vài cặp trùng để hiệu chỉnh ngưỡng dedupe, xác nhận sao lưu tự động.
+1. Pilot RESKI: chủ dự án duyệt spec REQ-1 ở BA review, gửi thêm 5 đến 10 yêu cầu thật (có vài cặp trùng) để đo chất lượng Triage/BA, chi phí và hiệu chỉnh dedupe; tạo tài khoản nhân viên thật. Các việc còn lại ở `kb/runbook.md` mục 12 (LLM theo chính sách dữ liệu, xác nhận người nhận thấy thư).
 2. Quyết định của chủ dự án: định nghĩa ưu tiên và độ khó của công ty (prompt v4 thay bản TEMPORARY); có bật `PAPERCLIP_AUTH_DISABLE_SIGN_UP=true` không (và kiểm thử luồng bootstrap); có cần màn hình quản trị tài khoản và màn hình tạo link mời cho nhân viên không.
-3. **P2 phần BA Spec: code xong, đã chạy thật** (change `add-ba-spec-stage`, `kb/ba-spec.md`, ADR 0020 và 0021, `scripts/devflow/smoke-p2.mjs` 25/25 với repo và key thật). Còn: chủ dự án xem giao diện (Systems, chọn hệ thống ở Triage review, BA review), thử với repo riêng có token, rồi archive change. Tech Plan là change sau (`add-tech-plan-stage`); role BA/Tech Lead cho approver là bản vá chờ làm.
+3. **P2 phần BA Spec: code xong, đã chạy thật** (change `add-ba-spec-stage`, `kb/ba-spec.md`, ADR 0020 và 0021, `scripts/devflow/smoke-p2.mjs` 25/25 với repo và key thật). Repo riêng có token đã chạy được ở RESKI. Còn: chủ dự án duyệt spec đầu tiên trên giao diện, rồi archive change. Tech Plan là change sau (`add-tech-plan-stage`); role BA/Tech Lead cho approver là bản vá chờ làm.
 
 ## Backlog cải tiến
 Các vấn đề nhỏ và cải tiến chưa làm nằm ở `openspec/backlog.md` (mã số, nguồn, mức ưu tiên A/B/C). Chủ dự án báo trong chat, Claude ghi vào đó.
@@ -22,6 +22,8 @@ Các vấn đề nhỏ và cải tiến chưa làm nằm ở `openspec/backlog.m
 - Còn thiếu cho pilot: xác nhận người nhận thấy thư (SMTP đã gửi thật); vLLM local (đã chạy thử bằng API Claude và OpenAI embedding, chưa với vLLM/TEI).
 - Telemetry của Paperclip: **đã chốt tắt** trong cấu hình Docker (`PAPERCLIP_TELEMETRY_DISABLED=1`, ADR 0019); chưa quan sát lưu lượng ra ngoài thực tế.
 - Triage chạy thật bằng worker nội bộ (không qua adapter của Paperclip); các agent adapter (BA, Dev, QA) chưa thử ở runtime vì thuộc P2 trở đi.
+- Embedding đang lỗi chứng chỉ TLS khi gọi OpenAI từ container, dedupe chỉ chạy trigram (backlog B-37). Key OpenAI trong `docker/.env` đã bị in ra trong một phiên chat ngày 2026-10-19: chủ dự án cần thu hồi và tạo key mới.
+- Chính sách dữ liệu: repo thật của RESKI đã được gửi sang API Claude (agent BA) và yêu cầu thật sang Triage; chủ dự án cần chốt việc này (runbook mục 9 khuyến nghị LLM local cho dữ liệu thật).
 - Model embedding: đang thử `text-embedding-3-small` (OpenAI); bge-m3 qua TEI là lựa chọn local, chưa thử. Số chiều không chặn vì `dr_embeddings` không cố định số chiều (chỉ mục HNSW tạo riêng sau khi chọn model, ADR 0013).
 
 ## Bảng tiến độ P1
@@ -83,6 +85,7 @@ Kết luận: **cần vá, không phải viết lại state machine**. Chưa th�
 P1 (đang chuẩn bị) → P2 BA Spec + Planner agent, gate còn lại, email mở rộng → P3 Dev agent (worktree/PR), QA agent, dashboard → P4 Governance đầy đủ, SSO, mở rộng toàn group.
 
 ## Gần đây
+- 2026-10-19: Bắt đầu pilot với công ty **RESKI** (`RES`): tạo công ty và seed pipeline (verify 8/8), hệ thống `reski` (repo riêng `MotivesSystem/reski_membership`), agent BA. REQ-1 qua Triage thật; BA lần đầu thất bại 3 lần `invalid_output` vì agent mất gắn kết hướng dẫn (`replaceAdapterConfig` trong script cũ), sửa ở `58e670330` (script gộp cấu hình và tự gắn lại, worker từ chối `agent_no_instructions`). Sau sửa: spec thật, 11 trích dẫn, 0,013 USD. Phát hiện thêm: embedding lỗi TLS (B-37), vùng nhớ Claude Code dùng chung (B-38), link trích dẫn repo riêng cần đăng nhập GitHub (`kb/ba-spec.md`).
 - 2026-10-19: Sửa lỗi portal khi người dùng là requester của hai công ty (thấy "Có lỗi xảy ra"): thêm `GET /api/portal/companies`, màn chọn công ty và ô đổi công ty, mọi gọi portal kèm `companyId` (`kb/intake-portal-web.md`); 2 test API và 7 test portal, đột biến bị bắt.
 - 2026-10-19: P2 BA Spec xong và chạy thật. Migration `0359` (`dr_systems`, `dr_request_systems`), trang Systems, Triage prompt v4 (đề xuất hệ thống) + chọn hệ thống ở Triage review, agent BA (`claude_local`, chỉ Read/Grep/Glob, tạo bằng `setup-ba-agent.mjs`, bị từ chối nếu cấu hình đã đổi), worker BA (một lượt một lần toàn instance, thư mục dọn trước/sau, ngân sách theo lượt và theo ngày), duyệt BA (API + trang `/ba-review`, trích dẫn link theo SHA, đổi hệ thống, override, `data.approved`), email nhân viên cho spec chờ duyệt, metrics và chi phí. Kiểm: khoảng 150 test mới (server, db, UI), đột biến bị bắt ở mọi nhóm, smoke thật 25/25 (11 trích dẫn đúng, 0,013 USD). Chưa: xem giao diện trên trình duyệt, repo riêng có token, push (nhánh `chore/project-kit` còn commit chưa đẩy).
 - 2026-10-19: Chốt Option 3 (agent chỉ có Read/Grep/Glob, chặn đường dẫn bằng `--disallowedTools`, đã thử bằng file mồi); DevFlow tự điều khiển lượt chạy (wakeup trực tiếp, không routine). Viết change `add-ba-spec-stage` (proposal, design kèm DDL, tasks, spec `ba-spec`), chờ duyệt. Dọn sạch tài nguyên spike.

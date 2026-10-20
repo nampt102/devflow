@@ -64,7 +64,10 @@ Mức ưu tiên: **A** cần trước pilot, **B** nên làm sớm trong pilot, 
 |---|---|---|---|
 | C-32 | Chạy BA song song (workspace theo lượt) khi một spec mỗi 1 đến 3 phút không đủ | C | `kb/ba-spec.md` |
 | C-33 | Cách ly agent mạnh hơn: bubblewrap với profile seccomp riêng hoặc runner tách (P4) | B | ADR 0020 |
-| C-34 | Chưa kiểm: repo riêng có token, repo lớn, model local cho agent adapter; xem giao diện trên trình duyệt | B | smoke P2 |
+| C-34 | Chưa kiểm: repo lớn, model local cho agent adapter. Repo riêng có token và giao diện BA review đã kiểm với RESKI (2026-10-19) | B | smoke P2 |
+| B-37 | Embedding lỗi trong container: gọi `api.openai.com` báo `UNABLE_TO_VERIFY_LEAF_SIGNATURE` (Anthropic vẫn được; nghi mạng chặn và thay chứng chỉ TLS, chưa xác nhận), nên dedupe chỉ chạy trigram. Có một case thử embedding lại mỗi 15 giây làm nhiễu log. Hướng: `NODE_EXTRA_CA_CERTS` với chứng chỉ gốc của mạng, hoặc tạm bỏ embedding | B | RESKI, 2026-10-19 |
+| B-38 | Vùng nhớ tự động của Claude Code (`/paperclip/.claude/projects/-paperclip-devflow-ws-ba/memory/`) dùng chung mọi công ty và không được dọn; cân nhắc tắt auto memory cho agent BA hoặc dọn cùng workspace | B | RESKI, 2026-10-19 |
+| C-39 | Công ty RESKI còn một case thử `verify …` do `setup-dev-request-pipeline.mjs --verify` tạo (đã qua `ba_spec`); hủy nếu làm nhiễu số liệu. `--verify` nên chạy trên công ty thử, không phải công ty pilot | C | RESKI, 2026-10-19 |
 | C-35 | Số liệu BA theo hệ thống (override và chi phí mỗi hệ thống) | C | 2026-10-19 |
 | C-36 | Xóa được agent "Spike BA …" (API trả 409 vì có run); nút "Set up BA agent" trong UI thay cho script | C | spike |
 
