@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { and, asc, desc, eq, isNull, notExists, notInArray, sql } from "drizzle-orm";
 import {
@@ -19,7 +20,7 @@ import { logger } from "../../middleware/logger.js";
 import { logActivity } from "../../services/activity-log.js";
 import { PROMPT_HASH, PROMPT_ROLE, PROMPT_VERSION, buildRequestFile, newBoundary, type RequestFileSystem } from "../prompts/ba.v1.js";
 import { TRIAGE_PIPELINE_KEY, sanitizeUntrusted } from "../triage/triage-service.js";
-import { baWorkspaceDir, DEFAULT_WORKSPACE_ROOT, findBaAgent, unsafeBaAgentReason } from "./agent.js";
+import { baWorkspaceDir, claudeTranscriptsDir, DEFAULT_WORKSPACE_ROOT, findBaAgent, unsafeBaAgentReason } from "./agent.js";
 import { baCommentMarkdown, BaOutputError, parseBaOutput, type BaOutput } from "./schema.js";
 import type { BaRunner } from "./runner.js";
 import type { cloneSystem } from "../systems/workspace.js";
@@ -72,12 +73,15 @@ export type BaServiceDeps = {
   /** reads the token of a system's secret; null when the secret is gone */
   resolveToken: (companyId: string, secretId: string) => Promise<string | null>;
   workspaceRoot?: string;
+  /** HOME of the agent's Claude Code process (its transcripts live under `.claude/projects`) */
+  claudeHome?: string;
   maxUsdPerDay?: number;
 };
 
 export function baService(db: Db, deps: BaServiceDeps) {
   const root = deps.workspaceRoot ?? DEFAULT_WORKSPACE_ROOT;
   const workspace = baWorkspaceDir(root);
+  const transcripts = claudeTranscriptsDir(workspace, deps.claudeHome ?? process.env.HOME ?? os.homedir());
 
   async function loadCase(companyId: string, caseId: string) {
     const [row] = await db
@@ -160,6 +164,7 @@ export function baService(db: Db, deps: BaServiceDeps) {
 
   /** The workspace is emptied before and after every run: only the request being worked on is ever on disk. */
   async function resetWorkspace() {
+    await fs.rm(transcripts, { recursive: true, force: true });
     await fs.rm(workspace, { recursive: true, force: true });
     await fs.mkdir(path.join(workspace, ".devflow"), { recursive: true });
     await fs.mkdir(path.join(workspace, "repos"), { recursive: true });
@@ -270,6 +275,7 @@ export function baService(db: Db, deps: BaServiceDeps) {
       }
     } finally {
       await fs.rm(workspace, { recursive: true, force: true }).catch(() => undefined);
+      await fs.rm(transcripts, { recursive: true, force: true }).catch(() => undefined);
     }
     if (!output) throw new BaFailure("invalid_output");
 

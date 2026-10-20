@@ -182,7 +182,7 @@ describeEmbeddedPostgres("devflow triage dedupe (trigram)", () => {
     fake.embedRequests.length = 0;
     expect(await service(true).triageCase(ctx.company.id, r.id)).toBe("proposed");
     expect(fake.embedRequests).toHaveLength(0);
-    expect(await service(true).embedPending(10)).toBe(0);
+    expect(await service(true).embedPending(10)).toEqual({ embedded: 0, failed: false });
     const [agent] = await db.select().from(agents).where(eq(agents.companyId, ctx.company.id));
     const embedCosts = await db.select().from(costEvents).where(and(eq(costEvents.agentId, agent.id), eq(costEvents.billingCode, "devflow:embed")));
     expect(embedCosts).toHaveLength(0);

@@ -164,17 +164,18 @@ export function triageService(
   }
 
   /** Backfill: embed requests that have no vector for the configured model. Stops at the first failure. */
-  async function embedPending(limit: number, excludeCompanyIds: readonly string[] = []): Promise<number> {
-    if (!deps.embed) return 0;
-    let done = 0;
+  /** `failed` when an embedding call failed: the pass stops there and the worker backs off before the next one. */
+  async function embedPending(limit: number, excludeCompanyIds: readonly string[] = []): Promise<{ embedded: number; failed: boolean }> {
+    if (!deps.embed) return { embedded: 0, failed: false };
+    let embedded = 0;
     for (const r of await dedupe.missingEmbeddings(deps.embed.model, limit)) {
       if (excludeCompanyIds.includes(r.company_id)) continue;
       const agentId = await ensureTriageAgent(r.company_id);
       const text = embedSource(r.title, r.description, r.business_impact);
-      if (!(await embedRequest(r.company_id, agentId, r.case_id, text))) break;
-      done += 1;
+      if (!(await embedRequest(r.company_id, agentId, r.case_id, text))) return { embedded, failed: true };
+      embedded += 1;
     }
-    return done;
+    return { embedded, failed: false };
   }
 
   /** After request_changes: the reviewer's reason and the proposal that was sent back, as data for the next pass. */

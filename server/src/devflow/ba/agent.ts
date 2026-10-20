@@ -20,9 +20,38 @@ export const DEFAULT_MODEL = "claude-haiku-5-5";
  */
 export const baWorkspaceDir = (root: string = DEFAULT_WORKSPACE_ROOT) => path.posix.join(root, "ba");
 
-/** Places the agent must not read even though its tools could reach them (Claude Code `Tool(//absolute/**)` rules). */
-const DENIED_DIRS = ["/paperclip/instances", "/proc", "/sys", "/etc", "/root", "/home", "/var", "/run", "/boot", "/dev"];
-export const denyRules = (): string => DENIED_DIRS.flatMap((d) => ["Read", "Grep", "Glob"].map((t) => `${t}(/${d}/**)`)).join(",");
+/**
+ * Where Claude Code writes the transcripts (and large tool results) of runs started in `cwd`: every company's BA runs
+ * share it because they share the workspace, so it is emptied together with the workspace.
+ */
+export const claudeTranscriptsDir = (cwd: string, home: string) => path.posix.join(home, ".claude", "projects", cwd.replace(/[^a-zA-Z0-9]/g, "-"));
+
+/**
+ * Places the agent must not read even though its tools could reach them (Claude Code `Tool(//absolute/**)` rules).
+ * `/paperclip/.claude` itself stays readable: Claude Code keeps large tool results of the current run under
+ * `projects/`, and the worker empties the workspace's transcript folder instead (see ba-service).
+ */
+const DENIED_DIRS = [
+  "/paperclip/instances",
+  "/paperclip/.claude/sessions",
+  "/paperclip/.claude/backups",
+  "/paperclip/.claude/session-env",
+  "/paperclip/.claude/shell-snapshots",
+  "/paperclip/.cache",
+  "/proc",
+  "/sys",
+  "/etc",
+  "/root",
+  "/home",
+  "/var",
+  "/run",
+  "/boot",
+  "/dev",
+];
+const DENIED_FILES = ["/paperclip/.claude.json"];
+const TOOLS = ["Read", "Grep", "Glob"];
+export const denyRules = (): string =>
+  [...DENIED_DIRS.flatMap((d) => TOOLS.map((t) => `${t}(/${d}/**)`)), ...DENIED_FILES.flatMap((f) => TOOLS.map((t) => `${t}(/${f})`))].join(",");
 
 export type BaAgentSpec = {
   name: string;
@@ -85,8 +114,8 @@ export function unsafeBaAgentReason(agent: AgentRow, workspaceRoot: string = DEF
     return at >= 0 ? args[at + 1] : undefined;
   };
   if (args.filter((a) => a === "--tools").length !== 1 || valueOf("--tools") !== BA_TOOLS) return "agent_tools_not_read_only";
-  const deny = valueOf("--disallowedTools") ?? "";
-  if (!deny.split(",").includes("Read(//paperclip/instances/**)")) return "agent_instance_not_denied";
+  const deny = new Set((valueOf("--disallowedTools") ?? "").split(","));
+  if (!denyRules().split(",").every((r) => deny.has(r))) return "agent_instance_not_denied";
   const budget = Number(valueOf("--max-budget-usd"));
   if (!Number.isFinite(budget) || budget <= 0) return "agent_no_budget";
   const meta = asRecord(agent.metadata);

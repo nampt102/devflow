@@ -23,7 +23,7 @@ import {
 import { getEmbeddedPostgresTestSupport, startEmbeddedPostgresTestDatabase } from "./helpers/embedded-postgres.js";
 import { pipelineService } from "../services/pipelines.js";
 import { PROMPT_HASH } from "../devflow/prompts/ba.v1.js";
-import { baAgentSpec, baWorkspaceDir } from "../devflow/ba/agent.js";
+import { baAgentSpec, baWorkspaceDir, claudeTranscriptsDir } from "../devflow/ba/agent.js";
 import { baService, BaFailure } from "../devflow/ba/ba-service.js";
 import type { BaRunResult, BaRunner } from "../devflow/ba/runner.js";
 import { createBaWorker } from "../devflow/ba/worker.js";
@@ -41,6 +41,7 @@ describeEmbeddedPostgres("devflow BA spec", () => {
   let tempDb: Awaited<ReturnType<typeof startEmbeddedPostgresTestDatabase>> | null = null;
   let root: string;
   const workspace = () => baWorkspaceDir(root);
+  const home = () => path.join(root, "home");
 
   beforeAll(async () => {
     tempDb = await startEmbeddedPostgresTestDatabase("devflow-ba-");
@@ -91,6 +92,7 @@ describeEmbeddedPostgres("devflow BA spec", () => {
       clone: c.clone as any,
       resolveToken: async (_company, secretId) => tokens.get(secretId) ?? null,
       workspaceRoot: root,
+      claudeHome: home(),
       maxUsdPerDay: opts.maxUsdPerDay,
     });
     return { service, runs: r.calls, clones: c.calls, cloneFails: c.failWith };
@@ -235,6 +237,27 @@ describeEmbeddedPostgres("devflow BA spec", () => {
     await t.service.baCase(ctx.company.id, caseId);
     expect(t.runs[0]!.repos).toEqual([]);
     expect(t.runs[0]!.request).not.toContain("another request");
+  });
+
+  it("empties Claude Code's transcripts of the shared workspace before and after a run (they hold other companies' requests)", async () => {
+    const ctx = await seedCompany();
+    const caseId = await seedRequest(ctx);
+    const transcripts = claudeTranscriptsDir(workspace(), home());
+    fs.mkdirSync(transcripts, { recursive: true });
+    fs.writeFileSync(path.join(transcripts, "other-company.jsonl"), "another company's run");
+    let leftoverSeen: boolean | null = null;
+    const t = make([
+      {
+        text: JSON.stringify({ ...VALID_BA_OUTPUT, affectedAreas: [] }),
+        during: async () => {
+          leftoverSeen = fs.existsSync(path.join(transcripts, "other-company.jsonl"));
+          fs.mkdirSync(path.join(transcripts, "this-run", "tool-results"), { recursive: true });
+        },
+      },
+    ]);
+    expect(await t.service.baCase(ctx.company.id, caseId)).toBe("proposed");
+    expect(leftoverSeen).toBe(false);
+    expect(fs.existsSync(transcripts)).toBe(false);
   });
 
   it("skips systems that are switched off", async () => {

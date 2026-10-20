@@ -26,6 +26,8 @@ Lưu ý: `AGENTS.md` mô tả PGlite cho dev, `doc/DATABASE.md` mô tả khác; 
 - **`opencode-ai`:** một lần build gặp lỗi cài `opencode-ai@latest` (EBADPLATFORM libc musl/glibc) trong Dockerfile; lần build sau (không sửa Dockerfile) cài thành công. Coi là lỗi tạm; image cuối có đủ `claude`, `codex`, `opencode`, `gemini`, `kimi`. Dockerfile của DevFlow **không** khác Paperclip.
 - **Image upstream:** `ghcr.io/paperclipai/paperclip` trả `denied` (không pull được), nên phải build từ source.
 - Có thể gặp lỗi mạng tạm (`EAI_AGAIN`) khi tải gói; thử build lại.
+- **Mạng ký lại TLS (2026-10-20):** mạng của máy dev có Sophos chặn giữa và ký lại chứng chỉ cho một số host (đã thấy với `api.openai.com`; Anthropic và GitHub thì không), nên Node trong container báo `UNABLE_TO_VERIFY_LEAF_SIGNATURE`. Cách xử lý: xuất CA gốc từ kho Windows (`Cert:\LocalMachine\Root`, ví dụ `Sophos SSL CA_…`) thành PEM vào `docker/certs/extra-ca.pem` (thư mục bị gitignore), đặt `NODE_EXTRA_CA_CERTS=/paperclip-certs/extra-ca.pem` trong `docker/.env`; compose gắn `docker/certs` vào `/paperclip-certs`. Chỉ có tác dụng với Node; `git`/`curl` trong container vẫn dùng kho CA riêng.
+- **Chạy test trong container:** image chứa source và vitest. Gắn `server/src` hiện tại rồi chạy bằng user `node` (Postgres nhúng không chạy bằng root): `docker run --rm --user node -e HOME=/tmp --entrypoint sh -v "<repo>\server\src:/app/server/src:ro" devflow-paperclip:local -c 'cd /app/server && npx vitest run src/__tests__/devflow-ba.test.ts'`. Test pgvector cần thêm `--network docker_default -e DEVFLOW_PGVECTOR_URL=postgres://paperclip:paperclip@docker-db-1:5432/postgres`.
 
 ## Chạy stack DevFlow bằng Docker (đã xác nhận 2026-10-17)
 ```

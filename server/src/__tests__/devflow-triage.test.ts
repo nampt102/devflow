@@ -477,6 +477,39 @@ describeEmbeddedPostgres("devflow triage", () => {
       }
     });
 
+    it("backs off the embedding backfill while it keeps failing (each failure is an activity row) and resumes after a success", async () => {
+      let t = 20_000_000;
+      let fail = true;
+      const calls: number[] = [];
+      const svc = {
+        ...service(),
+        findPending: async () => [],
+        embedPending: async () => {
+          calls.push(t);
+          return { embedded: fail ? 0 : 1, failed: fail };
+        },
+      };
+      const worker = createTriageWorker(db, svc, { baseBackoffMs: 1000, maxBackoffMs: 2000, now: () => t });
+      await worker.sweep(); // failure 1: wait 1s
+      await worker.sweep();
+      expect(calls).toHaveLength(1);
+      t += 1000;
+      await worker.sweep(); // failure 2: wait 2s
+      t += 1000;
+      await worker.sweep();
+      expect(calls).toHaveLength(2);
+      t += 1000;
+      await worker.sweep(); // failure 3: capped at 2s
+      t += 1999;
+      await worker.sweep();
+      expect(calls).toHaveLength(3);
+      t += 1;
+      fail = false;
+      await worker.sweep();
+      await worker.sweep(); // no wait after a success
+      expect(calls).toHaveLength(5);
+    });
+
     it("does nothing while another instance holds the advisory lock", async () => {
       const ctx = await seedCompany();
       const caseId = await seedRequest(ctx);

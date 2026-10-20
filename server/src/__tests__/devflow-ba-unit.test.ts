@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { PROMPT_HASH, PROMPT_VERSION, SYSTEM_PROMPT, buildRequestFile, newBoundary } from "../devflow/prompts/ba.v1.js";
-import { baAgentSpec, baWorkspaceDir, BA_TOOLS, denyRules, unsafeBaAgentReason } from "../devflow/ba/agent.js";
+import { baAgentSpec, baWorkspaceDir, BA_TOOLS, claudeTranscriptsDir, denyRules, unsafeBaAgentReason } from "../devflow/ba/agent.js";
 import { readRun } from "../devflow/ba/runner.js";
 import { VALID_BA_OUTPUT } from "./helpers/ba-fixtures.js";
 import { baCommentMarkdown, BaOutputError, extractJsonObject, parseBaOutput } from "../devflow/ba/schema.js";
@@ -132,8 +132,13 @@ describe("BA agent spec and safety check", () => {
   it("denies the instance data, system and secret folders for all three read tools", () => {
     const rules = denyRules().split(",");
     for (const t of ["Read", "Grep", "Glob"]) {
-      for (const d of ["paperclip/instances", "proc", "etc", "root", "home", "var"]) expect(rules, `${t} ${d}`).toContain(`${t}(//${d}/**)`);
+      for (const d of ["paperclip/instances", "paperclip/.claude/sessions", "paperclip/.cache", "proc", "etc", "root", "home", "var"]) expect(rules, `${t} ${d}`).toContain(`${t}(//${d}/**)`);
+      expect(rules, `${t} .claude.json`).toContain(`${t}(//paperclip/.claude.json)`);
     }
+  });
+
+  it("finds the transcripts folder Claude Code uses for the workspace", () => {
+    expect(claudeTranscriptsDir("/paperclip/devflow/ws/ba", "/paperclip")).toBe("/paperclip/.claude/projects/-paperclip-devflow-ws-ba");
   });
 
   it("accepts exactly the specified agent", () => {
@@ -156,6 +161,11 @@ describe("BA agent spec and safety check", () => {
     ["no tool list", args("--disallowedTools", denyRules(), "--max-budget-usd", "1"), "agent_tools_not_read_only"],
     ["the tool list given twice", args("--tools", "Read,Grep,Glob", "--tools", "Bash", "--disallowedTools", denyRules(), "--max-budget-usd", "1"), "agent_tools_not_read_only"],
     ["no instance deny rule", args("--tools", BA_TOOLS, "--disallowedTools", "Read(//etc/**)", "--max-budget-usd", "1"), "agent_instance_not_denied"],
+    [
+      "an older deny list (no Claude Code session folders)",
+      args("--tools", BA_TOOLS, "--disallowedTools", denyRules().split(",").filter((r) => !r.includes(".claude")).join(","), "--max-budget-usd", "1"),
+      "agent_instance_not_denied",
+    ],
     ["no spend limit", args("--tools", BA_TOOLS, "--disallowedTools", denyRules()), "agent_no_budget"],
     ["a zero spend limit", args("--tools", BA_TOOLS, "--disallowedTools", denyRules(), "--max-budget-usd", "0"), "agent_no_budget"],
     ["an unreadable spend limit", args("--tools", BA_TOOLS, "--disallowedTools", denyRules(), "--max-budget-usd", "lots"), "agent_no_budget"],

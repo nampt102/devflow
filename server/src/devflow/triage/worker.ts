@@ -34,6 +34,7 @@ export function createTriageWorker(db: Db, service: ReturnType<typeof triageServ
   let consecutiveFailures = 0;
   const budgetNoticed = new Set<string>(); // `${companyId}:${utc day}`: log the pause once per day
   let pausedUntil = 0;
+  const embed = { failures: 0, nextAt: 0 };
 
   /** Process one case; returns false when the sweep should stop (rate limit or breaker opened). */
   async function handle(item: { caseId: string; companyId: string }): Promise<boolean> {
@@ -92,8 +93,16 @@ export function createTriageWorker(db: Db, service: ReturnType<typeof triageServ
         attempted += 1;
         if (!(await handle(item))) break;
       }
-      // Backfill vectors for older requests (no-op without an embedding config or pgvector).
-      await service.embedPending(embedBatch, skip).catch((e) => logger.warn({ err: e }, "devflow triage: embed backfill failed"));
+      // Backfill vectors for older requests (no-op without an embedding config or pgvector). Each failed call is
+      // logged as activity, so a lasting outage must not be retried on every pass.
+      if (embed.nextAt <= now()) {
+        const result = await service.embedPending(embedBatch, skip).catch((e) => {
+          logger.warn({ err: e }, "devflow triage: embed backfill failed");
+          return { embedded: 0, failed: true };
+        });
+        embed.failures = result.failed ? embed.failures + 1 : 0;
+        embed.nextAt = result.failed ? now() + Math.min(baseBackoff * 2 ** (embed.failures - 1), maxBackoff) : 0;
+      }
     });
     return attempted;
   }

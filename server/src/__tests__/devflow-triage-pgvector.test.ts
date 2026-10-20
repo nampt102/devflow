@@ -165,7 +165,7 @@ describeWithPgvector("devflow triage dedupe (pgvector)", () => {
     expect(logs).toHaveLength(1);
     expect((logs[0].details as any).kind).toBe("server_error");
     // the backfill picks it up later
-    expect(await service().embedPending(50)).toBeGreaterThanOrEqual(1);
+    expect((await service().embedPending(50)).embedded).toBeGreaterThanOrEqual(1);
     expect(await embeddingRows(r.id)).toHaveLength(1);
   });
 

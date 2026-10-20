@@ -11,7 +11,11 @@ services:
     image: devflow-paperclip:local
     pull_policy: never
     build: !reset null
+    volumes:
+      # Extra root CAs for networks that inspect TLS (kb/tech-stack.md); docker/certs is gitignored
+      - ./certs:/paperclip-certs:ro
     environment:
+      NODE_EXTRA_CA_CERTS: "${NODE_EXTRA_CA_CERTS:-}"
       # Close public sign-up only after the instance has an admin (ADR 0012, kb/admin-accounts.md).
       PAPERCLIP_AUTH_DISABLE_SIGN_UP: "${PAPERCLIP_AUTH_DISABLE_SIGN_UP:-false}"
       # Triage agent LLM (empty = worker off)
