@@ -48,7 +48,7 @@
     "@agentclientprotocol/codex-acp": "1.6.2",
     "@ai-sdk/amazon-bedrock": "5.0.113",
     "@ai-sdk/anthropic": "4.0.78",
-    "@ai-sdk/google": "4.0.93",
+    "@ai-sdk/google": "4.0.95",
     "@ai-sdk/openai": "4.0.86",
     "@ai-sdk/xai": "5.0.20",
     "@aws-sdk/client-s3": "^3.1141.0",
