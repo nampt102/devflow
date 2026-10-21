@@ -15,7 +15,7 @@
 
 - [x] 3.1 Dockerfile runner, service compose, mạng và proxy, script cài khóa SSH và tạo môi trường Paperclip
 - [x] 3.2 Prompt `dev.v1` (hash ghim), schema strict, `request.md` (spec và kế hoạch đã duyệt, phản hồi)
-- [ ] 3.3 Cấu hình chuẩn và kiểm agent Dev trước mỗi lượt (môi trường runner, tool, ngân sách, hướng dẫn, prompt) + `setup-dev-agent.mjs`
+- [x] 3.3 Cấu hình chuẩn và kiểm agent Dev trước mỗi lượt (môi trường runner, tool, ngân sách, hướng dẫn, prompt) + `setup-dev-agent.mjs`
 - [ ] 3.4 Workspace trên runner: clone bằng token đọc, tạo hoặc lấy lại nhánh `devflow/<REQ>`, dọn sau mỗi case
 - [ ] 3.5 Kiểm diff (đường dẫn cấm, kích thước, nhị phân, đúng nhánh), kiểm bảo vệ nhánh, push bằng token ghi, mở/cập nhật PR nháp
 - [ ] 3.6 Dev worker trên khung `agent-stage` (khóa chung, backoff, sổ `agent.dev_run`, trần ngày) + test với runner, git và GitHub giả + đột biến

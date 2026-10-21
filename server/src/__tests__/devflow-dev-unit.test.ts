@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AgentOutputError } from "../devflow/agent-stage/output.js";
+import { DEV_RUNNER_ENVIRONMENT, DEV_TOOLS, devAgentSpec, devWorkspaceDir, unsafeDevAgentReason, unsafeRunnerEnvironmentReason, type DevAgentRow, type RunnerEnvironmentRow } from "../devflow/dev/agent.js";
 import { approvedPlanText, devTaskIds } from "../devflow/dev/input.js";
 import { checkDevOutput, parseDevOutput } from "../devflow/dev/schema.js";
 import { PROMPT_HASH, PROMPT_ROLE, PROMPT_VERSION, SYSTEM_PROMPT, buildRequestFile } from "../devflow/prompts/dev.v1.js";
@@ -119,5 +120,75 @@ describe("Dev output contract", () => {
     expect(() => checkDevOutput(parseDevOutput(JSON.stringify(ok), taskIds, [systemKey]), taskIds, [systemKey])).not.toThrow();
     const bad = report({ checks: [{ system: "elsewhere", command: "npm test", passed: true, outputTail: "" }] });
     expect(() => parseDevOutput(JSON.stringify(bad), taskIds, [systemKey])).toThrow(/system that was not given/);
+  });
+});
+
+describe("Dev agent configuration and the check before every run", () => {
+  const ENV_ID = "11111111-1111-4111-8111-111111111111";
+  const runner = (over: Partial<RunnerEnvironmentRow> & { config?: Record<string, unknown> } = {}): RunnerEnvironmentRow => ({
+    id: ENV_ID,
+    name: DEV_RUNNER_ENVIRONMENT,
+    driver: "ssh",
+    status: "active",
+    ...over,
+    config: { host: "devflow-runner", remoteWorkspacePath: "/paperclip/devflow/ws", knownHosts: "devflow-runner ssh-ed25519 AAAA", strictHostKeyChecking: true, ...over.config },
+  });
+  // what Paperclip stores for an agent made from the spec: the spec's config plus the binding of the instructions file
+  const good = (over: Partial<DevAgentRow> = {}, cfg: Record<string, unknown> = {}): DevAgentRow => {
+    const spec = devAgentSpec();
+    return {
+      adapterType: "claude_local",
+      adapterConfig: { ...spec.adapterConfig, instructionsFilePath: "/x/AGENTS.md", ...cfg },
+      metadata: spec.metadata,
+      status: "idle",
+      defaultEnvironmentId: ENV_ID,
+      ...over,
+    };
+  };
+  const extra = (...args: string[]) => ({ extraArgs: args });
+
+  it("publishes a spec that passes its own check, and nothing more than the prompt describes", () => {
+    const spec = devAgentSpec();
+    expect(spec.adapterConfig).toMatchObject({ cwd: devWorkspaceDir(), engine: "cli", extraArgs: ["--tools", DEV_TOOLS, "--max-budget-usd", "5"] });
+    expect(spec.runnerEnvironment).toBe("devflow-runner");
+    expect(spec.instructions).toBe(SYSTEM_PROMPT);
+    expect(unsafeDevAgentReason(good(), runner())).toBeNull();
+    expect(devAgentSpec({ model: "m", maxUsdPerRun: 2, workspaceRoot: "/x/ws" }).adapterConfig).toMatchObject({ model: "m", cwd: "/x/ws/dev", extraArgs: ["--tools", DEV_TOOLS, "--max-budget-usd", "2"] });
+  });
+
+  it.each([
+    ["an agent that is paused", good({ status: "paused" }), runner(), "agent_not_runnable"],
+    ["no environment on the agent (it would run in the server container)", good({ defaultEnvironmentId: null }), runner(), "agent_not_on_runner"],
+    ["an environment that was deleted", good(), null, "agent_not_on_runner"],
+    ["another environment than the one the agent points at", good(), runner({ id: "22222222-2222-4222-8222-222222222222" }), "agent_not_on_runner"],
+    ["a local environment", good(), runner({ driver: "local" }), "runner_environment_invalid"],
+    ["an environment with another name", good(), runner({ name: "some-ssh-box" }), "runner_environment_invalid"],
+    ["an environment that is switched off", good(), runner({ status: "archived" }), "runner_environment_invalid"],
+    ["another remote workspace path", good(), runner({ config: { remoteWorkspacePath: "/home/runner" } }), "runner_environment_invalid"],
+    ["the host key not checked", good(), runner({ config: { strictHostKeyChecking: false } }), "runner_host_key_not_pinned"],
+    ["no pinned host key", good(), runner({ config: { knownHosts: null } }), "runner_host_key_not_pinned"],
+    ["another adapter", good({ adapterType: "codex_local" }), runner(), "agent_wrong_adapter"],
+    ["the ACP engine, which ignores the arguments", good({}, { engine: "acp" }), runner(), "agent_wrong_engine"],
+    ["another folder", good({}, { cwd: "/paperclip/devflow/ws/plan" }), runner(), "agent_wrong_workspace"],
+    ["instructions not bound", good({}, { instructionsFilePath: "" }), runner(), "agent_no_instructions"],
+    ["a custom command", good({}, { command: "bash" }), runner(), "agent_extra_capability"],
+    ["browser access", good({}, { chrome: true }), runner(), "agent_extra_capability"],
+    ["MCP servers", good({}, { mcpServers: {} }), runner(), "agent_extra_capability"],
+    ["a tool added", good({}, extra("--tools", `${DEV_TOOLS},WebFetch`, "--max-budget-usd", "1")), runner(), "agent_tools_changed"],
+    ["a tool removed", good({}, extra("--tools", "Read,Edit", "--max-budget-usd", "1")), runner(), "agent_tools_changed"],
+    ["no tool list", good({}, extra("--max-budget-usd", "1")), runner(), "agent_tools_changed"],
+    ["the tool list given twice", good({}, extra("--tools", DEV_TOOLS, "--tools", "Bash", "--max-budget-usd", "1")), runner(), "agent_tools_changed"],
+    ["no spend limit", good({}, extra("--tools", DEV_TOOLS)), runner(), "agent_no_budget"],
+    ["a zero spend limit", good({}, extra("--tools", DEV_TOOLS, "--max-budget-usd", "0")), runner(), "agent_no_budget"],
+    ["an unreadable spend limit", good({}, extra("--tools", DEV_TOOLS, "--max-budget-usd", "lots")), runner(), "agent_no_budget"],
+    ["outdated instructions", good({ metadata: { devflowPromptHash: "old" } }), runner(), "agent_prompt_outdated"],
+  ] as const)("refuses %s", (_label, agent, environment, reason) => {
+    expect(unsafeDevAgentReason(agent as DevAgentRow, environment as RunnerEnvironmentRow | null)).toBe(reason);
+  });
+
+  it("checks the runner environment against the configured workspace root", () => {
+    expect(unsafeRunnerEnvironmentReason(runner({ config: { remoteWorkspacePath: "/x/ws" } }), "/x/ws")).toBeNull();
+    expect(unsafeRunnerEnvironmentReason(runner(), "/x/ws")).toBe("runner_environment_invalid");
+    expect(unsafeDevAgentReason(good({}, { cwd: "/x/ws/dev" }), runner({ config: { remoteWorkspacePath: "/x/ws" } }), "/x/ws")).toBeNull();
   });
 });

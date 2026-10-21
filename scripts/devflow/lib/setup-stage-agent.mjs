@@ -81,6 +81,18 @@ export async function setupStageAgent(stage) {
     console.log("replaced the stored Anthropic key");
   }
 
+  // The Dev agent runs only on the runner: bind it to the Paperclip SSH environment of the runner (setup-dev-runner.mjs).
+  let environmentFields = {};
+  if (spec.runnerEnvironment) {
+    const envs = must(await call("GET", `/api/companies/${companyId}/environments`), "list environments");
+    const runner = (Array.isArray(envs) ? envs : envs.items ?? []).find((e) => e.name === spec.runnerEnvironment);
+    if (!runner) {
+      console.error(`The runner environment "${spec.runnerEnvironment}" does not exist: run scripts/devflow/setup-dev-runner.mjs first.`);
+      process.exit(2);
+    }
+    environmentFields = { defaultEnvironmentId: runner.id };
+  }
+
   const adapterConfig = { ...spec.adapterConfig, env: { ANTHROPIC_API_KEY: { type: "secret_ref", secretId: secret.id, version: "latest" } } };
   let agentId = state.agent?.id;
   if (!agentId) {
@@ -91,6 +103,7 @@ export async function setupStageAgent(stage) {
         title: stage.title,
         capabilities: stage.capabilities,
         adapterType: spec.adapterType,
+        ...environmentFields,
         adapterConfig,
         runtimeConfig: spec.runtimeConfig,
         metadata: spec.metadata,
@@ -113,7 +126,7 @@ export async function setupStageAgent(stage) {
     }
   } else {
     // merge, never replace: Paperclip keeps the binding of the instructions file in the same config
-    must(await call("PATCH", `/api/agents/${agentId}`, { adapterConfig, runtimeConfig: spec.runtimeConfig, metadata: spec.metadata, status: "idle" }), "update agent");
+    must(await call("PATCH", `/api/agents/${agentId}`, { adapterConfig, runtimeConfig: spec.runtimeConfig, metadata: spec.metadata, ...environmentFields, status: "idle" }), "update agent");
     const file = must(await call("GET", `/api/agents/${agentId}/instructions-bundle/file?path=AGENTS.md`), "read instructions");
     if (file.content !== spec.instructions) {
       must(await call("PUT", `/api/agents/${agentId}/instructions-bundle/file`, { path: "AGENTS.md", content: spec.instructions, baseHash: file.contentHash ?? null }), "update instructions");

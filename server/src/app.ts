@@ -112,6 +112,7 @@ import { triageReviewRoutes } from "./devflow/triage-review/routes.js";
 import { systemsRoutes } from "./devflow/systems/routes.js";
 import { baRoutes } from "./devflow/ba/routes.js";
 import { planRoutes } from "./devflow/plan/routes.js";
+import { devRoutes } from "./devflow/dev/routes.js";
 import { memberRolesRoutes } from "./devflow/roles/routes.js";
 import { environmentRoutes } from "./routes/environments.js";
 import { executionWorkspaceRoutes } from "./routes/execution-workspaces.js";
@@ -865,6 +866,7 @@ export async function createApp(
   api.use(systemsRoutes(db));
   api.use(baRoutes(db, { reviewCase: (input) => pipelineService(db).reviewCase(input) }));
   api.use(planRoutes(db, { reviewCase: (input) => pipelineService(db).reviewCase(input) }));
+  api.use(devRoutes(db));
   api.use(memberRolesRoutes(db));
   api.use(
     environmentRoutes(db, {
