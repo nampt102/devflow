@@ -4,8 +4,8 @@
 # The only way out is the allow-list proxy (devflow-proxy); see docker-compose.runner.yml and squid.conf.
 FROM node:24-bookworm-slim
 
-# Toolchains for the first target repositories: Node (base image) and Python. Flutter is not installed yet
-# (spike: not tried); add it here when a system needs it. python3-venv is left out on purpose: its packages are
+# Toolchains for the first target repositories: Node (base image), Python and .NET 8/10. Flutter is not installed
+# yet; add it here before a Flutter system (RESKI) is enabled for Dev. python3-venv is left out on purpose: its packages are
 # blocked by some company firewalls; use `pip install --user` or virtualenv instead.
 RUN printf 'Acquire::Retries "5";\n' > /etc/apt/apt.conf.d/80retries \
  && apt-get update \
@@ -13,15 +13,30 @@ RUN printf 'Acquire::Retries "5";\n' > /etc/apt/apt.conf.d/80retries \
  && rm -rf /var/lib/apt/lists/* \
  && npm install -g @anthropic-ai/claude-code@latest
 
+# .NET: SDKs 8 and 10 side by side (each SDK carries its own runtime). `dotnet` picks the SDK a repository's
+# global.json asks for, else the newest; DOTNET_ROLLFORWARD lets a newer runtime run a test project that targets
+# an older one. Needs the libraries .NET links against.
+ENV DOTNET_ROOT=/usr/share/dotnet DOTNET_NOLOGO=1 DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_ROLLFORWARD=Major
+# Networks that inspect TLS: root CAs from docker/certs (gitignored, may be empty), as for the server image.
+RUN --mount=type=bind,from=certs,target=/certs     for f in /certs/*.pem; do [ -f "$f" ] && cp "$f" "/usr/local/share/ca-certificates/$(basename "$f" .pem).crt"; done;     update-ca-certificates
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends libicu72 libssl3 zlib1g \
+ && rm -rf /var/lib/apt/lists/* \
+ && curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh \
+ && for channel in 8.0 10.0; do bash /tmp/dotnet-install.sh --channel "$channel" --install-dir "$DOTNET_ROOT"; done \
+ && ln -s "$DOTNET_ROOT/dotnet" /usr/bin/dotnet \
+ && rm /tmp/dotnet-install.sh
+
 # Same path as on the server: the adapter needs the working directory valid on both sides (spike finding).
 RUN useradd -m -s /bin/bash runner \
- && mkdir -p /paperclip/devflow/ws /home/runner/.ssh /run/sshd /etc/ssh/hostkeys \
- && chown -R runner:runner /paperclip /home/runner/.ssh \
+ && mkdir -p /paperclip/devflow/ws /home/runner/.ssh /home/runner/.nuget /home/runner/.npm /run/sshd /etc/ssh/hostkeys \
+ && chown -R runner:runner /paperclip /home/runner/.ssh /home/runner/.nuget /home/runner/.npm \
  && chmod 700 /home/runner/.ssh \
  && printf '%s\n' \
     'HTTP_PROXY=http://devflow-proxy:3128' 'HTTPS_PROXY=http://devflow-proxy:3128' \
     'http_proxy=http://devflow-proxy:3128' 'https_proxy=http://devflow-proxy:3128' \
-    'NO_PROXY=localhost,127.0.0.1' > /etc/environment   # sshd sessions read this through PAM
+    'NO_PROXY=localhost,127.0.0.1' 'DOTNET_ROOT=/usr/share/dotnet' 'DOTNET_ROLLFORWARD=Major' \
+    'DOTNET_NOLOGO=1' 'DOTNET_CLI_TELEMETRY_OPTOUT=1' > /etc/environment   # sshd sessions read this through PAM
 
 COPY sshd_config /etc/ssh/sshd_config.d/devflow.conf
 COPY entrypoint.sh /usr/local/bin/devflow-runner-entrypoint

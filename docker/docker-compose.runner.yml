@@ -9,12 +9,17 @@ services:
   devflow-runner:
     build:
       context: ./runner
+      additional_contexts:
+        certs: ./certs
     image: devflow-runner:local
     restart: unless-stopped
     networks: [runner_net]
     volumes:
       - ./runner/keys/runner_key.pub:/run/runner/authorized_keys:ro
       - runner_hostkeys:/etc/ssh/hostkeys
+      # package caches, so a rebuild or restart does not download them again
+      - runner_nuget:/home/runner/.nuget
+      - runner_npm:/home/runner/.npm
     pids_limit: 1024
     mem_limit: 6g
     cpus: 3
@@ -37,4 +42,6 @@ networks:
 
 volumes:
   runner_hostkeys:
+  runner_nuget:
+  runner_npm:
   proxy_log:

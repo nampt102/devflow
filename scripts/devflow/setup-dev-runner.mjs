@@ -51,6 +51,7 @@ if (!fs.existsSync(keyFile)) {
 fs.copyFileSync(`${keyFile}.pub`, path.join(keyDir, "runner_key.pub"));
 
 // 2. containers
+fs.mkdirSync(path.join(dockerDir, "certs"), { recursive: true }); // build context for extra root CAs (may be empty)
 if (!args.includes("--no-docker")) {
   const up = spawnSync("docker", ["compose", ...compose("up", "-d", "--build", "devflow-runner", "devflow-proxy", "server")], { cwd: dockerDir, stdio: "inherit" });
   if (up.status !== 0) process.exit(up.status ?? 1);
