@@ -86,3 +86,11 @@ Quét 30 commit của DevFlow (từ `935c17b6e`) và cây tệp: không có giá
 - [x] Sao lưu tự động đã xác nhận (mục 6); còn làm: sao chép bản sao và tệp đính kèm ra ngoài máy.
 - [x] Luồng bootstrap khi đóng đăng ký đã kiểm (mục 8: phải bootstrap trước, rồi mới đóng); còn quyết định thời điểm đóng.
 - [ ] Xem xét AGPL (ADR 0002) trước khi triển khai ngoài thử nghiệm.
+
+## 13. Vai trò người duyệt BA / Tech Lead (ADR 0023)
+Ai được duyệt ở Triage review, BA review (cần `ba` hoặc `tech_lead`) và Plan review (cần `tech_lead`). Owner của công ty và instance admin luôn duyệt được. Một người có thể giữ cả hai vai.
+- **Thứ tự triển khai (quan trọng):** build image và khởi động (migration `0360` tự áp) → **gán vai trước** → rồi mới đổi `approver` của pipeline. Quên bước gán thì chỉ owner duyệt được, không ai bị khóa vĩnh viễn.
+- **Gán vai:** trang `/roles` ("Roles" ở sidebar; chỉ owner hoặc instance admin tick được, nhân viên khác chỉ xem), hoặc `node scripts/devflow/set-member-roles.mjs --company <id> --email <email> --roles ba,tech_lead` (danh sách thay thế vai cũ; `--roles none` để gỡ hết; `--list` để xem mọi người). Mỗi thay đổi ghi `activity_log` `devflow.roles_changed`.
+- **Đổi approver của công ty đã seed:** `node scripts/devflow/setup-dev-request-pipeline.mjs --company <id>` (chỉ sửa trường `approver` của ba stage, chạy lại không đổi gì). Hoàn tác: thêm `--any-human`; bảng vai giữ nguyên.
+- **Kiểm:** đăng nhập bằng tài khoản staff không có vai: trang duyệt hiện lý do và tắt nút, gọi API quyết định trả 403, case không đổi.
+- Người rời công ty giữ dòng vai nhưng không duyệt được (mất quyền truy cập công ty); chưa tự dọn.

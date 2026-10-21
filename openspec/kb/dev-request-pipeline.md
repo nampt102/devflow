@@ -18,7 +18,7 @@ Quy tắc đã kiểm chứng: lối ra duy nhất của stage working là sang 
 - Seed + kiểm tra cổng trên instance đang chạy: `node scripts/devflow/setup-dev-request-pipeline.mjs --company <id> --verify` (cần `DEVFLOW_TEST_ADMIN_EMAIL/PASSWORD`, đọc từ env). Idempotent. 7/7 kiểm tra pass (xem log trong `status.md`).
 
 ## Chưa được kiểm chứng / còn hạn chế
-- Approver theo **role** (BA, Tech Lead) chưa có: hiện mọi người dùng (board user) duyệt được mọi review. Cần bản vá ở spike (M).
+- Approver theo **vai** (BA, Tech Lead): đã có từ 2026-10-21 (change `add-approver-roles`, ADR 0023). `triage_review` và `ba_review` cần `ba` hoặc `tech_lead`; `plan_review` cần `tech_lead`. Owner của công ty và instance admin luôn duyệt được. Công ty đã seed phải chạy lại `setup-dev-request-pipeline.mjs` để đổi `approver` (chỉ trường đó; `--any-human` để hoàn tác). Gán vai: màn hình `/roles` hoặc `scripts/devflow/set-member-roles.mjs`.
 - "Agent không thể duyệt" mới kiểm chứng ở cấu hình và test sẵn có của Paperclip (`pipelines-routes.test.ts:938`), chưa thử runtime với agent key.
 - `API /api/cases/:id/events` trả `{ items: [...] }`; kiểu event quan sát được: `ingested`, `transitioned`, `review_decided`. Chưa có diff field-level (bản vá M).
 - `case_key` vẫn là UUID, chưa có `REQ-n`.

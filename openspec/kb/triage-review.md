@@ -6,7 +6,7 @@ Trạng thái: code + test xong (2026-10-18). Quyết định: `decisions/0017-t
 - `GET /api/companies/:id/devflow/triage-queue`: case của pipeline `dev-request` đang ở `triage_review` và có đề xuất `proposed`, cũ nhất trước, tối đa 200. Mỗi dòng có mã REQ, tiêu đề, tuổi, **tên** requester (không email, không id tài khoản), số tệp, tóm tắt đề xuất. Case ở `triage_review` mà không có đề xuất `proposed` không hiện ở đây (xem ở hàng chờ chung `review-queue` của Paperclip).
 - `GET .../triage-cases/:caseId`: yêu cầu đầy đủ, tệp đính kèm (`/api/assets/:id/content`), đề xuất đầy đủ (lý do, giả định, câu hỏi mở, cờ quy tắc), ứng viên trùng với điểm do server tính (`trigram`, `vector`) và lý do model nêu.
 - `POST .../triage-cases/:caseId/decision` `{ outputId, expectedVersion, decision, reason?, final? }`; `final` chỉ cần các field đổi (`classification`, `priority`, `difficulty`, `requiresHuman`, `requiresHumanReasons`, `duplicateOfCaseId`); Zod strict.
-- Quyền: chỉ board user có quyền công ty (viewer đọc được, không quyết định được); công ty khác nhận 404; agent key bị từ chối; **người gửi không duyệt được yêu cầu của chính mình**; chưa đăng nhập 401.
+- Quyền: chỉ board user có quyền công ty (viewer đọc được, không quyết định được); công ty khác nhận 404; agent key bị từ chối; **người gửi không duyệt được yêu cầu của chính mình**; chưa đăng nhập 401. Từ 2026-10-21 (ADR 0023) stage `triage_review` cấu hình approver theo vai: cần `ba` hoặc `tech_lead` (owner và instance admin luôn qua), thiếu vai thì 403 và chi tiết trả `canDecide: false` kèm `requiredRoles` để trang tắt nút và nêu lý do.
 
 ## Quyết định chạy nguyên tử
 `pipelineService.reviewCase` có thêm tham số nội bộ `beforeCommit(tx)` (vá nhỏ ở core, không nhận từ HTTP) chạy trong cùng transaction sau bước chuyển stage. Trong đó: khóa dòng đề xuất và kiểm còn `proposed`; ghi `dr_overrides` **chỉ cho field thật sự đổi** (approve: 5 field; reject: chỉ liên kết trùng `duplicateOf`; request_changes: không có); đặt trạng thái đề xuất (approve không sửa → `accepted`, có sửa → `overridden`, các quyết định khác → `superseded`; kèm người và thời điểm); approve thì sao chép giá trị cuối vào `dr_requests`, reject-trùng thì ghi `duplicate_of_case_id`; ghi `activity_log` `triage.decided` (quyết định, tên field sửa, không có nội dung yêu cầu). Chuyển stage lỗi (xung đột version, thiếu lý do) hoặc ghi domain lỗi thì **cả hai cùng rollback** (có test dùng trigger ép lỗi).
@@ -18,7 +18,7 @@ Mục "Triage review" ở sidebar (cùng cờ `enablePipelines` với Pipelines)
 
 ## Giới hạn đã biết
 - Chọn bản trùng chỉ trong danh sách ứng viên (chưa nhập mã REQ bất kỳ).
-- Chưa có snooze, duyệt hàng loạt, role BA/Tech Lead (mọi board user không phải viewer duyệt được), claim/lease, tìm kiếm trong hàng chờ, thông báo cho nhân viên.
+- Chưa có snooze, duyệt hàng loạt, claim/lease, tìm kiếm trong hàng chờ, thông báo cho nhân viên.
 - Requester chỉ thấy nhãn "Không tiếp tục xử lý" cho cả reject lẫn trùng.
 - UI được kiểm bằng test logic và kiểm tra thủ công trên trình duyệt; chưa có test render component. Dưới 1024px rộng, hàng chờ xếp phía trên chi tiết (phải cuộn), chưa tối ưu cho màn hình hẹp.
 - **Bật trang:** cờ `enablePipelines` **không có nút trong giao diện**, chỉ bật bằng API: `PATCH /api/instance/settings/experimental` với `{"enablePipelines": true}` (admin instance). Khi tắt, `/triage` quay về Dashboard và sidebar không hiện mục Triage review.
