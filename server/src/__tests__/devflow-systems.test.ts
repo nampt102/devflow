@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import express from "express";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { activityLog, companies, createDb, drSystems } from "@paperclipai/db";
+import { activityLog, companies, companyMemberships, createDb, drSystems } from "@paperclipai/db";
 import { getEmbeddedPostgresTestSupport, startEmbeddedPostgresTestDatabase } from "./helpers/embedded-postgres.js";
 import { systemsRoutes } from "../devflow/systems/routes.js";
 import type { SecretDeps } from "../devflow/systems/service.js";
@@ -210,6 +210,98 @@ describeEmbeddedPostgres("devflow systems catalog", () => {
     const [still] = await db.select().from(drSystems).where(eq(drSystems.id, mine.body.id));
     expect(still!.name).toBe("HR Portal");
     expect((await request(app(staff(a.id), s.deps)).get(url(a.id))).body.items).toHaveLength(1);
+  });
+
+  describe("agent Dev settings (add-dev-stage)", () => {
+    const owner = (companyId: string): Actor => ({ ...staff(companyId), userId: "owner-user", memberships: [{ companyId, membershipRole: "owner", status: "active" }] });
+    const admin = (companyId: string): Actor => ({ ...staff(companyId), userId: "admin-user", isInstanceAdmin: true });
+
+    async function newSystem(label: string) {
+      const company = await seedCompany(label);
+      const s = fakeSecrets();
+      const created = await request(app(staff(company.id), s.deps)).post(url(company.id)).send(body());
+      const patch = (actor: Actor, b: Record<string, unknown>) => request(app(actor, s.deps)).patch(url(company.id, `/${created.body.id}`)).send(b);
+      return { company, s, id: created.body.id as string, patch };
+    }
+
+    it("is off by default and the settings never expose the write token", async () => {
+      const { company, s, patch, id } = await newSystem("Dev defaults");
+      const created = await request(app(staff(company.id), s.deps)).get(url(company.id));
+      expect(created.body.items[0]).toMatchObject({ devEnabled: false, hasWriteToken: false, testCommand: null, forbiddenPaths: [], allowUnprotected: false });
+      const res = await patch(staff(company.id), { writeToken: "ghp_write-secret", testCommand: "cd backend && npm test", forbiddenPaths: ["deploy/**", "*.pem"] });
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({ hasWriteToken: true, devEnabled: false, testCommand: "cd backend && npm test", forbiddenPaths: ["deploy/**", "*.pem"] });
+      expect(JSON.stringify(res.body)).not.toMatch(/ghp_write-secret|writeTokenSecretId|write_token_secret_id/);
+      expect([...s.store.values()].map((v) => v.value)).toEqual(["ghp_write-secret"]);
+      const [row] = await db.select().from(drSystems).where(eq(drSystems.id, id));
+      expect(row!.tokenSecretId).toBeNull(); // the read token is a different secret
+      const logged = (await db.select().from(activityLog).where(eq(activityLog.companyId, company.id))).map((r) => JSON.stringify(r.details)).join("");
+      expect(logged).not.toMatch(/ghp_write-secret/);
+    });
+
+    it("refuses to enable Dev without a write token, and to remove the token while Dev is on", async () => {
+      const { company, s, patch } = await newSystem("Dev token");
+      expect((await patch(staff(company.id), { devEnabled: true })).status).toBe(422);
+      expect((await patch(staff(company.id), { devEnabled: true, writeToken: "ghp_w" })).body.devEnabled).toBe(true);
+      expect((await patch(staff(company.id), { writeToken: null })).status).toBe(422);
+      expect(s.store.size).toBe(1);
+      const off = await patch(staff(company.id), { devEnabled: false, writeToken: null });
+      expect(off.body).toMatchObject({ devEnabled: false, hasWriteToken: false });
+      expect(s.store.size).toBe(0);
+    });
+
+    it("rotates the write token in place and keeps it apart from the read token", async () => {
+      const { company, s, patch } = await newSystem("Dev rotate");
+      await patch(staff(company.id), { token: "ghp_read" });
+      await patch(staff(company.id), { writeToken: "ghp_w1" });
+      await patch(staff(company.id), { writeToken: "ghp_w2" });
+      expect([...s.store.values()].map((v) => v.value).sort()).toEqual(["ghp_read", "ghp_w2"]);
+      await patch(staff(company.id), { token: null }); // dropping the read token leaves the write token
+      expect([...s.store.values()].map((v) => v.value)).toEqual(["ghp_w2"]);
+    });
+
+    it("lets only the owner or an instance admin allow an unprotected branch", async () => {
+      const { company, patch, id } = await newSystem("Dev unprotected");
+      await db.insert(companyMemberships).values({ companyId: company.id, principalType: "user", principalId: "owner-user", status: "active", membershipRole: "owner" });
+      expect((await patch(staff(company.id), { allowUnprotected: true })).status).toBe(403);
+      const [still] = await db.select().from(drSystems).where(eq(drSystems.id, id));
+      expect(still!.allowUnprotected).toBe(false);
+      expect((await patch(owner(company.id), { allowUnprotected: true })).body.allowUnprotected).toBe(true);
+      expect((await patch(staff(company.id), { allowUnprotected: false })).body.allowUnprotected).toBe(false); // turning it off is for everyone
+      expect((await patch(admin(company.id), { allowUnprotected: true })).body.allowUnprotected).toBe(true);
+      // an owner of another company does not count
+      const other = await seedCompany("Dev unprotected other");
+      await db.insert(companyMemberships).values({ companyId: other.id, principalType: "user", principalId: "staff-user", status: "active", membershipRole: "owner" });
+      await patch(staff(company.id), { allowUnprotected: false });
+      expect((await patch(staff(company.id), { allowUnprotected: true })).status).toBe(403);
+    });
+
+    it("validates the command and the forbidden paths", async () => {
+      const { company, patch } = await newSystem("Dev validation");
+      for (const bad of [
+        { testCommand: "" },
+        { testCommand: "x".repeat(501) },
+        { forbiddenPaths: ["../etc"] },
+        { forbiddenPaths: ["/etc/passwd"] },
+        { forbiddenPaths: ["a/../b"] },
+        { forbiddenPaths: ["a b"] },
+        { forbiddenPaths: Array.from({ length: 51 }, (_, i) => `p${i}`) },
+        { devEnabled: "yes" },
+        { writeToken: "" },
+      ]) {
+        expect((await patch(staff(company.id), bad)).status, JSON.stringify(bad).slice(0, 60)).toBe(400);
+      }
+      expect((await patch(staff(company.id), { testCommand: null, forbiddenPaths: [] })).status).toBe(200);
+    });
+
+    it("does not touch another company's secrets through a cross-company system id", async () => {
+      const a = await newSystem("Dev iso A");
+      const b = await seedCompany("Dev iso B");
+      const before = a.s.calls.length;
+      const res = await request(app(staff(b.id), a.s.deps)).patch(url(b.id, `/${a.id}`)).send({ writeToken: "ghp_x", devEnabled: true });
+      expect(res.status).toBe(404);
+      expect(a.s.calls.length).toBe(before);
+    });
   });
 
   it("is for signed-in staff only", async () => {

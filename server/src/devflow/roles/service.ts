@@ -18,27 +18,29 @@ export const setRolesSchema = z.strictObject({ roles: z.array(z.string().max(50)
 type Viewer = { userId: string; instanceAdmin?: boolean };
 type Row = Record<string, any>;
 
+/** Owner of the company (active membership) or instance admin: the people who may change roles and risk settings. */
+export async function isOwnerOrAdmin(db: Db, companyId: string, viewer: Viewer): Promise<boolean> {
+  if (viewer.instanceAdmin === true) return true;
+  const [owner] = await db
+    .select({ id: companyMemberships.id })
+    .from(companyMemberships)
+    .where(
+      and(
+        eq(companyMemberships.companyId, companyId),
+        eq(companyMemberships.principalType, "user"),
+        eq(companyMemberships.principalId, viewer.userId),
+        eq(companyMemberships.status, "active"),
+        eq(companyMemberships.membershipRole, "owner"),
+      ),
+    )
+    .limit(1);
+  return Boolean(owner);
+}
+
 export function memberRolesService(db: Db) {
   const rows = async (q: ReturnType<typeof sql>) => (await db.execute(q)) as unknown as Row[];
 
-  /** Owner of the company (active membership) or instance admin: the people who may change roles. */
-  async function canManage(companyId: string, viewer: Viewer): Promise<boolean> {
-    if (viewer.instanceAdmin === true) return true;
-    const [owner] = await db
-      .select({ id: companyMemberships.id })
-      .from(companyMemberships)
-      .where(
-        and(
-          eq(companyMemberships.companyId, companyId),
-          eq(companyMemberships.principalType, "user"),
-          eq(companyMemberships.principalId, viewer.userId),
-          eq(companyMemberships.status, "active"),
-          eq(companyMemberships.membershipRole, "owner"),
-        ),
-      )
-      .limit(1);
-    return Boolean(owner);
-  }
+  const canManage = (companyId: string, viewer: Viewer) => isOwnerOrAdmin(db, companyId, viewer);
 
   /** Active staff of the company with their roles, for the Roles screen. */
   async function list(companyId: string, viewer: Viewer) {

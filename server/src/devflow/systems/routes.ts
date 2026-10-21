@@ -1,7 +1,7 @@
 import { Router } from "express";
 import type { Db } from "@paperclipai/db";
 import { validate } from "../../middleware/validate.js";
-import { staffUser } from "../staff.js";
+import { staffUser, staffViewer } from "../staff.js";
 import { createSystemSchema, systemsService, updateSystemSchema, type SecretDeps } from "./service.js";
 
 /** Staff manage the catalog of systems (repositories) their requests can be about. */
@@ -23,8 +23,8 @@ export function systemsRoutes(db: Db, secrets?: SecretDeps) {
 
   router.patch("/companies/:companyId/devflow/systems/:systemId", validate(updateSystemSchema), async (req, res) => {
     const companyId = req.params.companyId as string;
-    const userId = staffUser(req, companyId, "manage systems");
-    res.json(await svc.update(companyId, userId, req.params.systemId as string, req.body));
+    const { userId, instanceAdmin } = staffViewer(req, companyId, "manage systems");
+    res.json(await svc.update(companyId, userId, req.params.systemId as string, req.body, instanceAdmin));
   });
 
   return router;

@@ -8,7 +8,7 @@
 ## 2. Hệ thống (schema + API + UI)
 
 - [x] 2.1 Migration 0361 thêm cột (kèm `allow_unprotected`) + schema Drizzle + test CHECK và cách ly công ty
-- [ ] 2.2 API Systems: bật Dev, token ghi (secret riêng), lệnh kiểm tra, đường dẫn cấm; token không bao giờ trả lại + test
+- [x] 2.2 API Systems: bật Dev, token ghi (secret riêng), lệnh kiểm tra, đường dẫn cấm; token không bao giờ trả lại + test
 - [ ] 2.3 Trang Systems: các ô mới
 
 ## 3. Runner và agent Dev

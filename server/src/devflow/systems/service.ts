@@ -1,10 +1,11 @@
 import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { drSystems, type Db } from "@paperclipai/db";
-import { conflict, notFound } from "../../errors.js";
+import { conflict, forbidden, notFound, unprocessable } from "../../errors.js";
 import { logActivity } from "../../services/activity-log.js";
 import { secretService } from "../../services/secrets.js";
 import { getConfiguredSecretProvider } from "../../secrets/configured-provider.js";
+import { isOwnerOrAdmin } from "../roles/service.js";
 
 // The catalog of systems (repositories) a company's requests can be about. The BA agent reads the repositories
 // of the systems assigned to a request. Everything here ends up in a git command line, so each field is checked
@@ -19,6 +20,13 @@ const branch = z.string().trim().regex(BRANCH).refine((v) => !v.includes("..") &
 const docsPath = z.string().trim().regex(DOCS_PATH).refine((v) => !v.startsWith("/") && !v.split("/").includes(".."), "Docs path must stay inside the repository");
 const repoUrl = z.string().trim().regex(GITHUB_REPO, "Use a plain https://github.com/<owner>/<repo> URL").transform((v) => v.replace(/\.git$/, ""));
 const token = z.string().trim().min(1).max(500);
+// agent Dev: the test command runs on the runner by the agent (bash -lc); forbidden paths are repo-relative globs
+const testCommand = z.string().trim().min(1).max(500);
+const forbiddenPath = z
+  .string()
+  .trim()
+  .regex(/^[A-Za-z0-9._\/*-]{1,200}$/)
+  .refine((v) => !v.startsWith("/") && !v.split("/").includes(".."), "Forbidden paths are relative to the repository");
 
 export const createSystemSchema = z
   .object({
@@ -41,6 +49,12 @@ export const updateSystemSchema = z
     active: z.boolean(),
     // a string replaces the token, null removes it
     token: token.nullable(),
+    // agent Dev (add-dev-stage)
+    devEnabled: z.boolean(),
+    writeToken: token.nullable(),
+    testCommand: testCommand.nullable(),
+    forbiddenPaths: z.array(forbiddenPath).max(50),
+    allowUnprotected: z.boolean(),
   })
   .partial()
   .strict();
@@ -55,6 +69,11 @@ export type SystemDto = {
   docsPath: string;
   active: boolean;
   hasToken: boolean;
+  devEnabled: boolean;
+  hasWriteToken: boolean;
+  testCommand: string | null;
+  forbiddenPaths: string[];
+  allowUnprotected: boolean;
   updatedAt: Date;
 };
 
@@ -71,11 +90,16 @@ export const toDto = (row: Row): SystemDto => ({
   docsPath: row.docsPath,
   active: row.active,
   hasToken: row.tokenSecretId !== null,
+  devEnabled: row.devEnabled,
+  hasWriteToken: row.writeTokenSecretId !== null,
+  testCommand: row.testCommand,
+  forbiddenPaths: row.forbiddenPaths,
+  allowUnprotected: row.allowUnprotected,
   updatedAt: row.updatedAt,
 });
 
 export type SecretDeps = {
-  create(companyId: string, name: string, value: string, userId: string): Promise<string>;
+  create(companyId: string, name: string, value: string, userId: string, kind?: "read" | "write"): Promise<string>;
   rotate(companyId: string, secretId: string, value: string, userId: string): Promise<void>;
   remove(secretId: string): Promise<void>;
   /** the secret exists and belongs to the company */
@@ -85,8 +109,8 @@ export type SecretDeps = {
 export function defaultSecretDeps(db: Db): SecretDeps {
   const svc = secretService(db);
   return {
-    async create(companyId, name, value, userId) {
-      const created = await svc.create(companyId, { name, provider: getConfiguredSecretProvider(), value, description: "GitHub read-only token (DevFlow system)" }, { userId, agentId: null });
+    async create(companyId, name, value, userId, kind = "read") {
+      const created = await svc.create(companyId, { name, provider: getConfiguredSecretProvider(), value, description: kind === "write" ? "GitHub write token for the DevFlow Dev agent (branches devflow/* and draft PRs)" : "GitHub read-only token (DevFlow system)" }, { userId, agentId: null });
       return created.id;
     },
     async rotate(_companyId, secretId, value, userId) {
@@ -153,11 +177,19 @@ export function systemsService(db: Db, secrets: SecretDeps = defaultSecretDeps(d
       }
     },
 
-    async update(companyId: string, userId: string, systemId: string, input: z.infer<typeof updateSystemSchema>): Promise<SystemDto> {
+    async update(companyId: string, userId: string, systemId: string, input: z.infer<typeof updateSystemSchema>, instanceAdmin = false): Promise<SystemDto> {
       const current = await find(companyId, systemId);
-      const { token: newToken, ...fields } = input;
+      const { token: newToken, writeToken: newWriteToken, ...fields } = input;
+      // accepting an unprotected default branch is a risk decision: owner or instance admin only
+      if (input.allowUnprotected === true && !current.allowUnprotected && !(await isOwnerOrAdmin(db, companyId, { userId, instanceAdmin }))) {
+        throw forbidden("Only the company owner can allow Dev on an unprotected branch");
+      }
+      const hasWriteTokenAfter = newWriteToken === null ? false : typeof newWriteToken === "string" ? true : current.writeTokenSecretId !== null;
+      if ((input.devEnabled ?? current.devEnabled) && !hasWriteTokenAfter) {
+        throw unprocessable("Enabling the Dev agent needs a write token");
+      }
       const set: Partial<typeof drSystems.$inferInsert> = { ...fields, updatedAt: new Date() };
-      let removeSecretId: string | null = null;
+      const removeSecretIds: string[] = [];
       if (typeof newToken === "string") {
         if (current.tokenSecretId && (await secrets.exists(companyId, current.tokenSecretId))) {
           await secrets.rotate(companyId, current.tokenSecretId, newToken, userId);
@@ -166,7 +198,17 @@ export function systemsService(db: Db, secrets: SecretDeps = defaultSecretDeps(d
         }
       } else if (newToken === null && current.tokenSecretId) {
         set.tokenSecretId = null;
-        removeSecretId = current.tokenSecretId;
+        removeSecretIds.push(current.tokenSecretId);
+      }
+      if (typeof newWriteToken === "string") {
+        if (current.writeTokenSecretId && (await secrets.exists(companyId, current.writeTokenSecretId))) {
+          await secrets.rotate(companyId, current.writeTokenSecretId, newWriteToken, userId);
+        } else {
+          set.writeTokenSecretId = await secrets.create(companyId, `devflow-system-${current.key}-write-${Date.now().toString(36)}`, newWriteToken, userId, "write");
+        }
+      } else if (newWriteToken === null && current.writeTokenSecretId) {
+        set.writeTokenSecretId = null;
+        removeSecretIds.push(current.writeTokenSecretId);
       }
       const [row] = await db
         .update(drSystems)
@@ -174,7 +216,7 @@ export function systemsService(db: Db, secrets: SecretDeps = defaultSecretDeps(d
         .where(and(eq(drSystems.id, systemId), eq(drSystems.companyId, companyId)))
         .returning();
       if (!row) throw notFound("System not found");
-      if (removeSecretId) await secrets.remove(removeSecretId).catch(() => undefined);
+      for (const id of removeSecretIds) await secrets.remove(id).catch(() => undefined);
       await logActivity(db, {
         companyId,
         actorType: "user",
