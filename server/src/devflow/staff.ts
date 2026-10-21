@@ -10,3 +10,9 @@ export function staffUser(req: Request, companyId: string, what = "review reques
   assertCompanyAccess(req, companyId);
   return req.actor.userId ?? "board";
 }
+
+/** `staffUser` plus the instance-admin flag, which a role approver needs (add-approver-roles, D4). */
+export function staffViewer(req: Request, companyId: string, what = "review requests"): { userId: string; instanceAdmin: boolean } {
+  const userId = staffUser(req, companyId, what);
+  return { userId, instanceAdmin: req.actor.type === "board" && req.actor.isInstanceAdmin === true };
+}

@@ -30,6 +30,7 @@ import {
   type PlanDraft,
 } from "../lib/plan-review";
 import { queryKeys } from "../lib/queryKeys";
+import { accessBlocker } from "../lib/roles";
 import { ageLabel, agoLabel, durationLabel, isNewSince, pct } from "../lib/triage-review";
 
 // DevFlow Plan review: staff read the agent's technical plan (tasks by system, with sizes, dependencies and cited
@@ -177,7 +178,8 @@ function ReviewForm({ companyId, detail, onDecided }: { companyId: string; detai
       queryClient.invalidateQueries({ queryKey: queryKeys.devflowPlan.detail(companyId, detail.caseId) });
     },
   });
-  const blocker = (decision: PlanDecision) => planDecisionBlocker(decision, draft, reason);
+  const noAccess = accessBlocker(detail);
+  const blocker = (decision: PlanDecision) => noAccess ?? planDecisionBlocker(decision, draft, reason);
   const plan = detail.plan;
   const editOf = (id: string) => draft.tasks.find((t) => t.id === id)!;
 
@@ -194,6 +196,7 @@ function ReviewForm({ companyId, detail, onDecided }: { companyId: string; detai
           ))}
         </div>
         <h2 className="text-lg font-semibold text-foreground">{detail.title}</h2>
+        {noAccess ? <p className="text-sm text-amber-700 dark:text-amber-300" role="status">{noAccess}</p> : null}
       </header>
 
       {detail.baSpec ? (

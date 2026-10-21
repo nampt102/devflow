@@ -14,6 +14,7 @@ import { useBreadcrumbs } from "../context/BreadcrumbContext";
 import { useCompany } from "../context/CompanyContext";
 import { useToastActions } from "../context/ToastContext";
 import { queryKeys } from "../lib/queryKeys";
+import { accessBlocker } from "../lib/roles";
 import { ageLabel, agoLabel, durationLabel, isNewSince, pct, toggleSystem } from "../lib/triage-review";
 import { changedSpecFields, citationLabel, citationUrl, CONFIDENCE_LABEL, decisionBlocker, draftFromSpec, FAILURE_LABELS, FIELD_LABELS, finalPatch, readSeenAt, usd, writeSeenAt, type BaDraft } from "../lib/ba-review";
 
@@ -159,7 +160,8 @@ function ReviewForm({ companyId, detail, onDecided }: { companyId: string; detai
       queryClient.invalidateQueries({ queryKey: queryKeys.devflowBa.detail(companyId, detail.caseId) });
     },
   });
-  const blocker = (decision: BaDecision) => decisionBlocker(decision, draft, reason);
+  const noAccess = accessBlocker(detail);
+  const blocker = (decision: BaDecision) => noAccess ?? decisionBlocker(decision, draft, reason);
   const corrections = changed.length + (systemsChanged ? 1 : 0);
   const spec = detail.spec;
 
@@ -176,6 +178,7 @@ function ReviewForm({ companyId, detail, onDecided }: { companyId: string; detai
           ))}
         </div>
         <h2 className="text-lg font-semibold text-foreground">{detail.title}</h2>
+        {noAccess ? <p className="text-sm text-amber-700 dark:text-amber-300" role="status">{noAccess}</p> : null}
       </header>
 
       <section className="space-y-2">

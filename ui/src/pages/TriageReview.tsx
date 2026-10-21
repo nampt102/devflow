@@ -15,6 +15,7 @@ import { useBreadcrumbs } from "../context/BreadcrumbContext";
 import { useCompany } from "../context/CompanyContext";
 import { useToastActions } from "../context/ToastContext";
 import { queryKeys } from "../lib/queryKeys";
+import { accessBlocker } from "../lib/roles";
 import {
   ageLabel,
   agoLabel,
@@ -224,7 +225,8 @@ function ReviewForm({ companyId, detail, onDecided }: { companyId: string; detai
     },
   });
 
-  const blocker = (decision: TriageDecision) => decisionBlocker(decision, draft, reason);
+  const noAccess = accessBlocker(detail);
+  const blocker = (decision: TriageDecision) => noAccess ?? decisionBlocker(decision, draft, reason);
   const duplicate = detail.candidates.find((c) => c.caseId === draft.duplicateOfCaseId);
 
   return (
@@ -237,6 +239,7 @@ function ReviewForm({ companyId, detail, onDecided }: { companyId: string; detai
           </span>
         </div>
         <h2 className="text-lg font-semibold text-foreground">{detail.title}</h2>
+        {noAccess ? <p className="text-sm text-amber-700 dark:text-amber-300" role="status">{noAccess}</p> : null}
       </header>
 
       <section className="space-y-2">

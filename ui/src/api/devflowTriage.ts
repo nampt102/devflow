@@ -47,6 +47,9 @@ export interface TriageCandidate {
 }
 
 export interface TriageDetail {
+  /** false when the viewer lacks the role the stage asks for (add-approver-roles) */
+  canDecide: boolean;
+  requiredRoles: string[];
   caseId: string;
   caseKey: string;
   requestNumber: number;

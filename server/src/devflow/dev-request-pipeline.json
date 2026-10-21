@@ -18,7 +18,8 @@
       "config": {
         "requireApproval": true,
         "approver": {
-          "kind": "any_human"
+          "kind": "role",
+          "roles": ["ba", "tech_lead"]
         },
         "approveToStageKey": "ba_spec",
         "rejectToStageKey": "cancelled",
@@ -41,7 +42,8 @@
       "config": {
         "requireApproval": true,
         "approver": {
-          "kind": "any_human"
+          "kind": "role",
+          "roles": ["ba", "tech_lead"]
         },
         "approveToStageKey": "tech_plan",
         "rejectToStageKey": "cancelled",
@@ -64,7 +66,8 @@
       "config": {
         "requireApproval": true,
         "approver": {
-          "kind": "any_human"
+          "kind": "role",
+          "roles": ["tech_lead"]
         },
         "approveToStageKey": "dev",
         "rejectToStageKey": "cancelled",

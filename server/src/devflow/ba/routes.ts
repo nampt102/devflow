@@ -2,7 +2,7 @@ import { Router } from "express";
 import type { Db } from "@paperclipai/db";
 import { notFound } from "../../errors.js";
 import { validate } from "../../middleware/validate.js";
-import { staffUser } from "../staff.js";
+import { staffUser, staffViewer } from "../staff.js";
 import { baAgentSpec, DEFAULT_MAX_USD_PER_RUN, DEFAULT_MODEL, findBaAgent, unsafeBaAgentReason, DEFAULT_WORKSPACE_ROOT } from "./agent.js";
 import { baMetricsService } from "./metrics.js";
 import { baDecisionSchema, baReviewService } from "./review-service.js";
@@ -60,16 +60,16 @@ export function baRoutes(db: Db, deps: { reviewCase: ReviewCase }, env: Env = pr
 
   router.get("/companies/:companyId/devflow/ba-cases/:caseId", async (req, res) => {
     const companyId = req.params.companyId as string;
-    staffUser(req, companyId, "review BA specs");
-    const found = await review.detail(companyId, req.params.caseId as string);
+    const viewer = staffViewer(req, companyId, "review BA specs");
+    const found = await review.detail(companyId, req.params.caseId as string, viewer);
     if (!found) throw notFound("Request not found");
     res.json(found);
   });
 
   router.post("/companies/:companyId/devflow/ba-cases/:caseId/decision", validate(baDecisionSchema), async (req, res) => {
     const companyId = req.params.companyId as string;
-    const userId = staffUser(req, companyId, "review BA specs");
-    res.json(await review.decide({ companyId, caseId: req.params.caseId as string, userId, body: req.body }));
+    const { userId, instanceAdmin } = staffViewer(req, companyId, "review BA specs");
+    res.json(await review.decide({ companyId, caseId: req.params.caseId as string, userId, instanceAdmin, body: req.body }));
   });
 
   return router;

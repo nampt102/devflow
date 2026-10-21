@@ -3,6 +3,8 @@ import type { TriageDetail, TriageQueueItem } from "../api/devflowTriage";
 import { ageLabel, agoLabel, changedFields, decisionBlocker, draftFromDetail, durationLabel, filterQueue, finalPatch, isNewSince, pct, readOrder, readSeenAt, scoreLabel, selectedSystemKeys, sortQueue, systemsDiffer, toggleSystem } from "./triage-review";
 
 const detail = (over: Partial<TriageDetail["proposal"]> = {}, candidates: TriageDetail["candidates"] = []): TriageDetail => ({
+  canDecide: true,
+  requiredRoles: [],
   caseId: "c1",
   caseKey: "REQ-1",
   requestNumber: 1,

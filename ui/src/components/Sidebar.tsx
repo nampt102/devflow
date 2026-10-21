@@ -1,6 +1,7 @@
 import {
   Inbox,
   ListChecks,
+  ShieldCheck,
   CircleCheck,
   Target,
   LayoutDashboard,
@@ -274,6 +275,9 @@ export function Sidebar({ children }: { children?: ReactNode }) {
           ) : null}
           {showPipelines ? (
             <SidebarNavItem to="/systems" label="Systems" icon={Server} />
+          ) : null}
+          {showPipelines ? (
+            <SidebarNavItem to="/roles" label="Roles" icon={ShieldCheck} />
           ) : null}
           {showPipelines ? (
             <SidebarNavItem to="/triage" label="Triage review" icon={ClipboardCheck} badge={triageCount?.waiting || undefined} badgeLabel="waiting for review" />

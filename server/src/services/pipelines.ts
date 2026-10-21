@@ -39,6 +39,8 @@ import {
   type PipelineStageAutomation,
   PIPELINE_AUTOMATION_DEFAULT_TITLE_TEMPLATE,
   PIPELINE_CASE_BODY_DOCUMENT_KEY,
+  PIPELINE_APPROVER_ROLES,
+  type PipelineApproverRole,
   type RoutineVariable,
   type RoutineRevisionSnapshotV1,
 } from "@paperclipai/shared";
@@ -49,6 +51,7 @@ import type { IssueAssignmentWakeupDeps } from "./issue-assignment-wakeup.js";
 import { logActivity } from "./activity-log.js";
 import { assertAssignableAgent } from "./agent-assignability.js";
 import { authorizationService } from "./authorization.js";
+import { userMayDecideAsRole } from "./pipeline-approver-roles.js";
 import { visibleIssueCondition } from "./issue-visibility.js";
 import type { IssuePostCommitAction } from "./issues.js";
 import {
@@ -96,7 +99,9 @@ const DEFAULT_STAGES = [
 ] as const;
 
 export type PipelineActor =
-  | { type: "user"; userId: string }
+  // `instanceAdmin` is set only by DevFlow routes (add-approver-roles); it lets an instance admin pass a role
+  // approver. Paperclip's own HTTP routes never set it, so they keep their previous behavior.
+  | { type: "user"; userId: string; instanceAdmin?: boolean }
   | { type: "agent"; agentId: string; runId: string }
   | { type: "system" };
 
@@ -116,8 +121,9 @@ export type PipelineStageConfig = Record<string, unknown> & {
   disabled?: boolean;
   requireApproval?: boolean;
   approver?: {
-    kind?: "any_human" | "user" | "agent";
+    kind?: "any_human" | "user" | "agent" | "role";
     id?: string;
+    roles?: PipelineApproverRole[];
   };
   reviewerKind?: "human" | "any";
   variables?: Array<{
@@ -1031,8 +1037,21 @@ function normalizeStageApprover(
     throw unprocessable("Stage approver must be an object", { code: "validation" });
   }
   const kind = approver?.kind ?? "any_human";
-  if (kind !== "any_human" && kind !== "user" && kind !== "agent") {
-    throw unprocessable("Stage approver kind must be any_human, user, or agent", { code: "validation" });
+  if (kind !== "any_human" && kind !== "user" && kind !== "agent" && kind !== "role") {
+    throw unprocessable("Stage approver kind must be any_human, user, agent, or role", { code: "validation" });
+  }
+  if (kind === "role") {
+    const roles = approver?.roles;
+    const valid =
+      Array.isArray(roles) &&
+      roles.length >= 1 &&
+      roles.length <= 4 &&
+      roles.every((role) => (PIPELINE_APPROVER_ROLES as readonly string[]).includes(role)) &&
+      new Set(roles).size === roles.length;
+    if (!valid) {
+      throw unprocessable("Role approvers require a non-empty list of distinct roles", { code: "validation" });
+    }
+    return { kind, roles: [...roles!] };
   }
   const id = typeof approver?.id === "string" ? approver.id.trim() : approver?.id;
   if ((kind === "user" || kind === "agent") && (typeof id !== "string" || id.length === 0)) {
@@ -1058,13 +1077,27 @@ function assertStageEnabled(stage: typeof pipelineStages.$inferSelect, action: s
   });
 }
 
-function assertActorCanApproveStageExit(stage: typeof pipelineStages.$inferSelect, actor: PipelineActor) {
+// Async since add-approver-roles: only the `role` branch reads the database; the other branches are unchanged.
+async function assertActorCanApproveStageExit(
+  tx: PipelineDb,
+  stage: typeof pipelineStages.$inferSelect,
+  actor: PipelineActor,
+  companyId: string,
+) {
   const config = normalizeStageConfig(stage.kind, stageConfig(stage));
   if (config.requireApproval !== true) return;
   const approver = config.approver ?? { kind: "any_human" };
   if (approver.kind === "any_human") {
     if (actor.type === "user") return;
     throw new HttpError(403, "Stage approval requires a human approver", { code: "review_required" });
+  }
+  if (approver.kind === "role") {
+    const roles = approver.roles ?? [];
+    if (actor.type === "user" && (await userMayDecideAsRole(tx, companyId, actor, roles))) return;
+    throw new HttpError(403, "Stage approval requires one of the roles: " + roles.join(", "), {
+      code: "review_required",
+      approver,
+    });
   }
   if (approver.kind === "user") {
     if (actor.type === "user" && actor.userId === approver.id) return;
@@ -3237,7 +3270,7 @@ export function pipelineService(db: Db, deps: { heartbeat?: IssueAssignmentWakeu
       : await getStageByKeyOrThrow(tx, current.pipelineId, input.toStageKey ?? "");
     assertStageEnabled(toStage, "transition");
     if (fromStage.id !== toStage.id) {
-      assertActorCanApproveStageExit(fromStage, input.actor);
+      await assertActorCanApproveStageExit(tx, fromStage, input.actor, input.companyId);
       await assertStageTransitionGates(tx, current, fromStage, { skipChildrenTerminalGate: input.skipChildrenTerminalGate });
       await assertLatestReviewApprovalStillCurrent(tx, current, fromStage, toStage, {
         allowWorkflowVersionDrift: input.transitionClass === "auto" && input.reason === "children_terminal",
@@ -4915,7 +4948,7 @@ export function pipelineService(db: Db, deps: { heartbeat?: IssueAssignmentWakeu
           throw unprocessable("Pipeline case is not in a review stage", { code: "validation" });
         }
         const config = reviewConfigForStage(detail.stage);
-        assertActorCanApproveStageExit(detail.stage, input.actor);
+        await assertActorCanApproveStageExit(tx, detail.stage, input.actor, input.companyId);
         const reasonRequired =
           (input.decision === "request_changes" && config.requireRequestChangesReason !== false) ||
           (input.decision === "reject" && config.requireRejectReason !== false);

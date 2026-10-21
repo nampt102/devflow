@@ -4,6 +4,7 @@ import { drAgentOutputs, drOverrides, drSystems, type Db } from "@paperclipai/db
 import { conflict, forbidden, notFound, unprocessable } from "../../errors.js";
 import { logActivity } from "../../services/activity-log.js";
 import { BA_STAGE } from "../ba/ba-service.js";
+import { reviewAccess, type Viewer } from "../review-access.js";
 import { PLAN_REVIEW_STAGE, PLAN_STAGE } from "./plan-service.js";
 import { planCommentMarkdown, planOutputSchema, planTaskSchema, type PlanOutput, type PlanTask } from "./schema.js";
 
@@ -136,11 +137,12 @@ export function planReviewService(db: Db, deps: { reviewCase: ReviewCase }) {
     return a ? { summary: a.summary ?? null, inScope: a.inScope ?? [], acceptanceCriteria: a.acceptanceCriteria ?? [] } : null;
   }
 
-  async function detail(companyId: string, caseId: string) {
+  async function detail(companyId: string, caseId: string, viewer: Viewer) {
     const c = await loadReviewable(companyId, caseId);
     if (!c || c.stage_key !== PLAN_REVIEW_STAGE) return null;
     const output = await proposedOutput(companyId, caseId);
     if (!output) return null;
+    const access = await reviewAccess(db, companyId, caseId, viewer);
     const data = output.data as Row;
     // repository addresses of the systems the agent read, so a citation can link to the exact commit
     const repoKeys: string[] = (data.repos ?? []).map((r: Row) => r.system);
@@ -148,6 +150,7 @@ export function planReviewService(db: Db, deps: { reviewCase: ReviewCase }) {
       ? await db.select({ key: drSystems.key, name: drSystems.name, repoUrl: drSystems.repoUrl }).from(drSystems).where(and(eq(drSystems.companyId, companyId), inArray(drSystems.key, repoKeys)))
       : [];
     return {
+      ...access,
       caseId: c.case_id,
       caseKey: c.case_key,
       requestNumber: c.request_number,
@@ -168,7 +171,7 @@ export function planReviewService(db: Db, deps: { reviewCase: ReviewCase }) {
     };
   }
 
-  async function decide(input: { companyId: string; caseId: string; userId: string; body: PlanDecisionBody }) {
+  async function decide(input: { companyId: string; caseId: string; userId: string; instanceAdmin?: boolean; body: PlanDecisionBody }) {
     const { companyId, caseId, userId, body } = input;
     const c = await loadReviewable(companyId, caseId);
     if (!c) throw notFound("Request not found");
@@ -193,7 +196,7 @@ export function planReviewService(db: Db, deps: { reviewCase: ReviewCase }) {
         decision: body.decision,
         reason: body.reason?.trim() || undefined,
         expectedVersion: body.expectedVersion,
-        actor: { type: "user", userId },
+        actor: { type: "user", userId, instanceAdmin: input.instanceAdmin === true },
         beforeCommit: async (txRaw: unknown) => {
           const tx = txRaw as Db;
           const [live] = await tx.select({ status: drAgentOutputs.status }).from(drAgentOutputs).where(eq(drAgentOutputs.id, output.id)).for("update");

@@ -9,10 +9,26 @@ const routineVariableLikeNameSchema = z.string().trim().regex(/^[A-Za-z][A-Za-z0
 export const pipelineStageKindSchema = z.enum(["working", "review", "done", "cancelled"]);
 export const legacyPipelineStageKindSchema = z.enum(["open", "working", "review", "done", "cancelled"]);
 
+// DevFlow (openspec change add-approver-roles): business roles a review stage can require. A person may hold
+// several; the closed list matches the CHECK on dr_member_roles.
+export const PIPELINE_APPROVER_ROLES = ["ba", "tech_lead"] as const;
+export const pipelineApproverRoleSchema = z.enum(PIPELINE_APPROVER_ROLES);
+
 export const pipelineStageApproverSchema = z.object({
-  kind: z.enum(["any_human", "user", "agent"]).optional().default("any_human"),
+  kind: z.enum(["any_human", "user", "agent", "role"]).optional().default("any_human"),
   id: z.string().trim().min(1).max(200).optional(),
+  roles: z.array(pipelineApproverRoleSchema).min(1).max(4).optional(),
 }).superRefine((value, ctx) => {
+  if (value.kind === "role") {
+    if (!value.roles || new Set(value.roles).size !== value.roles.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["roles"],
+        message: "Role approvers require a non-empty list of distinct roles",
+      });
+    }
+    return;
+  }
   if (value.kind !== "any_human" && (typeof value.id !== "string" || value.id.length === 0)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -148,6 +164,7 @@ export const pipelineAutomationRetryRequestSchema = z.object({
 
 export type PipelineStageKind = z.infer<typeof pipelineStageKindSchema>;
 export type PipelineStageApprover = z.infer<typeof pipelineStageApproverSchema>;
+export type PipelineApproverRole = z.infer<typeof pipelineApproverRoleSchema>;
 export type PipelineStageOnEnter = z.infer<typeof pipelineStageOnEnterSchema>;
 export type PipelineStageAutomationConfig = z.infer<typeof pipelineStageAutomationSchema>;
 export type PipelineStageCarryOverPolicy = z.infer<typeof pipelineStageCarryOverPolicySchema>;

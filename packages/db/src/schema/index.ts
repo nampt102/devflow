@@ -259,3 +259,4 @@ export { drAgentOutputs, drOverrides } from "./dr_agent_outputs.js";
 export { drEmbeddings, pgVector } from "./dr_embeddings.js";
 export { drEmailOutbox } from "./dr_email_outbox.js";
 export { drSystems, drRequestSystems } from "./dr_systems.js";
+export { drMemberRoles } from "./dr_member_roles.js";

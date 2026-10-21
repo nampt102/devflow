@@ -4,6 +4,7 @@ import { drAgentOutputs, drOverrides, drRequestSystems, drRequests, drSystems, t
 import { conflict, forbidden, notFound, unprocessable } from "../../errors.js";
 import { logActivity } from "../../services/activity-log.js";
 import { statusLabelVi } from "../portal/status-labels.js";
+import { reviewAccess, type Viewer } from "../review-access.js";
 import { REQUIRES_HUMAN_REASONS, triageOutputSchema } from "../triage/schema.js";
 
 // Review of Triage proposals by staff (step 8, openspec/decisions/0017). The decision runs through the
@@ -164,17 +165,19 @@ export function triageReviewService(db: Db, deps: { reviewCase: ReviewCase }) {
     return { available, suggestedKeys, selectedIds: selected.map((a) => a.id) };
   }
 
-  async function detail(companyId: string, caseId: string) {
+  async function detail(companyId: string, caseId: string, viewer: Viewer) {
     const c = await loadReviewable(companyId, caseId);
     if (!c || c.stage_key !== "triage_review") return null;
     const output = await proposedOutput(companyId, caseId);
     if (!output) return null;
+    const access = await reviewAccess(db, companyId, caseId, viewer);
     const attachments = await rows(sql`
       select a.id, a.asset_id, s.original_filename as name, s.content_type, s.byte_size
       from dr_attachments a join assets s on s.id = a.asset_id
       where a.case_id = ${caseId} and a.company_id = ${companyId} order by a.created_at`);
     const data = output.data as Row;
     return {
+      ...access,
       caseId: c.case_id,
       caseKey: c.case_key,
       requestNumber: c.request_number,
@@ -203,7 +206,7 @@ export function triageReviewService(db: Db, deps: { reviewCase: ReviewCase }) {
     };
   }
 
-  async function decide(input: { companyId: string; caseId: string; userId: string; body: DecisionBody }) {
+  async function decide(input: { companyId: string; caseId: string; userId: string; instanceAdmin?: boolean; body: DecisionBody }) {
     const { companyId, caseId, userId, body } = input;
     const c = await loadReviewable(companyId, caseId);
     if (!c) throw notFound("Request not found");
@@ -265,7 +268,7 @@ export function triageReviewService(db: Db, deps: { reviewCase: ReviewCase }) {
         decision: body.decision,
         reason,
         expectedVersion: body.expectedVersion,
-        actor: { type: "user", userId },
+        actor: { type: "user", userId, instanceAdmin: input.instanceAdmin === true },
         beforeCommit: async (txRaw: unknown) => {
           const tx = txRaw as Db;
           const [live] = await tx

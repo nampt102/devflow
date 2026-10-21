@@ -19,6 +19,7 @@ import {
   pipelines,
 } from "@paperclipai/db";
 import { getEmbeddedPostgresTestSupport, startEmbeddedPostgresTestDatabase } from "./helpers/embedded-postgres.js";
+import { grantRoles, makeOwner, requireRoles } from "./helpers/role-gate.js";
 import { errorHandler } from "../middleware/error-handler.js";
 import { pipelineService } from "../services/pipelines.js";
 import { triageReviewRoutes } from "../devflow/triage-review/routes.js";
@@ -520,6 +521,27 @@ describeEmbeddedPostgres("devflow triage review", () => {
     const res = await decide(ctx, r, { decision: "approve" }, staff(ctx.requesterUser, ctx.company.id));
     expect(res.status).toBe(403);
     expect(await stageOf(r.id)).toBe("triage_review");
+  });
+
+  it("with role approvers, only BA or Tech Lead (or an owner) may decide, and the screen says so", async () => {
+    const ctx = await seedCompany();
+    await requireRoles(db, ctx.pipeline.id, "triage_review", ["ba", "tech_lead"]);
+    const r = await seedRequest(ctx);
+    const detail = async (actor?: Express.Request["actor"]) =>
+      (await request(app(actor ?? staff(ctx.reviewer, ctx.company.id))).get(`/api/companies/${ctx.company.id}/devflow/triage-cases/${r.id}`)).body;
+    expect(await detail()).toMatchObject({ canDecide: false, requiredRoles: ["ba", "tech_lead"] });
+    expect((await decide(ctx, r, { decision: "approve" })).status).toBe(403);
+    expect(await stageOf(r.id)).toBe("triage_review");
+    expect((await outputRow(r.outputId)).status).toBe("proposed");
+    expect(await overridesOf(r.id)).toHaveLength(0);
+
+    await grantRoles(db, ctx.company.id, ctx.reviewer, ["ba"]);
+    expect(await detail()).toMatchObject({ canDecide: true });
+    const owner = `user-${randomUUID()}`;
+    await makeOwner(db, ctx.company.id, owner);
+    expect(await detail(staff(owner, ctx.company.id, "owner"))).toMatchObject({ canDecide: true });
+    expect((await decide(ctx, r, { decision: "approve" })).status).toBe(200);
+    expect(await stageOf(r.id)).toBe("ba_spec");
   });
 
   it("refuses viewers, agents, signed-out callers, and treats other companies as not found", async () => {

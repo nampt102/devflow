@@ -24,6 +24,7 @@ import {
 } from "@paperclipai/db";
 import { getEmbeddedPostgresTestSupport, startEmbeddedPostgresTestDatabase } from "./helpers/embedded-postgres.js";
 import { VALID_BA_OUTPUT } from "./helpers/ba-fixtures.js";
+import { grantRoles, requireRoles } from "./helpers/role-gate.js";
 import { errorHandler } from "../middleware/error-handler.js";
 import { pipelineService } from "../services/pipelines.js";
 import { baAgentSpec } from "../devflow/ba/agent.js";
@@ -435,6 +436,23 @@ describeEmbeddedPostgres("devflow BA review", () => {
     const res = await decide(ctx, r, { decision: "approve" }, staff(ctx.requesterUser, ctx.company.id));
     expect(res.status).toBe(403);
     expect(await stageOf(r.id)).toBe("ba_review");
+  });
+
+  it("with role approvers, BA or Tech Lead may decide (either one), and the screen says so", async () => {
+    const ctx = await seedCompany();
+    await requireRoles(db, ctx.pipeline.id, "ba_review", ["ba", "tech_lead"]);
+    const r = await seedRequest(ctx);
+    const detail = async () => (await get(ctx, `ba-cases/${r.id}`)).body;
+    expect(await detail()).toMatchObject({ canDecide: false, requiredRoles: ["ba", "tech_lead"] });
+    expect((await decide(ctx, r, { decision: "approve" })).status).toBe(403);
+    expect(await stageOf(r.id)).toBe("ba_review");
+    expect((await outputRow(r.outputId)).status).toBe("proposed");
+    expect(await overridesOf(r.id)).toHaveLength(0);
+
+    await grantRoles(db, ctx.company.id, ctx.reviewer, ["tech_lead"]);
+    expect(await detail()).toMatchObject({ canDecide: true });
+    expect((await decide(ctx, r, { decision: "approve" })).status).toBe(200);
+    expect(await stageOf(r.id)).toBe("tech_plan");
   });
 
   it("is for signed-in staff of the company only: agents and signed-out callers are refused, other companies see nothing", async () => {

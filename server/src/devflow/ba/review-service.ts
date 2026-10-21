@@ -3,6 +3,7 @@ import { z } from "zod";
 import { drAgentOutputs, drOverrides, drRequestSystems, drSystems, type Db } from "@paperclipai/db";
 import { conflict, forbidden, notFound, unprocessable } from "../../errors.js";
 import { logActivity } from "../../services/activity-log.js";
+import { reviewAccess, type Viewer } from "../review-access.js";
 import { BA_REVIEW_STAGE, BA_STAGE } from "./ba-service.js";
 import { baCommentMarkdown, baOutputSchema, type BaOutput } from "./schema.js";
 
@@ -122,11 +123,12 @@ export function baReviewService(db: Db, deps: { reviewCase: ReviewCase }) {
     return { available, selectedIds: available.filter((a) => ids.has(a.id)).map((a) => a.id) };
   }
 
-  async function detail(companyId: string, caseId: string) {
+  async function detail(companyId: string, caseId: string, viewer: Viewer) {
     const c = await loadReviewable(companyId, caseId);
     if (!c || c.stage_key !== BA_REVIEW_STAGE) return null;
     const output = await proposedOutput(companyId, caseId);
     if (!output) return null;
+    const access = await reviewAccess(db, companyId, caseId, viewer);
     const attachments = await rows(sql`
       select a.id, a.asset_id, s.original_filename as name, s.content_type, s.byte_size
       from dr_attachments a join assets s on s.id = a.asset_id
@@ -138,6 +140,7 @@ export function baReviewService(db: Db, deps: { reviewCase: ReviewCase }) {
       ? await db.select({ key: drSystems.key, name: drSystems.name, repoUrl: drSystems.repoUrl }).from(drSystems).where(and(eq(drSystems.companyId, companyId)))
       : [];
     return {
+      ...access,
       caseId: c.case_id,
       caseKey: c.case_key,
       requestNumber: c.request_number,
@@ -159,7 +162,7 @@ export function baReviewService(db: Db, deps: { reviewCase: ReviewCase }) {
     };
   }
 
-  async function decide(input: { companyId: string; caseId: string; userId: string; body: BaDecisionBody }) {
+  async function decide(input: { companyId: string; caseId: string; userId: string; instanceAdmin?: boolean; body: BaDecisionBody }) {
     const { companyId, caseId, userId, body } = input;
     const c = await loadReviewable(companyId, caseId);
     if (!c) throw notFound("Request not found");
@@ -195,7 +198,7 @@ export function baReviewService(db: Db, deps: { reviewCase: ReviewCase }) {
         decision: body.decision,
         reason: body.reason?.trim() || undefined,
         expectedVersion: body.expectedVersion,
-        actor: { type: "user", userId },
+        actor: { type: "user", userId, instanceAdmin: input.instanceAdmin === true },
         beforeCommit: async (txRaw: unknown) => {
           const tx = txRaw as Db;
           const [live] = await tx.select({ status: drAgentOutputs.status }).from(drAgentOutputs).where(eq(drAgentOutputs.id, output.id)).for("update");

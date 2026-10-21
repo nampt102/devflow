@@ -13,6 +13,15 @@ const definition = JSON.parse(
   transitions: Array<{ fromStageKey: string; toStageKey: string }>;
 };
 
+// add-approver-roles: the stages that already have an agent need a role; Dev and QA reviews stay open to any human until P3.
+const EXPECTED_APPROVER: Record<string, unknown> = {
+  triage_review: { kind: "role", roles: ["ba", "tech_lead"] },
+  ba_review: { kind: "role", roles: ["ba", "tech_lead"] },
+  plan_review: { kind: "role", roles: ["tech_lead"] },
+  code_review: { kind: "any_human" },
+  qa_signoff: { kind: "any_human" },
+};
+
 const stages = definition.stages;
 const byKey = new Map(stages.map((s) => [s.key, s]));
 const reviews = stages.filter((s) => s.kind === "review");
@@ -55,12 +64,16 @@ describe("dev-request pipeline definition", () => {
     for (const r of reviews) {
       const c = r.config!;
       expect(c.requireApproval).toBe(true);
-      expect(c.approver).toEqual({ kind: "any_human" }); // never an agent approver
+      expect(c.approver).toEqual(EXPECTED_APPROVER[r.key]); // never an agent approver
       expect(c.requireRejectReason).toBe(true);
       expect(c.requireRequestChangesReason).toBe(true);
       expect(byKey.get(c.rejectToStageKey)?.kind).toBe("cancelled");
       expect(byKey.get(c.requestChangesToStageKey)?.kind).toBe("working");
     }
+  });
+
+  it("lists every review stage in the approver table, so a new stage cannot skip the role decision", () => {
+    expect(reviews.map((r) => r.key).sort()).toEqual(Object.keys(EXPECTED_APPROVER).sort());
   });
 
   it("matches review exits to declared transitions and only approval advances", () => {

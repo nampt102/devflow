@@ -4,7 +4,7 @@ import { notFound } from "../../errors.js";
 import { validate } from "../../middleware/validate.js";
 import { DEFAULT_WORKSPACE_ROOT } from "../agent-stage/agent.js";
 import { stageMetricsService } from "../agent-stage/metrics.js";
-import { staffUser } from "../staff.js";
+import { staffUser, staffViewer } from "../staff.js";
 import { DEFAULT_PLAN_MAX_USD_PER_RUN, DEFAULT_PLAN_MODEL, findPlanAgent, planAgentSpec, unsafePlanAgentReason } from "./agent.js";
 import { PLAN_REVIEW_STAGE, PLAN_STAGE } from "./plan-service.js";
 import { planDecisionSchema, planReviewService } from "./review-service.js";
@@ -61,16 +61,16 @@ export function planRoutes(db: Db, deps: { reviewCase: ReviewCase }, env: Env = 
 
   router.get("/companies/:companyId/devflow/plan-cases/:caseId", async (req, res) => {
     const companyId = req.params.companyId as string;
-    staffUser(req, companyId, "review technical plans");
-    const found = await review.detail(companyId, req.params.caseId as string);
+    const viewer = staffViewer(req, companyId, "review technical plans");
+    const found = await review.detail(companyId, req.params.caseId as string, viewer);
     if (!found) throw notFound("Request not found");
     res.json(found);
   });
 
   router.post("/companies/:companyId/devflow/plan-cases/:caseId/decision", validate(planDecisionSchema), async (req, res) => {
     const companyId = req.params.companyId as string;
-    const userId = staffUser(req, companyId, "review technical plans");
-    res.json(await review.decide({ companyId, caseId: req.params.caseId as string, userId, body: req.body }));
+    const { userId, instanceAdmin } = staffViewer(req, companyId, "review technical plans");
+    res.json(await review.decide({ companyId, caseId: req.params.caseId as string, userId, instanceAdmin, body: req.body }));
   });
 
   return router;

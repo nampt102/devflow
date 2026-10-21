@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { activityLog, agents, authUsers, companies, createDb, drAgentOutputs, drOverrides, drRequesters, drRequests, drSystems, pipelineCases, pipelineStages, pipelines } from "@paperclipai/db";
 import { getEmbeddedPostgresTestSupport, startEmbeddedPostgresTestDatabase } from "./helpers/embedded-postgres.js";
 import { APPROVED_BA_SPEC, VALID_PLAN_OUTPUT } from "./helpers/plan-fixtures.js";
+import { grantRoles, requireRoles } from "./helpers/role-gate.js";
 import { errorHandler } from "../middleware/error-handler.js";
 import { pipelineService } from "../services/pipelines.js";
 import { planAgentSpec, planWorkspaceDir } from "../devflow/plan/agent.js";
@@ -258,6 +259,27 @@ describeEmbeddedPostgres("devflow Plan review", () => {
     expect(await stageOf(r.id)).toBe("cancelled");
     expect((await outputRow(r.outputId)).status).toBe("superseded");
     expect((await decide(ctx, r, { decision: "approve" })).status).toBe(409);
+  });
+
+  it("with role approvers, only Tech Lead (or an owner) may approve the plan; BA alone may not", async () => {
+    const ctx = await seedCompany();
+    await requireRoles(db, ctx.pipeline.id, "plan_review", ["tech_lead"]);
+    const r = await seedRequest(ctx);
+    const detail = async () => (await get(ctx, `plan-cases/${r.id}`)).body;
+    expect(await detail()).toMatchObject({ canDecide: false, requiredRoles: ["tech_lead"] });
+    expect((await decide(ctx, r, { decision: "approve" })).status).toBe(403);
+
+    await grantRoles(db, ctx.company.id, ctx.reviewer, ["ba"]);
+    expect(await detail()).toMatchObject({ canDecide: false });
+    expect((await decide(ctx, r, { decision: "approve" })).status).toBe(403);
+    expect(await stageOf(r.id)).toBe("plan_review");
+    expect((await outputRow(r.outputId)).status).toBe("proposed");
+    expect(await overridesOf(r.id)).toHaveLength(0);
+
+    await grantRoles(db, ctx.company.id, ctx.reviewer, ["tech_lead"]);
+    expect(await detail()).toMatchObject({ canDecide: true });
+    expect((await decide(ctx, r, { decision: "approve" })).status).toBe(200);
+    expect(await stageOf(r.id)).toBe("dev");
   });
 
   it("sends the plan back with a reason the next run receives", async () => {
