@@ -12,7 +12,7 @@ Mức ưu tiên: **A** cần trước pilot, **B** nên làm sớm trong pilot, 
 | B-03 | Dưới 1024px hàng chờ xếp trên chi tiết, phải cuộn | C | `kb/triage-review.md` |
 | B-04 | Chọn bản trùng chỉ trong danh sách ứng viên, chưa nhập mã REQ bất kỳ | B | `kb/triage-review.md` |
 | C-05 | Chưa có snooze, duyệt hàng loạt, claim/lease (hai người có thể cùng mở một yêu cầu; người thứ hai bị 409 khi quyết định) | C | `kb/triage-review.md` |
-| B-06 | **Xong (code; chờ triển khai)**: vai BA/Tech Lead nhiều vai mỗi người, approver kiểu `role`, màn hình `/roles`, ba trang duyệt tắt nút khi thiếu vai (change `add-approver-roles`, ADR 0023). Còn: build image, gán vai, đổi approver ở RESKI/DevFlow Verify (`kb/runbook.md` mục 13) | done | `kb/spike-pipelines.md` |
+| B-06 | **Xong (đã triển khai và thử ở DevFlow TEST)**: vai BA/Tech Lead nhiều vai mỗi người, approver kiểu `role`, màn hình `/roles`, ba trang duyệt tắt nút khi thiếu vai (change `add-approver-roles`, ADR 0023). Còn: RESKI gán vai và đổi approver khi có nhân viên thật (`kb/runbook.md` mục 13) | done | `kb/spike-pipelines.md` |
 | C-07 | Requester chỉ thấy "Không tiếp tục xử lý" cho cả reject lẫn trùng | C | `kb/triage-review.md` |
 | B-08 | **Xong**: agent đổi tên "DevFlow Triage (internal)" và có ghi chú giải thích nút Test báo lỗi là bình thường (agent cũ được đổi tên khi worker chạy) | done | chủ dự án, 2026-10-18 |
 | B-09 | Portal và Board dùng chung phiên đăng nhập trên `localhost:3100`: đăng nhập requester làm mất phiên admin (và chia sẻ khóa giao diện sáng/tối, việc này là chủ ý). Chỉ dẫn dùng cửa sổ ẩn danh; xem xét tách cookie hoặc cổng | B | chủ dự án, 2026-10-18 |

@@ -28,5 +28,5 @@
 ## 5. Kiểm chứng và triển khai
 
 - [x] 5.1 Typecheck server, UI, db, shared; test DevFlow và `pipelines-*` pass (gồm pgvector)
-- [ ] 5.2 Build image (hướng dẫn trong `kb/tech-stack.md`), gán vai cho nhân viên hiện có của RESKI và DevFlow Verify, chạy lại seed pipeline, thử bằng tài khoản không có vai
+- [x] 5.2 Build image (hướng dẫn trong `kb/tech-stack.md`), gán vai cho nhân viên hiện có của RESKI và DevFlow Verify, chạy lại seed pipeline, thử bằng tài khoản không có vai. Đã làm ngày 2026-10-21 ở DevFlow TEST (tên mới của DevFlow Verify); chủ dự án thử ok. RESKI chỉ có owner nên chưa gán vai và chưa đổi approver; làm khi có nhân viên thật
 - [x] 5.3 Cập nhật `kb/runbook.md` (thứ tự triển khai, cách gán vai), `kb/triage-review.md`, `kb/ba-spec.md`, `kb/tech-plan.md`, `kb/dev-request-pipeline.md`, ADR 0023, `status.md`; đánh dấu B-06 xong trong `backlog.md`
