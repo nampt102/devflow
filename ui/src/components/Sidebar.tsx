@@ -44,6 +44,7 @@ import { heartbeatsApi } from "../api/heartbeats";
 import { instanceSettingsApi } from "../api/instanceSettings";
 import { queryKeys } from "../lib/queryKeys";
 import { devflowBaApi } from "../api/devflowBa";
+import { devflowPlanApi } from "../api/devflowPlan";
 import { devflowTriageApi } from "../api/devflowTriage";
 import { attentionBadgeCount } from "../lib/attention";
 import { useInboxBadge } from "../hooks/useInboxBadge";
@@ -117,6 +118,13 @@ export function Sidebar({ children }: { children?: ReactNode }) {
   const { data: baCount } = useQuery({
     queryKey: queryKeys.devflowBa.count(selectedCompanyId!),
     queryFn: () => devflowBaApi.count(selectedCompanyId!),
+    enabled: !!selectedCompanyId && showPipelines,
+    refetchInterval: 30_000,
+    retry: false,
+  });
+  const { data: planCount } = useQuery({
+    queryKey: queryKeys.devflowPlan.count(selectedCompanyId!),
+    queryFn: () => devflowPlanApi.count(selectedCompanyId!),
     enabled: !!selectedCompanyId && showPipelines,
     refetchInterval: 30_000,
     retry: false,
@@ -272,6 +280,9 @@ export function Sidebar({ children }: { children?: ReactNode }) {
           ) : null}
           {showPipelines ? (
             <SidebarNavItem to="/ba-review" label="BA review" icon={FileText} badge={baCount?.waiting || undefined} badgeLabel="waiting for review" />
+          ) : null}
+          {showPipelines ? (
+            <SidebarNavItem to="/plan-review" label="Plan review" icon={ListChecks} badge={planCount?.waiting || undefined} badgeLabel="waiting for review" />
           ) : null}
           {showGoalsLink ? (
             <SidebarNavItem to="/goals" label="Goals" icon={Target} />
