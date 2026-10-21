@@ -70,6 +70,7 @@ Mức ưu tiên: **A** cần trước pilot, **B** nên làm sớm trong pilot, 
 | C-39 | **Xong 2026-10-20**: case `verify 1792397041188` của RESKI đã chuyển `cancelled` bằng transition `force` của board (pipeline không có đường `ba_spec → cancelled`; có lý do trong activity log). Lưu ý còn hiệu lực: `--verify` nên chạy trên công ty thử, không phải công ty pilot | done | RESKI, 2026-10-19 |
 | C-35 | Số liệu BA theo hệ thống (override và chi phí mỗi hệ thống) | C | 2026-10-19 |
 | C-36 | Xóa được agent "Spike BA …" (API trả 409 vì có run); nút "Set up BA agent" trong UI thay cho script | C | spike |
+| B-40 | Tự chạy setup agent BA và Planner khi tạo công ty, và tự đồng bộ lại khi cấu hình chuẩn đổi (hiện phải chạy tay `setup-ba-agent.mjs`, `setup-plan-agent.mjs` cho từng công ty, ví dụ khi thêm luật chặn chéo của `add-tech-plan-stage`) | B | chủ dự án, 2026-10-20 |
 
 ## Giao diện portal (theo dõi)
 | Mã | Nội dung | Ưu tiên | Nguồn |

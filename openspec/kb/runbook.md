@@ -16,7 +16,8 @@ Cho người chạy pilot (D7: chủ dự án tự chọn công ty và tự ch�
 | Email | `DEVFLOW_SMTP_HOST/PORT/SECURE/USER/PASS/FROM`, `DEVFLOW_PORTAL_BASE_URL` | Thiếu HOST hoặc FROM thì không gửi email. |
 | Giới hạn | `DEVFLOW_TRIAGE_MAX_TOKENS_PER_DAY` | Mỗi công ty, theo ngày UTC, tính Triage + embedding. Compose mặc định 500000; `0` là không giới hạn. |
 | BA Spec | `DEVFLOW_BA_MODEL`, `DEVFLOW_BA_MAX_USD_PER_RUN`, `DEVFLOW_BA_MAX_USD_PER_DAY`, `DEVFLOW_BA_INTERVAL_MS`, `DEVFLOW_AGENT_WORKSPACE_ROOT`, `DEVFLOW_BA_ENABLED` | Mặc định haiku, 1 USD mỗi lượt, 20 USD mỗi ngày mỗi công ty (0 = không trần). Cần agent BA mỗi công ty: `node scripts/devflow/setup-ba-agent.mjs --company <id>` (đặt `DEVFLOW_AGENT_ANTHROPIC_API_KEY`, chạy lại sau mỗi lần đổi prompt BA). Xem `kb/ba-spec.md`. |
-| Công tắc dừng | `DEVFLOW_WORKERS_ENABLED=false` | Dừng Triage, embedding, BA và email cùng lúc (đặt rồi `up -d` lại). Portal và màn hình duyệt vẫn chạy. |
+| Tech Plan | `DEVFLOW_PLAN_MODEL`, `DEVFLOW_PLAN_MAX_USD_PER_RUN`, `DEVFLOW_PLAN_MAX_USD_PER_DAY`, `DEVFLOW_PLAN_INTERVAL_MS`, `DEVFLOW_PLAN_ENABLED` | Mặc định sonnet, 2 USD mỗi lượt, 20 USD mỗi ngày mỗi công ty (tách khỏi BA). Cần agent Planner mỗi công ty: `node scripts/devflow/setup-plan-agent.mjs --company <id>` (dùng lại key của BA). Khi thêm hoặc đổi stage agent, chạy lại script setup của **mọi** agent (luật chặn chéo đổi). Xem `kb/tech-plan.md`. |
+| Công tắc dừng | `DEVFLOW_WORKERS_ENABLED=false` | Dừng Triage, embedding, BA, Tech Plan và email cùng lúc (đặt rồi `up -d` lại). Portal và màn hình duyệt vẫn chạy. |
 | Telemetry | `PAPERCLIP_TELEMETRY_DISABLED` | Compose đặt mặc định `1` (tắt). Xem mục 7. |
 | Đăng ký | `PAPERCLIP_AUTH_DISABLE_SIGN_UP` | Xem mục 8. |
 Sau khi đổi `.env`: `docker compose -f docker-compose.yml -f docker-compose.devflow.yml up -d` để tạo lại container.
