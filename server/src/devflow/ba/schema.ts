@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AgentOutputError, describeIssues, extractJsonObject, unsafePath } from "../agent-stage/output.js";
 
 // Output contract of the BA Spec agent (openspec/changes/add-ba-spec-stage, design D4).
 // Strict on purpose: unknown keys are rejected, not ignored. Text is Vietnamese; file names and code keep their spelling.
@@ -30,34 +31,7 @@ export const baOutputSchema = z.strictObject({
 });
 export type BaOutput = z.infer<typeof baOutputSchema>;
 
-export class BaOutputError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "BaOutputError";
-  }
-}
-
-/** The JSON object in the agent's final message: the whole text, a fenced block, or the last top-level object. */
-export function extractJsonObject(text: string): unknown {
-  const trimmed = text.trim();
-  const candidates = [trimmed];
-  const fenced = /```(?:json)?\s*([\s\S]*?)```/i.exec(trimmed);
-  if (fenced?.[1]) candidates.push(fenced[1].trim());
-  const first = trimmed.indexOf("{");
-  const last = trimmed.lastIndexOf("}");
-  if (first >= 0 && last > first) candidates.push(trimmed.slice(first, last + 1));
-  for (const c of candidates) {
-    try {
-      const value = JSON.parse(c);
-      if (value && typeof value === "object" && !Array.isArray(value)) return value;
-    } catch {
-      // try the next candidate
-    }
-  }
-  throw new BaOutputError("output is not a JSON object");
-}
-
-const unsafePath = (p: string) => p.startsWith("/") || p.startsWith("~") || p.includes("\\") || p.split("/").includes("..") || /[\u0000-\u001f]/.test(p);
+export { AgentOutputError as BaOutputError, extractJsonObject };
 
 /**
  * Parse the agent's text. Error messages carry paths and rule names only, never the agent's text, because they are
@@ -66,14 +40,11 @@ const unsafePath = (p: string) => p.startsWith("/") || p.startsWith("~") || p.in
 export function parseBaOutput(text: string, allowedSystemKeys: readonly string[]): BaOutput {
   const raw = extractJsonObject(text);
   const parsed = baOutputSchema.safeParse(raw);
-  if (!parsed.success) {
-    const issues = parsed.error.issues.slice(0, 8).map((i) => `${i.path.join(".") || "(root)"}: ${i.code}`);
-    throw new BaOutputError(`output does not match the schema (${issues.join("; ")})`);
-  }
+  if (!parsed.success) throw new AgentOutputError(`output does not match the schema (${describeIssues(parsed.error.issues)})`);
   const allowed = new Set(allowedSystemKeys);
   for (const area of parsed.data.affectedAreas) {
-    if (!allowed.has(area.system)) throw new BaOutputError("affectedAreas names a system that was not assigned to this request");
-    if (unsafePath(area.path)) throw new BaOutputError("affectedAreas has a path outside the repository");
+    if (!allowed.has(area.system)) throw new AgentOutputError("affectedAreas names a system that was not assigned to this request");
+    if (unsafePath(area.path)) throw new AgentOutputError("affectedAreas has a path outside the repository");
   }
   return parsed.data;
 }
