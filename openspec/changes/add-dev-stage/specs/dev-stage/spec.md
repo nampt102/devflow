@@ -22,6 +22,10 @@ Khi yêu cầu ở `dev` có kế hoạch đã duyệt và ít nhất một hệ
 - **WHEN** nhánh mặc định của repo không bắt buộc đi qua PR
 - **THEN** DevFlow không đẩy gì, ghi lỗi `repo_unprotected`, và yêu cầu vẫn ở `dev`
 
+#### Scenario: Repo không thể bật bảo vệ nhánh nhưng đã được cho phép
+- **WHEN** hệ thống có `allow_unprotected` bật và nhánh mặc định không được bảo vệ
+- **THEN** DevFlow vẫn đẩy `devflow/*` và mở PR nháp, đề xuất ghi cảnh báo, và không bao giờ merge
+
 #### Scenario: Diff chạm đường dẫn cấm
 - **WHEN** commit của agent sửa `.github/workflows/deploy.yml`
 - **THEN** DevFlow không đẩy, đề xuất ghi lý do `forbidden_paths` để người duyệt thấy

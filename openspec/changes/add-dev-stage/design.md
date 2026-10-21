@@ -28,7 +28,7 @@
 - Clone: DevFlow (ở server, như BA) clone repo vào `/paperclip/devflow/ws/dev/repos/<key>` bằng **token chỉ đọc**, tạo nhánh `devflow/<REQ-n>` từ branch mặc định; nếu nhánh đã có trên GitHub (lượt sau request_changes) thì lấy nhánh đó và làm tiếp.
 - Agent sửa, chạy lệnh kiểm tra, `git commit` cục bộ (git config tên "DevFlow Dev"). Không có remote có quyền ghi trong workspace.
 - Sau lượt chạy (Paperclip đã ghi commit về server; chỉ dựa vào `git log`/`git diff <baseSha>..HEAD`, **không** tin chỉ mục hay cây làm việc vì spike thấy chúng lệch sau khi ghi về), DevFlow kiểm: chỉ có commit mới trên đúng nhánh; không có thay đổi ở **đường dẫn cấm** (mặc định `.github/workflows/**`, `.env*`, `**/*.pem`, `**/*.key`, thêm được theo hệ thống); tổng dòng đổi ≤ trần (mặc định 3000); không file nhị phân lớn hơn 1 MB. Vi phạm → không push, lỗi rõ loại (`forbidden_paths`, `diff_too_large`), đề xuất vẫn ghi để người duyệt thấy lý do.
-- **Trước khi push**, DevFlow gọi GitHub API kiểm **nhánh mặc định có bảo vệ** (bắt buộc qua PR); không có → từ chối (`repo_unprotected`). Push bằng **token ghi** truyền qua header cho đúng một lệnh `git push` (như clone ở ADR 0021), chỉ tới `refs/heads/devflow/*`.
+- **Trước khi push**, DevFlow gọi GitHub API kiểm **nhánh mặc định có bảo vệ** (bắt buộc qua PR); không có → từ chối (`repo_unprotected`), trừ khi hệ thống được chủ dự án bật `allow_unprotected` (repo riêng gói miễn phí không có branch protection, ví dụ RESKI; spike 1.4). Khi đó DevFlow vẫn chỉ đẩy `devflow/*`, mở PR nháp, không merge, và đề xuất ghi cảnh báo "nhánh mặc định không được bảo vệ". Push bằng **token ghi** truyền qua header cho đúng một lệnh `git push` (như clone ở ADR 0021), chỉ tới `refs/heads/devflow/*`.
 - Mở PR **nháp** qua REST GitHub (`fetch`, không thêm thư viện): tiêu đề `[REQ-n] <tiêu đề>`, nội dung gồm tóm tắt, task đã làm, lệnh kiểm tra và kết quả, link về DevFlow, nhãn `devflow`. Lượt sau request_changes thì cập nhật PR có sẵn (thêm bình luận tóm tắt lượt mới).
 
 ### D4. Bật theo hệ thống, token ghi riêng, lệnh kiểm tra
@@ -65,10 +65,12 @@ ALTER TABLE dr_systems
   ADD COLUMN write_token_secret_id uuid,
   ADD COLUMN test_command text,
   ADD COLUMN forbidden_paths text[] NOT NULL DEFAULT '{}'::text[],
+  ADD COLUMN allow_unprotected boolean NOT NULL DEFAULT false,
   ADD CONSTRAINT dr_systems_test_command_check CHECK (test_command IS NULL OR char_length(test_command) BETWEEN 1 AND 500),
   ADD CONSTRAINT dr_systems_forbidden_paths_check CHECK (cardinality(forbidden_paths) <= 50),
   ADD CONSTRAINT dr_systems_dev_token_check CHECK (NOT dev_enabled OR write_token_secret_id IS NOT NULL);
 ```
+- `allow_unprotected` mặc định false; chỉ có ý nghĩa khi `dev_enabled`. Do chủ dự án bật có chủ đích (API/UI hạn chế vai owner/instance admin).
 - `dev_enabled` cần token ghi (CHECK). Không khóa ngoại tới secret (như `token_secret_id`).
 - Thông tin PR nằm trong `data` của đề xuất (`dr_agent_outputs`), không thêm bảng.
 - `test_command` là chuỗi chạy bằng `bash -lc` **trên runner, bởi agent** (agent vốn đã có Bash); DevFlow không tự chạy lệnh này ở server.

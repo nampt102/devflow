@@ -19,6 +19,13 @@ export const drSystems = pgTable(
     docsPath: text("docs_path").notNull().default("docs"),
     // company_secrets.id of the read-only token; null for a public repository. Same company is checked by the service.
     tokenSecretId: uuid("token_secret_id"),
+    // agent Dev (change add-dev-stage): per-system switch, separate write token, optional test command, extra forbidden paths
+    devEnabled: boolean("dev_enabled").notNull().default(false),
+    writeTokenSecretId: uuid("write_token_secret_id"),
+    testCommand: text("test_command"),
+    forbiddenPaths: text("forbidden_paths").array().notNull().default(sql`'{}'::text[]`),
+    // the default branch has no branch protection (e.g. private repo on the free GitHub plan) and the project owner accepts that
+    allowUnprotected: boolean("allow_unprotected").notNull().default(false),
     // a system is switched off, never deleted, so old agent outputs still name it
     active: boolean("active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -30,6 +37,9 @@ export const drSystems = pgTable(
     keyCheck: check("dr_systems_key_check", sql`${table.key} ~ '^[a-z0-9][a-z0-9-]{0,62}$'`),
     repoCheck: check("dr_systems_repo_check", sql`${table.repoUrl} ~ '^https://github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'`),
     docsCheck: check("dr_systems_docs_check", sql`${table.docsPath} !~ '(^/|\\.\\.)'`),
+    testCommandCheck: check("dr_systems_test_command_check", sql`${table.testCommand} is null or char_length(${table.testCommand}) between 1 and 500`),
+    forbiddenPathsCheck: check("dr_systems_forbidden_paths_check", sql`cardinality(${table.forbiddenPaths}) <= 50`),
+    devTokenCheck: check("dr_systems_dev_token_check", sql`not ${table.devEnabled} or ${table.writeTokenSecretId} is not null`),
     sizeCheck: check(
       "dr_systems_size_check",
       sql`char_length(${table.name}) between 1 and 200 and char_length(${table.description}) <= 2000 and char_length(${table.defaultBranch}) between 1 and 200 and char_length(${table.docsPath}) <= 200`,
