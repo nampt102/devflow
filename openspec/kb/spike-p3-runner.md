@@ -19,8 +19,11 @@ Mục tiêu (change `add-dev-stage`, tasks 1.2 và 1.3): xác nhận agent `clau
 
 ## Chưa kiểm
 - Toolchain Flutter (kích thước image, `flutter pub get` qua proxy); chỉ mới thử Node và Python có sẵn.
-- 1.4 (GitHub: kiểm bảo vệ nhánh, push nhánh `devflow/*` bằng token ghi qua header, mở/cập nhật/đóng PR nháp) cần một repo thử nghiệm và token ghi: chờ chủ dự án chỉ định.
 - Khóa máy chủ SSH ghim (`knownHosts`), xoay khóa, nhiều lượt chạy liên tiếp (dọn bên runner), hai lượt đồng thời.
 
 ## Tài nguyên thử còn lại (xóa khi xong spike)
 Công ty `DevFlow Verify`: các agent "Spike Dev …" (không xóa được vì có run; đã/cần terminate), secret khóa SSH, môi trường `devflow-runner-spike-…`; container `devflow-runner`, `devflow-proxy`, mạng `runner_net`; thư mục `/paperclip/devflow/ws/dev` và `spike` ở server.
+
+## Spike GitHub (1.4, 2026-10-21, repo `MotivesSystem/reski_membership` do chủ dự án cho dùng)
+- Tạo nhánh `devflow/spike-1-4` từ `main`, commit 1 file, mở PR **nháp** (#232), sửa nội dung, đóng, xóa nhánh: tất cả qua REST API, đều chạy được (dùng token `gh` của chủ dự án để thử; bản thật dùng token ghi riêng của hệ thống). Đã dọn: PR đóng, nhánh xóa.
+- **Phát hiện quan trọng:** repo riêng trên gói GitHub miễn phí **không bật được branch protection và ruleset** (API trả 403 "Upgrade to GitHub Pro"; `branches/main.protected=false`). Quy tắc `repo_unprotected` của spec sẽ chặn mọi lượt Dev ở repo này. Cần quyết định: nâng gói/chuyển repo vào tổ chức có gói trả phí, hoặc cho phép ghi đè có chủ đích theo hệ thống (cột `allow_unprotected`), hoặc bỏ kiểm tra. Agent vẫn chỉ đẩy `devflow/*` và không merge nên rủi ro còn lại là người khác merge nhầm.

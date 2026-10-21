@@ -3,7 +3,7 @@
 - [x] 1.1 Chủ dự án duyệt proposal, design và DDL theo mặc định (2026-10-21: Node + Python + Flutter, sonnet 5 USD/lượt và 50 USD/ngày, trần diff 3000 dòng, `tech_lead` duyệt)
 - [x] 1.2 Spike runner (đạt, xem `kb/spike-p3-runner.md`): container `devflow-runner` trong compose; agent `claude_local` chạy qua execution target SSH của Paperclip (môi trường, khóa, `cwd`, `env`, transcript, `resultJson`, chi phí); ghi kết quả vào `kb/spike-p3-runner.md`. Không chạy được → dừng, trình phương án dự phòng
 - [x] 1.3 Spike mạng (đạt; Flutter chưa thử): mạng nội bộ + proxy danh sách cho phép; Claude Code, `git clone`, `npm`/`pip`/`flutter pub get` đi qua proxy; host khác bị chặn
-- [ ] 1.4 Spike GitHub: kiểm bảo vệ nhánh, push nhánh `devflow/*` bằng token ghi qua header, mở PR nháp, cập nhật, đóng (repo thử nghiệm)
+- [x] 1.4 Spike GitHub (đạt; repo RESKI không có branch protection, xem kb/spike-p3-runner.md): kiểm bảo vệ nhánh, push nhánh `devflow/*` bằng token ghi qua header, mở PR nháp, cập nhật, đóng (repo thử nghiệm)
 
 ## 2. Hệ thống (schema + API + UI)
 
