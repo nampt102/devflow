@@ -47,3 +47,27 @@ export function systemsErrorMessage(error: unknown): string {
   if (status === 404) return "Not found or no longer available.";
   return body?.error || (error instanceof Error ? error.message : "Something went wrong. Try again.");
 }
+
+const FORBIDDEN_PATH = /^[A-Za-z0-9._/*-]{1,200}$/;
+
+/** One path per line (commas also split); blank lines are dropped and repeats removed. */
+export function parseForbiddenPaths(text: string): string[] {
+  return [...new Set(text.split(/[\n,]/).map((v) => v.trim()).filter(Boolean))];
+}
+
+export type DevForm = { devEnabled: boolean; testCommand: string; forbiddenPaths: string; hasWriteToken: boolean; newWriteToken: string; removeWriteToken: boolean };
+export type DevErrors = { testCommand?: string; forbiddenPaths?: string; writeToken?: string };
+
+/** Errors for the agent Dev settings; the server repeats these checks. */
+export function validateDevSettings(dev: DevForm): DevErrors {
+  const errors: DevErrors = {};
+  if (dev.testCommand.trim().length > 500) errors.testCommand = "Use at most 500 characters.";
+  const paths = parseForbiddenPaths(dev.forbiddenPaths);
+  if (paths.length > 50) errors.forbiddenPaths = "Use at most 50 paths.";
+  else if (paths.some((v) => !FORBIDDEN_PATH.test(v) || v.startsWith("/") || v.split("/").includes(".."))) {
+    errors.forbiddenPaths = "Use paths inside the repository (letters, digits, . _ - / *), one per line.";
+  }
+  const willHaveToken = dev.newWriteToken.trim() ? true : dev.removeWriteToken ? false : dev.hasWriteToken;
+  if (dev.devEnabled && !willHaveToken) errors.writeToken = "Enter a write token to turn the Dev agent on.";
+  return errors;
+}

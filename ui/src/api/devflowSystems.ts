@@ -12,6 +12,11 @@ export interface DevflowSystem {
   docsPath: string;
   active: boolean;
   hasToken: boolean;
+  devEnabled: boolean;
+  hasWriteToken: boolean;
+  testCommand: string | null;
+  forbiddenPaths: string[];
+  allowUnprotected: boolean;
   updatedAt: string;
 }
 
@@ -33,6 +38,13 @@ export interface SystemChanges {
   active?: boolean;
   /** a string replaces the token, null removes it */
   token?: string | null;
+  // agent Dev (add-dev-stage)
+  devEnabled?: boolean;
+  /** a string replaces the write token, null removes it */
+  writeToken?: string | null;
+  testCommand?: string | null;
+  forbiddenPaths?: string[];
+  allowUnprotected?: boolean;
 }
 
 export const devflowSystemsApi = {

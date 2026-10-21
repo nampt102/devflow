@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { suggestKey, systemsErrorMessage, validateSystemForm, type SystemForm } from "./systems";
+import { parseForbiddenPaths, suggestKey, systemsErrorMessage, validateDevSettings, validateSystemForm, type DevForm, type SystemForm } from "./systems";
 
 const ok: SystemForm = { name: "HR Portal", key: "hr-portal", repoUrl: "https://github.com/acme/hr-portal", defaultBranch: "main", docsPath: "docs", description: "" };
 
@@ -37,5 +37,28 @@ describe("systems helpers", () => {
     expect(systemsErrorMessage({ status: 404, body: {} })).toMatch(/Not found/);
     expect(systemsErrorMessage({ status: 400, body: { error: "Invalid branch" } })).toBe("Invalid branch");
     expect(systemsErrorMessage(null)).toMatch(/Something went wrong/);
+  });
+});
+
+describe("agent Dev settings", () => {
+  const dev: DevForm = { devEnabled: false, testCommand: "", forbiddenPaths: "", hasWriteToken: false, newWriteToken: "", removeWriteToken: false };
+
+  it("splits forbidden paths by line or comma and drops blanks and repeats", () => {
+    expect(parseForbiddenPaths("deploy/**\n\n *.pem ,deploy/**")).toEqual(["deploy/**", "*.pem"]);
+  });
+
+  it("needs a write token to turn Dev on, counting a stored or newly typed one", () => {
+    expect(validateDevSettings({ ...dev, devEnabled: true }).writeToken).toBeTruthy();
+    expect(validateDevSettings({ ...dev, devEnabled: true, newWriteToken: "ghp_x" }).writeToken).toBeUndefined();
+    expect(validateDevSettings({ ...dev, devEnabled: true, hasWriteToken: true }).writeToken).toBeUndefined();
+    expect(validateDevSettings({ ...dev, devEnabled: true, hasWriteToken: true, removeWriteToken: true }).writeToken).toBeTruthy();
+    expect(validateDevSettings({ ...dev, hasWriteToken: true, removeWriteToken: true })).toEqual({});
+  });
+
+  it("refuses paths outside the repository, odd characters, too long a command and too many paths", () => {
+    for (const bad of ["../x", "/etc", "a/../b", "a b", "x;y"]) expect(validateDevSettings({ ...dev, forbiddenPaths: bad }).forbiddenPaths, bad).toBeTruthy();
+    expect(validateDevSettings({ ...dev, forbiddenPaths: Array.from({ length: 51 }, (_, i) => `p${i}`).join("\n") }).forbiddenPaths).toBeTruthy();
+    expect(validateDevSettings({ ...dev, testCommand: "x".repeat(501) }).testCommand).toBeTruthy();
+    expect(validateDevSettings({ ...dev, testCommand: "npm test", forbiddenPaths: "deploy/**\n*.pem" })).toEqual({});
   });
 });

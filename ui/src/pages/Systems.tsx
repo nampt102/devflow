@@ -12,7 +12,7 @@ import { useBreadcrumbs } from "../context/BreadcrumbContext";
 import { useCompany } from "../context/CompanyContext";
 import { useToastActions } from "../context/ToastContext";
 import { queryKeys } from "../lib/queryKeys";
-import { suggestKey, systemsErrorMessage, validateSystemForm, type FormErrors, type SystemForm } from "../lib/systems";
+import { parseForbiddenPaths, suggestKey, systemsErrorMessage, validateDevSettings, validateSystemForm, type FormErrors, type SystemForm } from "../lib/systems";
 
 // DevFlow "Systems": the repositories a company's requests can be about. The Triage review assigns them to a
 // request and the BA agent reads them. The read-only token is typed here, sent once and never shown again;
@@ -43,6 +43,15 @@ function SystemFormView({ companyId, existing, onClose }: { companyId: string; e
   const [token, setToken] = useState("");
   const [removeToken, setRemoveToken] = useState(false);
   const [touched, setTouched] = useState(false);
+  const [devEnabled, setDevEnabled] = useState(existing?.devEnabled ?? false);
+  const [writeToken, setWriteToken] = useState("");
+  const [removeWriteToken, setRemoveWriteToken] = useState(false);
+  const [testCommand, setTestCommand] = useState(existing?.testCommand ?? "");
+  const [forbiddenPaths, setForbiddenPaths] = useState((existing?.forbiddenPaths ?? []).join("\n"));
+  const [allowUnprotected, setAllowUnprotected] = useState(existing?.allowUnprotected ?? false);
+  const devProblems = () =>
+    editing ? validateDevSettings({ devEnabled, testCommand, forbiddenPaths, hasWriteToken: existing?.hasWriteToken ?? false, newWriteToken: writeToken, removeWriteToken }) : {};
+  const devErrors = touched ? devProblems() : {};
   const errors: FormErrors = touched ? validateSystemForm(form, { editing }) : {};
   const set = (patch: Partial<SystemForm>) => setForm((f) => ({ ...f, ...patch }));
 
@@ -56,12 +65,18 @@ function SystemFormView({ companyId, existing, onClose }: { companyId: string; e
           defaultBranch: trimmed.defaultBranch,
           docsPath: trimmed.docsPath,
           ...(token.trim() ? { token: token.trim() } : removeToken ? { token: null } : {}),
+          devEnabled,
+          testCommand: testCommand.trim() || null,
+          forbiddenPaths: parseForbiddenPaths(forbiddenPaths),
+          allowUnprotected,
+          ...(writeToken.trim() ? { writeToken: writeToken.trim() } : removeWriteToken ? { writeToken: null } : {}),
         });
       }
       return devflowSystemsApi.create(companyId, { ...trimmed, ...(token.trim() ? { token: token.trim() } : {}) });
     },
     onSuccess: () => {
       setToken("");
+      setWriteToken("");
       pushToast({ title: editing ? "System updated" : "System added", tone: "success" });
       void queryClient.invalidateQueries({ queryKey: queryKeys.devflowSystems.list(companyId) });
       onClose();
@@ -72,7 +87,7 @@ function SystemFormView({ companyId, existing, onClose }: { companyId: string; e
   const submit = (e: FormEvent) => {
     e.preventDefault();
     setTouched(true);
-    if (Object.keys(validateSystemForm(form, { editing })).length > 0 || save.isPending) return;
+    if (Object.keys(validateSystemForm(form, { editing })).length > 0 || Object.keys(devProblems()).length > 0 || save.isPending) return;
     save.mutate();
   };
 
@@ -124,6 +139,49 @@ function SystemFormView({ companyId, existing, onClose }: { companyId: string; e
           Remove the stored token (the repository must then be public)
         </label>
       ) : null}
+      {editing ? (
+        <fieldset className="space-y-3 border-t border-border pt-3">
+          <legend className="text-sm font-medium text-foreground">Dev agent</legend>
+          <label className="flex items-center gap-2 text-sm text-foreground">
+            <input type="checkbox" checked={devEnabled} onChange={(e) => setDevEnabled(e.target.checked)} />
+            Let the Dev agent write code for this system (it only opens draft pull requests, never merges)
+          </label>
+          <Field
+            label={existing?.hasWriteToken ? "Replace write token (leave empty to keep the current one)" : "Write token"}
+            hint="A GitHub fine-grained token that can push branches and open pull requests on this repository only. The agent never sees it. Stored as a company secret and never shown again."
+            error={devErrors.writeToken}
+          >
+            <Input
+              type="password"
+              value={writeToken}
+              autoComplete="new-password"
+              onChange={(e) => { setWriteToken(e.target.value); if (e.target.value) setRemoveWriteToken(false); }}
+              placeholder={existing?.hasWriteToken ? "Token is set" : ""}
+            />
+          </Field>
+          {existing?.hasWriteToken ? (
+            <label className="flex items-center gap-2 text-sm text-foreground">
+              <input type="checkbox" checked={removeWriteToken} disabled={writeToken.length > 0} onChange={(e) => setRemoveWriteToken(e.target.checked)} />
+              Remove the stored write token (turn the Dev agent off first)
+            </label>
+          ) : null}
+          <Field label="Test command (optional)" hint="Run by the agent before it finishes, e.g. cd backend && npm test." error={devErrors.testCommand}>
+            <Input value={testCommand} maxLength={500} onChange={(e) => setTestCommand(e.target.value)} aria-invalid={Boolean(devErrors.testCommand)} />
+          </Field>
+          <Field label="Extra forbidden paths (optional)" hint="One per line. Changes to these are never pushed. Workflow and deploy files are always forbidden." error={devErrors.forbiddenPaths}>
+            <Textarea value={forbiddenPaths} rows={3} onChange={(e) => setForbiddenPaths(e.target.value)} aria-invalid={Boolean(devErrors.forbiddenPaths)} />
+          </Field>
+          <label className="flex items-start gap-2 text-sm text-foreground">
+            <input className="mt-1" type="checkbox" checked={allowUnprotected} onChange={(e) => setAllowUnprotected(e.target.checked)} />
+            <span>
+              Allow when the default branch is not protected
+              <span className="block text-xs text-muted-foreground">For repositories where GitHub cannot enforce branch protection. Only the company owner can turn this on. The agent still pushes only devflow/* branches and never merges.</span>
+            </span>
+          </label>
+        </fieldset>
+      ) : (
+        <p className="text-xs text-muted-foreground">Save the system first, then edit it to set up the Dev agent.</p>
+      )}
       <div className="flex justify-between gap-2">
         <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
         <Button type="submit" disabled={save.isPending}>
@@ -149,6 +207,7 @@ function SystemRow({ system, busy, onEdit, onToggle }: { system: DevflowSystem; 
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant="outline">{system.hasToken ? "Token set" : "Public repository"}</Badge>
+        {system.devEnabled ? <Badge variant="outline">Dev agent on</Badge> : null}
         {system.active ? <Badge>Active</Badge> : <Badge variant="secondary">Switched off</Badge>}
         <Button type="button" size="sm" variant="outline" onClick={onEdit}>
           <Pencil className="h-4 w-4" /> Edit
