@@ -15,7 +15,8 @@
 
 ### D1. Runner riêng, agent chạy qua execution target SSH của Paperclip
 - Service compose `devflow-runner`: image riêng (Debian, git, Node 24, Claude Code CLI, Python 3; Dart/Flutter nếu spike cho thấy chạy được với dung lượng chấp nhận), `sshd` chỉ nhận khóa của server, user không phải root, **không** biến môi trường bí mật, **không** volume `/paperclip`, thư mục làm việc `/work` (volume riêng của runner).
-- Agent Dev có `defaultEnvironmentId` trỏ tới môi trường SSH `devflow-runner` (tạo bằng script setup). Lượt chạy: Paperclip mở SSH, chạy `claude` ở `/work/dev`, nhận lại stream; DevFlow đọc `resultJson` như BA/Planner.
+- Agent Dev có `defaultEnvironmentId` trỏ tới môi trường SSH `devflow-runner` (tạo bằng script setup). Lượt chạy: Paperclip mở SSH, chạy `claude` trên runner, nhận lại stream; DevFlow đọc `resultJson` như BA/Planner.
+- **Cập nhật sau spike (2026-10-21, `kb/spike-p3-runner.md`):** workspace **nằm ở server**, không phải ở runner. DevFlow dựng thư mục `/paperclip/devflow/ws/dev` (clone bằng token đọc, nhánh `devflow/<REQ>`); mỗi lượt Paperclip **đóng gói thư mục này sang runner, chạy agent ở đó, rồi ghi các commit mới về lại thư mục ở server** và dọn bên runner. `cwd` của agent là cùng một đường dẫn ở cả hai phía (runner có sẵn thư mục `/paperclip/devflow/ws` rỗng của riêng nó). Nhờ vậy token ghi chỉ ở server, agent không bao giờ thấy.
 - Khóa SSH: cặp khóa sinh lúc cài, khóa riêng là secret của instance (không vào repo), khóa công khai mount vào runner.
 - **Spike trước tiên** (task 1): nếu `claude_local` qua SSH không chạy được, không truyền được `env`, hoặc cần vá lõi lớn, dừng lại và trình phương án dự phòng: runner có API HTTP nội bộ do DevFlow gọi trực tiếp (mất phần ghi run/chi phí của Paperclip, phải tự ghi), chờ chủ dự án chọn.
 
@@ -24,9 +25,9 @@
 - Danh sách nằm trong file cấu hình của runner, đổi được không cần build lại server. **Chưa kiểm chứng**: Claude Code và các trình cài package đi qua proxy ổn định.
 
 ### D3. Agent không có token; DevFlow push và mở PR
-- Clone: DevFlow (qua SSH, lệnh riêng không qua agent) clone repo vào `/work/dev/repos/<key>` bằng **token chỉ đọc** (như BA), tạo nhánh `devflow/<REQ-n>` từ branch mặc định; nếu nhánh đã có trên GitHub (lượt sau request_changes) thì lấy nhánh đó và làm tiếp.
+- Clone: DevFlow (ở server, như BA) clone repo vào `/paperclip/devflow/ws/dev/repos/<key>` bằng **token chỉ đọc**, tạo nhánh `devflow/<REQ-n>` từ branch mặc định; nếu nhánh đã có trên GitHub (lượt sau request_changes) thì lấy nhánh đó và làm tiếp.
 - Agent sửa, chạy lệnh kiểm tra, `git commit` cục bộ (git config tên "DevFlow Dev"). Không có remote có quyền ghi trong workspace.
-- Sau lượt chạy, DevFlow kiểm trên runner: chỉ có commit mới trên đúng nhánh; không có thay đổi ở **đường dẫn cấm** (mặc định `.github/workflows/**`, `.env*`, `**/*.pem`, `**/*.key`, thêm được theo hệ thống); tổng dòng đổi ≤ trần (mặc định 3000); không file nhị phân lớn hơn 1 MB. Vi phạm → không push, lỗi rõ loại (`forbidden_paths`, `diff_too_large`), đề xuất vẫn ghi để người duyệt thấy lý do.
+- Sau lượt chạy (Paperclip đã ghi commit về server; chỉ dựa vào `git log`/`git diff <baseSha>..HEAD`, **không** tin chỉ mục hay cây làm việc vì spike thấy chúng lệch sau khi ghi về), DevFlow kiểm: chỉ có commit mới trên đúng nhánh; không có thay đổi ở **đường dẫn cấm** (mặc định `.github/workflows/**`, `.env*`, `**/*.pem`, `**/*.key`, thêm được theo hệ thống); tổng dòng đổi ≤ trần (mặc định 3000); không file nhị phân lớn hơn 1 MB. Vi phạm → không push, lỗi rõ loại (`forbidden_paths`, `diff_too_large`), đề xuất vẫn ghi để người duyệt thấy lý do.
 - **Trước khi push**, DevFlow gọi GitHub API kiểm **nhánh mặc định có bảo vệ** (bắt buộc qua PR); không có → từ chối (`repo_unprotected`). Push bằng **token ghi** truyền qua header cho đúng một lệnh `git push` (như clone ở ADR 0021), chỉ tới `refs/heads/devflow/*`.
 - Mở PR **nháp** qua REST GitHub (`fetch`, không thêm thư viện): tiêu đề `[REQ-n] <tiêu đề>`, nội dung gồm tóm tắt, task đã làm, lệnh kiểm tra và kết quả, link về DevFlow, nhãn `devflow`. Lượt sau request_changes thì cập nhật PR có sẵn (thêm bình luận tóm tắt lượt mới).
 
@@ -76,7 +77,7 @@ ALTER TABLE dr_systems
 
 - [Agent có Bash: có thể chạy mã độc từ repo hay từ yêu cầu bị chèn lệnh] → runner không có secret ngoài key model, mạng theo danh sách, workspace dọn sau mỗi case, DevFlow kiểm diff trước khi push, người duyệt PR là chốt cuối.
 - [Key model nằm trong runner] → có thể bị chép ra qua host được phép (api.anthropic.com với key khác)? Chấp nhận cho pilot; theo dõi chi phí theo key; P4 dùng proxy model có xác thực riêng.
-- [Execution target SSH chưa kiểm chứng] → spike trước; phương án dự phòng trình lại.
+- [Execution target SSH] → đã kiểm chứng ở spike (agent chạy trên runner, commit về lại server, chi phí được ghi); còn các việc nhỏ ở `kb/spike-p3-runner.md`.
 - [Toolchain Flutter nặng (vài GB)] → bản đầu có thể chỉ Node/Python; nếu repo cần Flutter mà runner không có, agent ghi "không chạy được kiểm tra" và người duyệt quyết.
 - [Một lượt Dev dài chặn BA/Planner] → chấp nhận cho pilot (D5).
 - [Token ghi có thể push nhánh chính nếu repo không bảo vệ] → DevFlow kiểm bảo vệ trước khi push (D3) và chỉ push `refs/heads/devflow/*`; chủ dự án bật bảo vệ cho `main` và `test` trước khi cấp token.

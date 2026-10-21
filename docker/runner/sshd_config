@@ -1,0 +1,7 @@
+# Key login for the runner user only.
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitRootLogin no
+AllowUsers runner
+X11Forwarding no
+AllowTcpForwarding no
