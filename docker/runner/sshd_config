@@ -1,4 +1,5 @@
 # Key login for the runner user only.
+HostKey /etc/ssh/hostkeys/ssh_host_ed25519_key
 PasswordAuthentication no
 KbdInteractiveAuthentication no
 PermitRootLogin no

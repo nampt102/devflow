@@ -1,0 +1,40 @@
+# DevFlow runner for the Dev agent (change add-dev-stage, ADR 0024). Use with the base files:
+#   docker compose -f docker-compose.yml -f docker-compose.devflow.yml -f docker-compose.runner.yml up -d
+# Prefer scripts/devflow/setup-dev-runner.mjs: it creates the SSH key this file mounts, starts the two services and
+# registers the runner as a Paperclip environment.
+#
+# Isolation: the runner is on an internal network, so it can reach only the server (SSH from Paperclip) and the
+# allow-list proxy. It has no database, no server secret and no volume of the server.
+services:
+  devflow-runner:
+    build:
+      context: ./runner
+    image: devflow-runner:local
+    restart: unless-stopped
+    networks: [runner_net]
+    volumes:
+      - ./runner/keys/runner_key.pub:/run/runner/authorized_keys:ro
+      - runner_hostkeys:/etc/ssh/hostkeys
+    pids_limit: 1024
+    mem_limit: 6g
+    cpus: 3
+
+  devflow-proxy:
+    image: ubuntu/squid:latest
+    restart: unless-stopped
+    networks: [runner_net, default]
+    volumes:
+      - ./runner/squid.conf:/etc/squid/squid.conf:ro
+      - proxy_log:/var/log/squid
+
+  # the server reaches the runner over SSH
+  server:
+    networks: [default, runner_net]
+
+networks:
+  runner_net:
+    internal: true
+
+volumes:
+  runner_hostkeys:
+  proxy_log:
