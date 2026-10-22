@@ -12,6 +12,20 @@ export type StageFailureKind =
   | "agent_prompt_outdated"
   | "system_missing_token"
   | "no_approved_spec"
+  | "no_approved_plan"
+  | "no_dev_system"
+  | "agent_not_on_runner"
+  | "agent_tools_changed"
+  | "runner_environment_invalid"
+  | "runner_host_key_not_pinned"
+  | "repo_unprotected"
+  | "write_token_cannot_push"
+  | "github_auth"
+  | "github_forbidden"
+  | "github_rejected"
+  | "github_error"
+  | "push_rejected"
+  | "push_failed"
   | "clone_failed"
   | "clone_timeout"
   | "workspace_failed"
@@ -45,4 +59,14 @@ export const CONFIG_KINDS: ReadonlySet<StageFailureKind> = new Set<StageFailureK
   "agent_prompt_outdated",
   "system_missing_token",
   "no_approved_spec",
+  "no_approved_plan",
+  "no_dev_system",
+  "agent_not_on_runner",
+  "agent_tools_changed",
+  "runner_environment_invalid",
+  "runner_host_key_not_pinned",
+  "repo_unprotected",
+  "write_token_cannot_push",
+  "github_auth",
+  "github_forbidden",
 ]);

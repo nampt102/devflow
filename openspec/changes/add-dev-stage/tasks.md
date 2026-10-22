@@ -18,7 +18,7 @@
 - [x] 3.3 Cấu hình chuẩn và kiểm agent Dev trước mỗi lượt (môi trường runner, tool, ngân sách, hướng dẫn, prompt) + `setup-dev-agent.mjs`
 - [x] 3.4 Workspace trên server (repo neo + `.paperclip-repositories/<key>`, clone đầy đủ, nhánh `devflow/<REQ>` mới hoặc làm tiếp, dọn sau mỗi case; xem design D1) — clone bằng token đọc, tạo hoặc lấy lại nhánh `devflow/<REQ>`, dọn sau mỗi case
 - [x] 3.5 Kiểm diff (đường dẫn cấm, kích thước, nhị phân, đúng nhánh), kiểm bảo vệ nhánh, push bằng token ghi, mở/cập nhật PR nháp
-- [ ] 3.6 Dev worker trên khung `agent-stage` (khóa chung, backoff, sổ `agent.dev_run`, trần ngày) + test với runner, git và GitHub giả + đột biến
+- [x] 3.6 Dev worker trên khung `agent-stage` (khóa chung, backoff, sổ `agent.dev_run`, trần ngày) + test với runner, git và GitHub giả + đột biến
 
 ## 4. Code review
 

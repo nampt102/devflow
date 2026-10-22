@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { AgentOutputError, describeIssues, extractJsonObject } from "../agent-stage/output.js";
+import type { PublishedRepo } from "./publish.js";
 
 // Output contract of the Dev agent (openspec/changes/add-dev-stage, design D6).
 // Strict on purpose: unknown keys are rejected, not ignored. DevFlow adds the facts the agent cannot vouch for
@@ -49,4 +50,39 @@ export function parseDevOutput(text: string, taskIds: readonly string[], systemK
   if (!parsed.success) throw new AgentOutputError(`output does not match the schema (${describeIssues(parsed.error.issues)})`);
   checkDevOutput(parsed.data, taskIds, systemKeys);
   return parsed.data;
+}
+
+/** What DevFlow found for one system after the run: a draft pull request, no commit, or a diff it refused to push. */
+export type DevRepoResult =
+  | PublishedRepo
+  | { system: string; branch: string; baseBranch: string; baseSha: string; noChanges: true }
+  | { system: string; branch: string; baseBranch: string; baseSha: string; blocked: { kind: string; paths: string[] } };
+
+const BLOCKED_LABEL: Record<string, string> = {
+  forbidden_paths: "đã sửa file bị cấm (CI, .env, khóa...)",
+  diff_too_large: "thay đổi quá lớn",
+  binary_too_large: "có file nhị phân quá lớn",
+  submodule_change: "có thay đổi submodule",
+  wrong_branch: "commit không nằm trên nhánh của yêu cầu",
+  history_rewritten: "agent đã viết lại lịch sử git",
+};
+const STATUS_LABEL = { done: "xong", partial: "một phần", skipped: "bỏ qua" } as const;
+
+/** Readable text of the Dev report for the review screen (what `comment_text` stores). */
+export function devCommentMarkdown(d: DevOutput, repos: readonly DevRepoResult[]): string {
+  const bullets = (items: readonly string[]) => items.map((i) => `- ${i}`).join("\n");
+  const repoLine = (r: DevRepoResult) => {
+    if ("prUrl" in r) return `- **${r.system}**: [PR nháp #${r.prNumber}](${r.prUrl}) · nhánh \`${r.branch}\` · ${r.filesChanged} file, +${r.additions} −${r.deletions}${r.unprotectedWarning ? " · ⚠️ nhánh chính không được bảo vệ" : ""}`;
+    if ("noChanges" in r) return `- **${r.system}**: agent không commit gì, không có PR.`;
+    return `- **${r.system}**: KHÔNG đẩy lên GitHub: ${BLOCKED_LABEL[r.blocked.kind] ?? r.blocked.kind}${r.blocked.paths.length ? ` (${r.blocked.paths.slice(0, 10).join(", ")})` : ""}.`;
+  };
+  const parts = [
+    d.summary,
+    `**Pull request**\n${repos.map(repoLine).join("\n")}`,
+    `**Task**\n${d.tasks.map((t) => `- ${t.id} (${STATUS_LABEL[t.status]}): ${t.notes}`).join("\n")}`,
+    d.checks.length ? `**Kiểm tra**\n${d.checks.map((c) => `- ${c.passed ? "đạt" : "KHÔNG đạt"}: ${c.command} (${c.system})`).join("\n")}` : "**Kiểm tra:** agent không chạy lệnh kiểm tra nào.",
+    d.risks.length ? `**Rủi ro**\n${bullets(d.risks)}` : null,
+    d.openQuestions.length ? `**Câu hỏi mở**\n${bullets(d.openQuestions)}` : null,
+  ];
+  return parts.filter(Boolean).join("\n\n").slice(0, 20_000);
 }

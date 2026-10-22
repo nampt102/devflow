@@ -58,4 +58,11 @@ services:
       DEVFLOW_PLAN_MAX_USD_PER_RUN: "${DEVFLOW_PLAN_MAX_USD_PER_RUN:-}"
       DEVFLOW_PLAN_MAX_USD_PER_DAY: "${DEVFLOW_PLAN_MAX_USD_PER_DAY:-20}"
       DEVFLOW_PLAN_INTERVAL_MS: "${DEVFLOW_PLAN_INTERVAL_MS:-}"
+      # Dev worker and agent (change add-dev-stage): on by default; needs the runner and a Dev agent per company (scripts/devflow/setup-dev-runner.mjs, setup-dev-agent.mjs)
+      DEVFLOW_DEV_ENABLED: "${DEVFLOW_DEV_ENABLED:-}"
+      DEVFLOW_DEV_MODEL: "${DEVFLOW_DEV_MODEL:-}"
+      DEVFLOW_DEV_MAX_USD_PER_RUN: "${DEVFLOW_DEV_MAX_USD_PER_RUN:-}"
+      DEVFLOW_DEV_MAX_USD_PER_DAY: "${DEVFLOW_DEV_MAX_USD_PER_DAY:-50}"
+      DEVFLOW_DEV_MAX_DIFF_LINES: "${DEVFLOW_DEV_MAX_DIFF_LINES:-}"
+      DEVFLOW_DEV_INTERVAL_MS: "${DEVFLOW_DEV_INTERVAL_MS:-}"
       DEVFLOW_AGENT_WORKSPACE_ROOT: "${DEVFLOW_AGENT_WORKSPACE_ROOT:-}"

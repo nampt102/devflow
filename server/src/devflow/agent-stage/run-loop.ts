@@ -269,8 +269,32 @@ export function stageService<O extends Record<string, unknown>, C>(db: Db, def: 
       inputTokens,
       outputTokens,
     };
-    const commentText = def.comment(output);
+    return submit({ companyId, caseId, agentId: agent.id, version: row.version, data, commentText: def.comment(output), runId, keys, costUsd, inputTokens, outputTokens });
+  }
 
+  /**
+   * Stores the agent's output as the stage's proposal and sends the request to review. "stale" when the case moved or
+   * already has a proposal (the first writer wins; the unique index allows one live proposal per stage).
+   */
+  async function submit(a: {
+    companyId: string;
+    caseId: string;
+    agentId: string;
+    /** the case version the run started from */
+    version: number;
+    data: Record<string, unknown>;
+    commentText: string;
+    runId: string | null;
+    keys: readonly string[];
+    costUsd: number;
+    inputTokens: number;
+    outputTokens: number;
+  }): Promise<"proposed" | "stale"> {
+    const { companyId, caseId, runId, costUsd, inputTokens, outputTokens, keys } = a;
+    const agent = { id: a.agentId };
+    const row = { version: a.version };
+    const data = a.data;
+    const commentText = a.commentText;
     // link the proposal to its run when the run row exists (a missing row would break the foreign key)
     const [runRow] = runId ? await db.select({ id: heartbeatRuns.id }).from(heartbeatRuns).where(eq(heartbeatRuns.id, runId)) : [];
 
@@ -366,7 +390,7 @@ export function stageService<O extends Record<string, unknown>, C>(db: Db, def: 
     });
   }
 
-  return { findPending, runCase, overBudgetCompanies, recordBudgetPause, recordFailure };
+  return { findPending, runCase, overBudgetCompanies, recordBudgetPause, recordFailure, loadCase, loadFeedback, recordRun, submit };
 }
 
 export type StageService = ReturnType<typeof stageService>;
