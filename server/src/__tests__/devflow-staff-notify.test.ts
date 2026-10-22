@@ -78,6 +78,7 @@ describeEmbeddedPostgres("devflow staff digest", () => {
         { pipelineId: pipeline.id, key: "triage_review", name: "Triage Review", kind: "review", position: 150, config: { approveToStageKey: "triage", rejectToStageKey: "triage" } },
         { pipelineId: pipeline.id, key: "ba_review", name: "BA Review", kind: "review", position: 250, config: { approveToStageKey: "triage", rejectToStageKey: "triage" } },
         { pipelineId: pipeline.id, key: "plan_review", name: "Plan Review", kind: "review", position: 350, config: { approveToStageKey: "triage", rejectToStageKey: "triage" } },
+        { pipelineId: pipeline.id, key: "code_review", name: "Code Review", kind: "review", position: 450, config: { approveToStageKey: "triage", rejectToStageKey: "triage" } },
       ])
       .returning();
     const stage = Object.fromEntries(stages.map((s) => [s.key, s.id])) as Record<string, string>;
@@ -147,7 +148,7 @@ describeEmbeddedPostgres("devflow staff digest", () => {
   });
 
   /** A request whose BA spec (or technical plan) waits for review. */
-  async function waitingBa(ctx: Awaited<ReturnType<typeof seedCompany>>, minutesAgo = 1, title?: string, queue: "ba" | "plan" = "ba") {
+  async function waitingBa(ctx: Awaited<ReturnType<typeof seedCompany>>, minutesAgo = 1, title?: string, queue: "ba" | "plan" | "code" = "ba") {
     const n = ++counter;
     const { case: created } = await pipelineService(db).ingestCase({
       companyId: ctx.company.id,
@@ -157,13 +158,13 @@ describeEmbeddedPostgres("devflow staff digest", () => {
       stageKey: "triage",
       actor: { type: "user", userId: ctx.userId },
     });
-    await db.update(pipelineCases).set({ stageId: queue === "ba" ? ctx.stage.ba_review : ctx.stage.plan_review }).where(eq(pipelineCases.id, created.id));
+    await db.update(pipelineCases).set({ stageId: ctx.stage[{ ba: "ba_review", plan: "plan_review", code: "code_review" }[queue]]! }).where(eq(pipelineCases.id, created.id));
     await db.insert(drRequests).values({ caseId: created.id, companyId: ctx.company.id, requestNumber: n, requesterId: ctx.requester.id, description: "MÔ TẢ-BÍ-MẬT" });
     await db.insert(drAgentOutputs).values({
       companyId: ctx.company.id,
       caseId: created.id,
-      stageKey: queue === "ba" ? "ba_spec" : "tech_plan",
-      promptRole: queue,
+      stageKey: { ba: "ba_spec", plan: "tech_plan", code: "dev" }[queue],
+      promptRole: queue === "code" ? "dev" : queue,
       promptVersion: "v1",
       promptHash: "h",
       data: { summary: "SPEC-BÍ-MẬT" },
@@ -210,6 +211,23 @@ describeEmbeddedPostgres("devflow staff digest", () => {
     expect(planMail.text).not.toContain("SPEC-BÍ-MẬT");
     const actions = (await db.select().from(activityLog).where(eq(activityLog.companyId, ctx.company.id))).map((r) => r.action).sort();
     expect(actions).toEqual(["staff.notified_ba", "staff.notified_plan"]);
+    expect(await n.run()).toBe(0);
+  });
+
+  it("announces code waiting for review in its own digest with its own ledger", async () => {
+    const ctx = await seedCompany();
+    const code = await waitingBa(ctx, 1, "Công nợ khách hàng", "code");
+    const plan = await waitingBa(ctx, 1, "Báo cáo kho", "plan");
+    const n = notifier({ recipients: ["x@staff.test"] });
+    expect(await n.run()).toBe(2);
+    const mail = smtp.messages.find((m) => m.subject.includes("thay đổi code"))!;
+    expect(mail.subject).toBe("[DevFlow] 1 thay đổi code mới chờ duyệt");
+    expect(mail.text).toContain(`- ${code.key}: Công nợ khách hàng`);
+    expect(mail.text).not.toContain(plan.key);
+    expect(mail.text).toContain(`https://devflow.example/${ctx.prefix}/code-review`);
+    expect(mail.text).not.toContain("SPEC-BÍ-MẬT");
+    const actions = (await db.select().from(activityLog).where(eq(activityLog.companyId, ctx.company.id))).map((r) => r.action).sort();
+    expect(actions).toEqual(["staff.notified_code", "staff.notified_plan"]);
     expect(await n.run()).toBe(0);
   });
 

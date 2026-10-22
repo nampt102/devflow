@@ -1,5 +1,6 @@
 import {
   Inbox,
+  GitPullRequestDraft,
   ListChecks,
   ShieldCheck,
   CircleDot,
@@ -42,6 +43,7 @@ import { instanceSettingsApi } from "../api/instanceSettings";
 import { queryKeys } from "../lib/queryKeys";
 import { devflowBaApi } from "../api/devflowBa";
 import { devflowPlanApi } from "../api/devflowPlan";
+import { devflowCodeApi } from "../api/devflowCode";
 import { devflowTriageApi } from "../api/devflowTriage";
 import { attentionBadgeCount } from "../lib/attention";
 import { useInboxBadge } from "../hooks/useInboxBadge";
@@ -107,6 +109,13 @@ export function Sidebar() {
   const { data: planCount } = useQuery({
     queryKey: queryKeys.devflowPlan.count(selectedCompanyId!),
     queryFn: () => devflowPlanApi.count(selectedCompanyId!),
+    enabled: !!selectedCompanyId && showPipelines,
+    refetchInterval: 30_000,
+    retry: false,
+  });
+  const { data: codeCount } = useQuery({
+    queryKey: queryKeys.devflowCode.count(selectedCompanyId!),
+    queryFn: () => devflowCodeApi.count(selectedCompanyId!),
     enabled: !!selectedCompanyId && showPipelines,
     refetchInterval: 30_000,
     retry: false,
@@ -235,6 +244,9 @@ export function Sidebar() {
           ) : null}
           {showPipelines ? (
             <SidebarNavItem to="/plan-review" label="Plan review" icon={ListChecks} badge={planCount?.waiting || undefined} badgeLabel="waiting for review" />
+          ) : null}
+          {showPipelines ? (
+            <SidebarNavItem to="/code-review" label="Code review" icon={GitPullRequestDraft} badge={codeCount?.waiting || undefined} badgeLabel="waiting for review" />
           ) : null}
           {showGoalsLink ? (
             <SidebarNavItem to="/goals" label="Goals" icon={Target} />

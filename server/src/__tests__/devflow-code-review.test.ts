@@ -224,6 +224,22 @@ describeEmbeddedPostgres("devflow Code review", () => {
     expect((await get(b, "code-count")).body.waiting).toBe(1);
   });
 
+  it("reports Dev decisions, spending and problems from its own ledger in code-metrics", async () => {
+    const ctx = await seedCompany();
+    const r = await seedRequest(ctx);
+    await db.insert(activityLog).values([
+      { companyId: ctx.company.id, actorType: "system", actorId: "devflow-dev", action: "agent.dev_run", entityType: "pipeline_case", entityId: r.id, details: { ok: true, costUsd: 2.5, inputTokens: 100, outputTokens: 10 } },
+      { companyId: ctx.company.id, actorType: "system", actorId: "devflow-dev", action: "agent.dev_failed", entityType: "pipeline_case", entityId: r.id, details: { kind: "run_failed", attempts: 1 } },
+      { companyId: ctx.company.id, actorType: "system", actorId: "devflow-ba", action: "agent.ba_run", entityType: "pipeline_case", entityId: r.id, details: { ok: true, costUsd: 9 } },
+    ]);
+    await decide(ctx, r, { decision: "request_changes", reason: "Thiếu test" });
+    const res = await get(ctx, "code-metrics?days=30");
+    expect(res.status).toBe(200);
+    expect(res.body.agent).toMatchObject({ spendUsd: 2.5, runs: 1, failed: 1 }); // BA's spending is not counted here
+    expect(res.body.decisions).toMatchObject({ requestChanges: 1, approve: 0, reject: 0 });
+    expect(res.body.recentFailures[0]).toMatchObject({ action: "agent.dev_failed", kind: "run_failed" });
+  });
+
   it("shows the report next to the approved plan's tasks and the BA acceptance criteria", async () => {
     const ctx = await seedCompany();
     const r = await seedRequest(ctx);

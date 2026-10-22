@@ -4,8 +4,8 @@ import { logger } from "../../middleware/logger.js";
 import { logActivity } from "../../services/activity-log.js";
 import { type SendMail } from "./mailer.js";
 
-// Email to staff when new Triage proposals, BA specs or technical plans wait for review (backlog B-01, changes
-// add-ba-spec-stage and add-tech-plan-stage).
+// Email to staff when new Triage proposals, BA specs, technical plans or Dev work wait for review (backlog B-01, changes
+// add-ba-spec-stage, add-tech-plan-stage and add-dev-stage).
 // Each kind has its own digest and ledger. One digest per company and kind: the first new
 // proposal goes out at once, later ones are gathered until `intervalMinutes` have passed since the last digest.
 // Recipients: an explicit list (DEVFLOW_STAFF_NOTIFY_EMAILS), otherwise the company's active owners and admins.
@@ -32,7 +32,7 @@ export function parseRecipients(raw: string | undefined): string[] {
   return [...new Set((raw ?? "").split(/[,;\s]+/).map((s) => s.trim().toLowerCase()).filter((s) => EMAIL.test(s)))];
 }
 
-export type DigestKind = "triage" | "ba" | "plan";
+export type DigestKind = "triage" | "ba" | "plan" | "code";
 
 /** What each review queue is called in the mail, where its proposals live and how its digests are recorded. */
 const KINDS: Record<DigestKind, { stageKey: string; outputStage: string; path: string; notified: string; failed: string; subject: (n: number) => string; intro: (n: number) => string }> = {
@@ -62,6 +62,15 @@ const KINDS: Record<DigestKind, { stageKey: string; outputStage: string; path: s
     failed: "staff.notify_failed_plan",
     subject: (n) => `[DevFlow] ${n} kế hoạch kỹ thuật mới chờ duyệt`,
     intro: (n) => `Có ${n} kế hoạch kỹ thuật mới đang chờ bạn duyệt:`,
+  },
+  code: {
+    stageKey: "code_review",
+    outputStage: "dev",
+    path: "code-review",
+    notified: "staff.notified_code",
+    failed: "staff.notify_failed_code",
+    subject: (n) => `[DevFlow] ${n} thay đổi code mới chờ duyệt`,
+    intro: (n) => `Có ${n} thay đổi code (pull request nháp) mới đang chờ bạn duyệt:`,
   },
 };
 
@@ -167,7 +176,7 @@ export function createStaffNotifier(db: Db, send: SendMail, opts: StaffNotifyOpt
 
   /** One pass over every queue; returns how many digests were sent. */
   async function run(): Promise<number> {
-    return (await runKind("triage")) + (await runKind("ba")) + (await runKind("plan"));
+    return (await runKind("triage")) + (await runKind("ba")) + (await runKind("plan")) + (await runKind("code"));
   }
 
   return { run };

@@ -24,7 +24,7 @@
 
 - [x] 4.1 API hàng chờ, chi tiết, quyết định (`beforeCommit`, vai `tech_lead`, đóng PR khi reject, lý do vào lượt sau) + test
 - [x] 4.2 Cấu hình pipeline `code_review` approver `role` (`tech_lead`) qua `setup-dev-request-pipeline.mjs`
-- [ ] 4.3 Trang Board UI "Code review", số đếm sidebar, số liệu và chi phí, email nhân viên `code_review`
+- [x] 4.3 Trang Board UI "Code review", số đếm sidebar, số liệu và chi phí, email nhân viên `code_review`
 
 ## 5. Hoàn tất
 
