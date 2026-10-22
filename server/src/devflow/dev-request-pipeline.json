@@ -90,7 +90,10 @@
       "config": {
         "requireApproval": true,
         "approver": {
-          "kind": "any_human"
+          "kind": "role",
+          "roles": [
+            "tech_lead"
+          ]
         },
         "approveToStageKey": "qa",
         "rejectToStageKey": "cancelled",

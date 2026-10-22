@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import express from "express";
@@ -64,6 +65,22 @@ describe("approverPatches (seed script)", () => {
   it("rolls every review stage back to any_human with anyHuman", () => {
     const patches = approverPatches(definition, live({ kind: "role", roles: ["tech_lead"] }), { anyHuman: true });
     expect(patches.map((p) => [p.key, p.body.config.approver])).toEqual([["plan_review", { kind: "any_human" }]]);
+  });
+
+  it("brings the code review of an already-seeded pipeline to Tech Lead, from the real definition, and nothing else", () => {
+    const real = JSON.parse(readFileSync(new URL("../devflow/dev-request-pipeline.json", import.meta.url), "utf8")).stages as Array<{ key: string; kind: string; config?: { approver?: unknown } }>;
+    // a company seeded before add-dev-stage: every other review already has its role, code_review is still any_human
+    const seeded = real.map((s, i) => ({
+      id: `s${i}`,
+      key: s.key,
+      kind: s.kind,
+      config: s.kind === "review" ? { ...s.config, approveToStageKey: "x", approver: s.key === "code_review" ? { kind: "any_human" } : s.config?.approver } : {},
+    }));
+    const patches = approverPatches(real, seeded);
+    expect(patches.map((p) => [p.key, p.body.config.approver])).toEqual([["code_review", { kind: "role", roles: ["tech_lead"] }]]);
+    expect(patches[0]!.body.config.approveToStageKey).toBe("x"); // the rest of the live config is kept
+    // and a second run changes nothing
+    expect(approverPatches(real, seeded.map((s) => (s.key === "code_review" ? { ...s, config: { ...s.config, approver: { kind: "role", roles: ["tech_lead"] } } } : s)))).toEqual([]);
   });
 
   it("ignores stages the company does not have", () => {
