@@ -14,6 +14,7 @@ import { newBoundary } from "../prompts/ba.v1.js";
 import { sanitizeUntrusted } from "../triage/triage-service.js";
 import { devAgentProblem } from "./agent.js";
 import { approvedPlanText, devTaskIds } from "./input.js";
+import { githubClient } from "./github.js";
 import { DevPublishError, publishRepo, type PublishDeps, type PublishedRepo } from "./publish.js";
 import { devCommentMarkdown, parseDevOutput, type DevOutput, type DevRepoResult } from "./schema.js";
 import { devWorkspace, REPOS_DIR } from "./workspace.js";
@@ -30,6 +31,12 @@ const MAX_ATTEMPTS = 2; // one more run when the agent's JSON is rejected
 const BLOCKED_KINDS = new Set(["wrong_branch", "history_rewritten", "forbidden_paths", "diff_too_large", "binary_too_large", "submodule_change"]);
 
 const asStageFailure = (kind: string): StageFailure => new StageFailure(kind as StageFailureKind);
+
+/**
+ * GitHub refusals that show up only after the agent has run (the same kinds are setup problems when found before):
+ * they cost a run, so they are retried with backoff and given up on, not calmly forever.
+ */
+const DENIED_AFTER_RUN = new Set(["github_auth", "github_forbidden", "write_token_cannot_push", "repo_unprotected"]);
 
 export type DevServiceDeps = Omit<StageServiceDeps, "clone"> & {
   /** replaceable in tests */
@@ -109,6 +116,20 @@ export function devService(db: Db, deps: DevServiceDeps) {
       .orderBy(asc(drSystems.key));
   }
 
+  /** The write token can push and read pull requests, and the default branch is protected (or the owner allowed otherwise). */
+  async function preflightGithub(system: { repoUrl: string; defaultBranch: string; allowUnprotected: boolean }, token: string) {
+    const github = (deps.publishDeps?.github ?? githubClient)(token);
+    try {
+      if (!(await github.canPush(system.repoUrl))) throw new StageFailure("write_token_cannot_push");
+      // listing pull requests needs the same permission as opening one (the first real run found a token without it)
+      await github.findOpenPr(system.repoUrl, "devflow/preflight");
+      if (!(await github.isBranchProtected(system.repoUrl, system.defaultBranch)) && !system.allowUnprotected) throw new StageFailure("repo_unprotected");
+    } catch (err) {
+      if (err instanceof StageFailure) throw err;
+      throw asStageFailure((err as { kind?: string }).kind ?? "github_error");
+    }
+  }
+
   /** "proposed", or "stale" when the case moved or already has a proposal. */
   async function runCase(companyId: string, caseId: string): Promise<"proposed" | "stale"> {
     const row = await shared.loadCase(companyId, caseId);
@@ -157,6 +178,9 @@ export function devService(db: Db, deps: DevServiceDeps) {
       // before anything is spent: a system whose write token is gone cannot be published
       const writeToken = system.writeTokenSecretId ? await deps.resolveToken(companyId, system.writeTokenSecretId).catch(() => null) : null;
       if (!writeToken) throw new StageFailure("system_missing_token");
+      // ... and before the agent runs: a token without the right permissions, or a default branch that may not be
+      // pushed to, would otherwise be found only after a paid run (the first real smoke run lost its work this way)
+      await preflightGithub(system, writeToken);
       try {
         await workspace.reset();
         const [prepared] = await workspace.prepareAll(companyId, row.caseKey, [
@@ -224,7 +248,7 @@ export function devService(db: Db, deps: DevServiceDeps) {
           repo = published ?? { system: key, branch: prepared!.branch, baseBranch: prepared!.baseBranch, baseSha: prepared!.sha, noChanges: true };
         } catch (err) {
           if (!(err instanceof DevPublishError)) throw err;
-          if (!BLOCKED_KINDS.has(err.kind)) throw asStageFailure(err.kind === "diff_failed" ? "workspace_failed" : err.kind);
+          if (!BLOCKED_KINDS.has(err.kind)) throw asStageFailure(err.kind === "diff_failed" ? "workspace_failed" : DENIED_AFTER_RUN.has(err.kind) ? "publish_denied" : err.kind);
           // nothing is pushed; the reviewer reads why
           repo = { system: key, branch: prepared!.branch, baseBranch: prepared!.baseBranch, baseSha: prepared!.sha, blocked: { kind: err.kind, paths: err.paths.slice(0, 20) } };
         }

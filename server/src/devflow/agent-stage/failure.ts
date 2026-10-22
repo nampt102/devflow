@@ -26,6 +26,7 @@ export type StageFailureKind =
   | "github_error"
   | "push_rejected"
   | "push_failed"
+  | "publish_denied"
   | "clone_failed"
   | "clone_timeout"
   | "workspace_failed"

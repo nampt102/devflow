@@ -26,10 +26,11 @@ import { getEmbeddedPostgresTestSupport, startEmbeddedPostgresTestDatabase } fro
 import { pipelineService } from "../services/pipelines.js";
 import { PROMPT_HASH } from "../devflow/prompts/dev.v1.js";
 import type { StageRunResult, StageRunner } from "../devflow/agent-stage/runner.js";
+import { CONFIG_KINDS } from "../devflow/agent-stage/failure.js";
 import { createStageWorker } from "../devflow/agent-stage/worker.js";
 import { DEV_RUNNER_ENVIRONMENT, devAgentSpec, devWorkspaceDir } from "../devflow/dev/agent.js";
 import { devService } from "../devflow/dev/dev-service.js";
-import type { GithubClient } from "../devflow/dev/github.js";
+import { GithubError, type GithubClient } from "../devflow/dev/github.js";
 import { REPOS_DIR } from "../devflow/dev/workspace.js";
 import { APPROVED_BA_SPEC, VALID_PLAN_OUTPUT } from "./helpers/plan-fixtures.js";
 import { VALID_BA_OUTPUT } from "./helpers/ba-fixtures.js";
@@ -123,13 +124,17 @@ describeEmbeddedPostgres("devflow Dev", () => {
     return { sha, resumed: false };
   };
 
-  function fakeGithub(opts: { protected?: boolean; canPush?: boolean } = {}) {
+  function fakeGithub(opts: { protected?: boolean; canPush?: boolean; findFails?: boolean; createFails?: boolean } = {}) {
     const log: string[] = [];
     const client = {
       canPush: async () => (log.push("canPush"), opts.canPush ?? true),
       isBranchProtected: async () => (log.push("protected"), opts.protected ?? true),
-      findOpenPr: async () => (log.push("find"), null),
-      createDraftPr: async () => (log.push("create"), { number: 41, url: "https://github.com/acme/portal/pull/41", draft: true }),
+      findOpenPr: async () => {
+        log.push("find");
+        if (opts.findFails) throw new GithubError("github_forbidden", 403);
+        return null;
+      },
+      createDraftPr: async () => (log.push("create"), opts.createFails ? (() => { throw new GithubError("github_forbidden", 403); })() : { number: 41, url: "https://github.com/acme/portal/pull/41", draft: true }),
       updatePr: async () => log.push("update"),
       comment: async () => log.push("comment"),
       label: async () => log.push("label"),
@@ -137,7 +142,7 @@ describeEmbeddedPostgres("devflow Dev", () => {
     return { log, publishDeps: { github: () => client, push: async () => void log.push("push") } };
   }
 
-  type Opts = { maxUsdPerDay?: number; protected?: boolean; canPush?: boolean; token?: string | null; resolve?: (secretId: string) => string | null };
+  type Opts = { maxUsdPerDay?: number; protected?: boolean; canPush?: boolean; findFails?: boolean; createFails?: boolean; token?: string | null; resolve?: (secretId: string) => string | null };
   function makeDev(steps: RunStep[] = [], opts: Opts = {}) {
     const r = fakeRunner(steps, JSON.stringify(report()));
     const gh = fakeGithub(opts);
@@ -270,7 +275,8 @@ describeEmbeddedPostgres("devflow Dev", () => {
     expect(repos[0]).toMatchObject({ system: "portal", branch: expect.stringMatching(/^devflow\/REQ-\d+$/), prNumber: 41, prUrl: "https://github.com/acme/portal/pull/41", filesChanged: 2, additions: 2, newPr: true });
     expect((out!.data as any).costUsd).toBe(1.5);
     expect(out!.commentText).toContain("[PR nháp #41](https://github.com/acme/portal/pull/41)");
-    expect(t.github).toEqual(["canPush", "protected", "push", "find", "create", "label"]);
+    // checked before the agent ran (can push, can read pull requests, protected), then again when publishing
+    expect(t.github).toEqual(["canPush", "find", "protected", "canPush", "protected", "push", "find", "create", "label"]);
 
     const call = t.runs[0]!;
     expect(call.agentId).toBe(ctx.agentId);
@@ -343,7 +349,7 @@ describeEmbeddedPostgres("devflow Dev", () => {
     const caseId = await readyRequest(ctx);
     const t = makeDev([{ commit: { "src/ok.ts": "ok\n", ".github/workflows/deploy.yml": "name: x\n" } }]);
     expect(await t.service.runCase(ctx.company.id, caseId)).toBe("proposed");
-    expect(t.github).toEqual([]);
+    expect(t.github).not.toContain("push");
     const [out] = await devOutputs(caseId);
     expect((out!.data as any).repos[0]).toMatchObject({ system: "portal", blocked: { kind: "forbidden_paths", paths: [".github/workflows/deploy.yml"] } });
     expect(out!.commentText).toContain("KHÔNG đẩy lên GitHub");
@@ -356,7 +362,7 @@ describeEmbeddedPostgres("devflow Dev", () => {
     const caseId = await readyRequest(ctx);
     const t = makeDev([{}]);
     expect(await t.service.runCase(ctx.company.id, caseId)).toBe("proposed");
-    expect(t.github).toEqual([]);
+    expect(t.github).not.toContain("push");
     const [out] = await devOutputs(caseId);
     expect((out!.data as any).repos[0]).toMatchObject({ system: "portal", noChanges: true });
     expect(out!.commentText).toContain("không commit gì");
@@ -367,7 +373,9 @@ describeEmbeddedPostgres("devflow Dev", () => {
     const caseId = await readyRequest(ctx);
     const refused = makeDev([{ commit: { "src/x.ts": "x\n" } }], { protected: false });
     await expect(refused.service.runCase(ctx.company.id, caseId)).rejects.toMatchObject({ kind: "repo_unprotected" });
-    expect(refused.github).toEqual(["canPush", "protected"]);
+    expect(refused.github).toEqual(["canPush", "find", "protected"]); // found before the agent ran: nothing was spent
+    expect(refused.runs).toHaveLength(0);
+    expect(await activities(ctx.company.id, "agent.dev_run")).toHaveLength(0);
     expect(await stageOf(caseId)).toBe("dev");
     expect(await devOutputs(caseId)).toHaveLength(0);
     expect(fs.existsSync(devWorkspaceDir(root))).toBe(false);
@@ -397,7 +405,7 @@ describeEmbeddedPostgres("devflow Dev", () => {
     const u = makeDev([{ text: omitted, commit: { "src/x.ts": "x\n" } }, { text: omitted }]);
     await expect(u.service.runCase(second.company.id, bad)).rejects.toMatchObject({ kind: "invalid_output" });
     expect(u.runs[1]!.request).toContain("every task of the plan");
-    expect(u.github).toEqual([]);
+    expect(u.github).not.toContain("push");
     expect(await stageOf(bad)).toBe("dev");
     expect(fs.existsSync(devWorkspaceDir(root))).toBe(false);
   });
@@ -413,7 +421,7 @@ describeEmbeddedPostgres("devflow Dev", () => {
       const caseId = await readyRequest(ctx);
       const t = makeDev([{ ...step, commit: { "src/x.ts": "x\n" } }]);
       await expect(t.service.runCase(ctx.company.id, caseId)).rejects.toMatchObject({ kind });
-      expect(t.github).toEqual([]);
+      expect(t.github).not.toContain("push");
       expect(fs.existsSync(devWorkspaceDir(root))).toBe(false);
       expect((await activities(ctx.company.id, "agent.dev_run"))[0]!.details).toMatchObject({ ok: false, kind });
     }
@@ -425,6 +433,28 @@ describeEmbeddedPostgres("devflow Dev", () => {
     const t = makeDev([{ commit: { "src/x.ts": "x\n" } }], { canPush: false });
     await expect(t.service.runCase(ctx.company.id, caseId)).rejects.toMatchObject({ kind: "write_token_cannot_push" });
     expect(t.github).toEqual(["canPush"]);
+  });
+
+  it("finds a token that cannot read pull requests before the agent runs, so no run is paid for and nothing is pushed", async () => {
+    const ctx = await seedCompany();
+    const caseId = await readyRequest(ctx);
+    const t = makeDev([{ commit: { "src/x.ts": "x\n" } }], { findFails: true });
+    await expect(t.service.runCase(ctx.company.id, caseId)).rejects.toMatchObject({ kind: "github_forbidden" });
+    expect(t.runs).toHaveLength(0);
+    expect(t.github).toEqual(["canPush", "find"]);
+    expect(await activities(ctx.company.id, "agent.dev_run")).toHaveLength(0);
+    expect(fs.existsSync(devWorkspaceDir(root))).toBe(false);
+  });
+
+  it("treats a refusal that only shows after the run as a failed run (backoff, then give up), not a setup problem retried forever", async () => {
+    const ctx = await seedCompany();
+    const caseId = await readyRequest(ctx);
+    const t = makeDev([{ commit: { "src/x.ts": "x\n" } }], { createFails: true });
+    // the token could push and list pull requests but not open one
+    await expect(t.service.runCase(ctx.company.id, caseId)).rejects.toMatchObject({ kind: "publish_denied" });
+    expect(t.runs).toHaveLength(1);
+    expect(CONFIG_KINDS.has("publish_denied")).toBe(false);
+    expect(CONFIG_KINDS.has("github_forbidden")).toBe(true); // the same refusal found before the run is calm
   });
 
   it("gives the agent the code reviewer's reason after request_changes", async () => {
