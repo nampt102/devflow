@@ -508,7 +508,7 @@ interface TransferProgress {
 // blocking the pipe from opening. Until it resolves the counter reports bytes in
 // MB-only mode, then adopts the percentage once the total is known; `finish`
 // awaits the estimate so the terminal 100% line is still guaranteed.
-function createTransferProgress(input: {
+export function createTransferProgress(input: {
   onProgress: RuntimeProgressSink;
   phase: RuntimeProgressPhase;
   direction: RuntimeProgressDirection;
@@ -701,7 +701,8 @@ async function streamLocalFileToSsh(input: {
   }).finally(auth.cleanup);
 }
 
-async function streamSshToLocalFile(input: {
+/** Exported for tests only. */
+export async function streamSshToLocalFile(input: {
   spec: SshConnectionConfig;
   remoteScript: string;
   localFile: string;
@@ -744,14 +745,22 @@ async function streamSshToLocalFile(input: {
     });
     ssh.on("error", fail);
     sink.on("error", fail);
+    // The pipe ends the sink itself once ssh's stdout has ended and everything before it (through the progress counter)
+    // has been written. Ending the sink here, on ssh's `close`, could cut the file short: `close` can arrive while data
+    // is still in flight through the counter (a 34 MB git bundle from a runner on the same network lost its last third).
+    const sinkFinished = new Promise<void>((done) => sink.once("finish", done));
     ssh.on("close", (code) => {
-      sink.end(() => {
+      if ((code ?? 0) !== 0) {
+        sink.end(() => {
+          if (settled) return;
+          settled = true;
+          reject(new Error(sshStderr.trim() || `ssh exited with code ${code ?? -1}`));
+        });
+        return;
+      }
+      void sinkFinished.then(() => {
         if (settled) return;
         settled = true;
-        if ((code ?? 0) !== 0) {
-          reject(new Error(sshStderr.trim() || `ssh exited with code ${code ?? -1}`));
-          return;
-        }
         resolve();
       });
     });
