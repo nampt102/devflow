@@ -28,5 +28,5 @@
 
 ## 5. Hoàn tất
 
-- [ ] 5.1 Smoke thật: yêu cầu nhỏ trên repo thử nghiệm có bảo vệ nhánh → PR nháp → Code review approve
+- [x] 5.1 Smoke thật (2026-10-22, `scripts/devflow/smoke-p3.mjs` 17/17 trên repo RESKI: agent thật 0,028 USD, PR nháp #236 mở rồi đóng, nhánh xóa): yêu cầu nhỏ trên repo thử nghiệm có bảo vệ nhánh → PR nháp → Code review approve
 - [x] 5.2 KB `kb/dev-stage.md`, runbook (cài runner, khóa, token ghi, bảo vệ nhánh), status, ADR
