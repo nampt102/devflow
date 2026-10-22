@@ -27,17 +27,33 @@ export type CloneInput = {
 
 export type CloneResult = { sha: string };
 
-const BRANCH = /^[A-Za-z0-9][A-Za-z0-9._\/-]{0,199}$/;
+export const BRANCH = /^[A-Za-z0-9][A-Za-z0-9._\/-]{0,199}$/;
+
+/** `-c` arguments that send the token in an HTTP header for one git process (never in the URL or .git/config). */
+export function authHeaderArgs(token?: string | null): string[] {
+  if (!token) return [];
+  const basic = Buffer.from(`x-access-token:${token}`).toString("base64");
+  return ["-c", `http.extraHeader=Authorization: Basic ${basic}`];
+}
+
+/** The minimal environment of a git process: https only, no prompts, no system config. */
+export function gitRunEnv(extra: Record<string, string> = {}): Record<string, string> {
+  return {
+    PATH: process.env.PATH ?? "",
+    HOME: process.env.HOME ?? "/tmp",
+    GIT_TERMINAL_PROMPT: "0",
+    GIT_ALLOW_PROTOCOL: "https",
+    GIT_CONFIG_NOSYSTEM: "1",
+    ...extra,
+  };
+}
 
 export function cloneArgs(input: Pick<CloneInput, "repoUrl" | "branch" | "dest" | "token">): string[] {
   // the same checks the catalog applies; repeated here because this is where the command line is built
   if (!GITHUB_REPO.test(input.repoUrl)) throw new Error("Repository URL must be a plain https://github.com/<owner>/<repo> URL");
   if (!BRANCH.test(input.branch) || input.branch.includes("..")) throw new Error("Invalid branch name");
   const args: string[] = ["-c", "core.hooksPath=/dev/null", "-c", "advice.detachedHead=false"];
-  if (input.token) {
-    const basic = Buffer.from(`x-access-token:${input.token}`).toString("base64");
-    args.push("-c", `http.extraHeader=Authorization: Basic ${basic}`);
-  }
+  args.push(...authHeaderArgs(input.token));
   // `--` ends the options, so no field can be read as one
   args.push("clone", "--depth", "1", "--single-branch", "--no-tags", "--branch", input.branch, "--", input.repoUrl, input.dest);
   return args;
@@ -63,14 +79,7 @@ export async function cloneSystem(input: CloneInput): Promise<CloneResult> {
   const opts = {
     timeout: input.timeoutMs ?? 120_000,
     maxBuffer: 1024 * 1024,
-    env: {
-      PATH: process.env.PATH ?? "",
-      HOME: process.env.HOME ?? "/tmp",
-      GIT_TERMINAL_PROMPT: "0",
-      GIT_ALLOW_PROTOCOL: "https",
-      GIT_CONFIG_NOSYSTEM: "1",
-      ...(input.env ?? {}),
-    },
+    env: gitRunEnv(input.env),
   };
   try {
     await run(git, cloneArgs(input), opts);

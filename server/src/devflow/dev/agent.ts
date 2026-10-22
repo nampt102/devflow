@@ -12,7 +12,9 @@ import { PROMPT_HASH, PROMPT_ROLE, PROMPT_VERSION, SYSTEM_PROMPT } from "../prom
 export const DEV_AGENT_NAME = "DevFlow Dev";
 export const DEFAULT_DEV_MAX_USD_PER_RUN = 5;
 export const DEFAULT_DEV_MODEL = "claude-sonnet-5-5";
-export const DEV_TOOLS = "Read,Grep,Glob,Edit,Write,Bash";
+export const DEV_GIT_NAME = "DevFlow Dev";
+export const DEV_GIT_EMAIL = "dev@devflow.local";
+export const DEV_TOOLS ="Read,Grep,Glob,Edit,Write,Bash";
 /** Name of the Paperclip SSH environment of the runner (scripts/devflow/setup-dev-runner.mjs). */
 export const DEV_RUNNER_ENVIRONMENT = "devflow-runner";
 export const DEV_PROMPT = { role: PROMPT_ROLE, version: PROMPT_VERSION, hash: PROMPT_HASH, system: SYSTEM_PROMPT } as const;
@@ -38,6 +40,9 @@ export function devAgentSpec(opts: { model?: string; maxUsdPerRun?: number; work
       maxTurnsPerRun: 200,
       timeoutSec: 3600,
       extraArgs: ["--tools", DEV_TOOLS, "--max-budget-usd", String(maxUsd)],
+      // Paperclip recreates the repositories on the runner from git bundles and does not carry their local git config
+      // (spike 2026-10-22): the commit author must come from the environment. The setup script adds the Anthropic key.
+      env: { GIT_AUTHOR_NAME: DEV_GIT_NAME, GIT_AUTHOR_EMAIL: DEV_GIT_EMAIL, GIT_COMMITTER_NAME: DEV_GIT_NAME, GIT_COMMITTER_EMAIL: DEV_GIT_EMAIL },
     },
     runtimeConfig: { heartbeat: { enabled: false } },
     metadata: { devflowRole: DEV_PROMPT.role, devflowPromptVersion: DEV_PROMPT.version, devflowPromptHash: DEV_PROMPT.hash },

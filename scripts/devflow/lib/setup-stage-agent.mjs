@@ -93,7 +93,7 @@ export async function setupStageAgent(stage) {
     environmentFields = { defaultEnvironmentId: runner.id };
   }
 
-  const adapterConfig = { ...spec.adapterConfig, env: { ANTHROPIC_API_KEY: { type: "secret_ref", secretId: secret.id, version: "latest" } } };
+  const adapterConfig = { ...spec.adapterConfig, env: { ...(spec.adapterConfig.env ?? {}), ANTHROPIC_API_KEY: { type: "secret_ref", secretId: secret.id, version: "latest" } } };
   let agentId = state.agent?.id;
   if (!agentId) {
     const created = must(

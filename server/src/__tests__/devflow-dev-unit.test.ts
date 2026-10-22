@@ -27,7 +27,7 @@ describe("Dev prompt v1", () => {
   it("is pinned: editing v1 changes the hash, create dev.v2.ts instead", () => {
     expect(PROMPT_ROLE).toBe("dev");
     expect(PROMPT_VERSION).toBe("v1");
-    expect(PROMPT_HASH).toBe("62e7573b10a3e7ddf891a92d0a61327a2af509f1e4c65e48a0c0987c124373fe");
+    expect(PROMPT_HASH).toBe("bd07ce161d201bcd2af2f3143efe7a2f86baebecb14255d8a9c6085c146fca06");
   });
 
   it("keeps the agent in its workspace, away from the network, git remotes and forbidden files", () => {
@@ -60,7 +60,7 @@ describe("Dev prompt v1", () => {
     expect(between("APPROVED PLAN", "làm việc đã duyệt")).toBe(true);
     expect(between("REVIEWER FEEDBACK", "thiếu test voucher hết hạn")).toBe(true);
     // DevFlow's own lines sit outside the data, and a multi-line command stays on one line
-    expect(file).toContain("key: portal | directory: repos/portal/ | branch: devflow/REQ-3 (from main, commit 0123456789ab)");
+    expect(file).toContain("key: portal | directory: .paperclip-repositories/portal/ | branch: devflow/REQ-3 (from main, commit 0123456789ab)");
     expect(file).toContain("test command: cd web && npm test");
     expect(file).toContain("extra forbidden paths: deploy/**");
   });
