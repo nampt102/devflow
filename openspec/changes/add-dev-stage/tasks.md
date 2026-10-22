@@ -29,4 +29,4 @@
 ## 5. Hoàn tất
 
 - [ ] 5.1 Smoke thật: yêu cầu nhỏ trên repo thử nghiệm có bảo vệ nhánh → PR nháp → Code review approve
-- [ ] 5.2 KB `kb/dev-stage.md`, runbook (cài runner, khóa, token ghi, bảo vệ nhánh), status, ADR
+- [x] 5.2 KB `kb/dev-stage.md`, runbook (cài runner, khóa, token ghi, bảo vệ nhánh), status, ADR
