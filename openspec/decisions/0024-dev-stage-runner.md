@@ -31,5 +31,5 @@ Chọn **2**. Spike (2026-10-21/22, `kb/spike-p3-runner.md`) xác nhận chạy 
 - Hệ thống nhiều repo chạy lại các hệ thống đã xong khi một hệ thống sau lỗi (chưa lưu tiến độ từng hệ thống).
 - Transcript Claude Code trên runner dùng chung giữa các công ty (`cwd` giống nhau); chưa có việc dọn.
 - Agent BA và Planner (trong container server) không có luật chặn đọc `/paperclip/devflow/ws/dev`; an toàn nhờ khóa chung và dọn workspace, chưa thêm luật để không buộc chạy lại setup của chúng.
-- Toolchain hiện có: Node, Python, .NET 8 và 10. Flutter chưa cài (cần trước khi bật Dev cho RESKI).
+- Toolchain hiện có: Node, Python, .NET 8 và 10. Flutter 3.47.0 (ghim theo RESKI; đã thử `pub get`, `analyze`, `test` trên repo thật).
 - Cần xem lại khi: có nhiều công ty cùng dùng một runner (môi trường Paperclip là của instance, secret khóa SSH thuộc công ty đầu tiên), hoặc cần nhiều toolchain nặng (tách image theo stack, thêm `runner_profile` cho hệ thống).

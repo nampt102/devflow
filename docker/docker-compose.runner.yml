@@ -20,6 +20,7 @@ services:
       # package caches, so a rebuild or restart does not download them again
       - runner_nuget:/home/runner/.nuget
       - runner_npm:/home/runner/.npm
+      - runner_pub:/home/runner/.pub-cache
     pids_limit: 1024
     mem_limit: 6g
     cpus: 3
@@ -44,4 +45,5 @@ volumes:
   runner_hostkeys:
   runner_nuget:
   runner_npm:
+  runner_pub:
   proxy_log:

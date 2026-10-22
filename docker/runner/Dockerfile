@@ -4,8 +4,7 @@
 # The only way out is the allow-list proxy (devflow-proxy); see docker-compose.runner.yml and squid.conf.
 FROM node:24-bookworm-slim
 
-# Toolchains for the first target repositories: Node (base image), Python and .NET 8/10. Flutter is not installed
-# yet; add it here before a Flutter system (RESKI) is enabled for Dev. python3-venv is left out on purpose: its packages are
+# Toolchains for the first target repositories: Node (base image), Python, .NET 8/10 and Flutter (see below). python3-venv is left out on purpose: its packages are
 # blocked by some company firewalls; use `pip install --user` or virtualenv instead.
 RUN printf 'Acquire::Retries "5";\n' > /etc/apt/apt.conf.d/80retries \
  && apt-get update \
@@ -37,6 +36,26 @@ RUN useradd -m -s /bin/bash runner \
     'http_proxy=http://devflow-proxy:3128' 'https_proxy=http://devflow-proxy:3128' \
     'NO_PROXY=localhost,127.0.0.1' 'DOTNET_ROOT=/usr/share/dotnet' 'DOTNET_ROLLFORWARD=Major' \
     'DOTNET_NOLOGO=1' 'DOTNET_CLI_TELEMETRY_OPTOUT=1' > /etc/environment   # sshd sessions read this through PAM
+
+# Flutter, pinned to what RESKI's mobile app asks for (mobile/.fvmrc: 3.47.0), for `flutter pub get`, `analyze` and `test`;
+# no Android or iOS tooling (full app builds are not part of the Dev stage). Owned by the runner user because the tool writes
+# into its own folder. `precache --universal` fetches the Dart SDK and the test engine now, not on the first run behind the proxy.
+ARG FLUTTER_VERSION=3.47.0
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends unzip xz-utils zip \
+ && rm -rf /var/lib/apt/lists/* \
+ && git clone --depth 1 --branch "$FLUTTER_VERSION" https://github.com/flutter/flutter.git /opt/flutter \
+ && chown -R runner:runner /opt/flutter \
+ && mkdir -p /home/runner/.pub-cache && chown runner:runner /home/runner/.pub-cache \
+ && ln -s /opt/flutter/bin/flutter /usr/local/bin/flutter \
+ && ln -s /opt/flutter/bin/dart /usr/local/bin/dart
+USER runner
+RUN git config --global --add safe.directory /opt/flutter \
+ && flutter config --no-analytics --no-cli-animations >/dev/null \
+ && dart --disable-analytics >/dev/null \
+ && flutter precache --universal \
+ && flutter --version
+USER root
 
 COPY sshd_config /etc/ssh/sshd_config.d/devflow.conf
 COPY entrypoint.sh /usr/local/bin/devflow-runner-entrypoint

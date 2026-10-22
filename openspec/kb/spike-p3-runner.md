@@ -31,4 +31,4 @@ Công ty `DevFlow Verify`: các agent "Spike Dev …" (không xóa được vì 
 ## Toolchain trong image runner (2026-10-21)
 - Image `devflow-runner:local` (khoảng 3 GB) có Node 24, Python 3 (không có `python3-venv`: gói bị firewall công ty chặn; dùng `pip install --user` hoặc virtualenv) và .NET SDK **8.0 và 10.0** cạnh nhau (`dotnet --list-sdks` thấy cả hai; `DOTNET_ROLLFORWARD=Major`). `dotnet new`, `add package`, `build`, `run` chạy được; `restore` qua proxy đạt khi môi trường có `HTTPS_PROXY` (phiên SSH có từ `/etc/environment`; `docker exec` thì không tự có). OCSP của DigiCert bị proxy từ chối, vô hại.
 - Build cần CA gốc của mạng công ty (`docker/certs`, như image server): `dot.net` lỗi chứng chỉ khi thiếu. Host mới cho phép qua proxy: `.nuget.org`. Cache gói `~/.nuget`, `~/.npm` nằm trong volume.
-- **Flutter chưa cài**: thêm trước khi bật Dev cho RESKI (smoke 5.1).
+- **Flutter 3.47.0** đã thêm vào image (2026-10-22, 4,7 GB): trên repo RESKI `flutter pub get` qua proxy, `analyze` và `test` đều chạy được (cần `NO_PROXY=localhost,127.0.0.1`).
