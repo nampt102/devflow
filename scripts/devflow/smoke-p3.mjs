@@ -11,7 +11,10 @@
 //   4. checks the pull request and the file on GitHub, the proposal in Code review, rejects it (the pull request must be
 //      closed) and deletes the branch.
 //
-//   node scripts/devflow/smoke-p3.mjs --company <companyId>
+//   node scripts/devflow/smoke-p3.mjs --company <companyId> [--hold]
+//
+// --hold stops after step 3 and the checks of step 4: the request waits in Code review with its open draft pull request, so
+// a person can look at the screen and decide there (clean up the branch afterwards).
 //
 // Env (docker/.env): PAPERCLIP_URL (http://localhost:3100), DEVFLOW_TEST_ADMIN_EMAIL/PASSWORD (instance admin),
 // DEVFLOW_SMOKE_GITHUB_TOKEN (fine-grained token on the repository: Contents AND Pull requests, both read and write;
@@ -199,6 +202,12 @@ const compare = await gh("GET", `/repos/${owner}/${repo}/compare/main...${encode
 check("the branch changes only that file", compare.status === 200 && compare.body.files?.length === 1 && compare.body.files[0].filename === "docs/devflow-smoke.md", JSON.stringify(compare.body.files?.map((f) => f.filename)));
 const main = await gh("GET", `/repos/${owner}/${repo}/branches/main`);
 check("main was not touched by DevFlow (no push to it)", main.body?.commit?.sha === compare.body?.merge_base_commit?.sha);
+
+// With --hold the request stays in Code review (and the draft pull request open) for a person to decide in the browser.
+if (args.includes("--hold")) {
+  console.log(`held: open Code review for ${caseKey} and decide there; afterwards delete the branch: DELETE /repos/${owner}/${repo}/git/refs/heads/${branch}`);
+  finish();
+}
 
 // 5. the decision and clean-up
 const decision = await call("POST", `/api/companies/${companyId}/devflow/code-cases/${caseId}/decision`, { outputId: detail.outputId, expectedVersion: detail.version, decision: "reject", reason: "smoke test finished" });
