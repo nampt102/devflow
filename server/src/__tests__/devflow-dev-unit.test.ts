@@ -156,6 +156,14 @@ describe("Dev agent configuration and the check before every run", () => {
     expect(devAgentSpec({ model: "m", maxUsdPerRun: 2, workspaceRoot: "/x/ws" }).adapterConfig).toMatchObject({ model: "m", cwd: "/x/ws/dev", extraArgs: ["--tools", DEV_TOOLS, "--max-budget-usd", "2"] });
   });
 
+  it("sets the commit author through git config variables and keeps every env key clear of Paperclip's strict secret rule", () => {
+    const env = devAgentSpec().adapterConfig.env as Record<string, string>;
+    expect(env).toMatchObject({ GIT_CONFIG_COUNT: "2", GIT_CONFIG_KEY_0: "user.name", GIT_CONFIG_VALUE_0: "DevFlow Dev", GIT_CONFIG_KEY_1: "user.email", GIT_CONFIG_VALUE_1: "dev@devflow.local" });
+    // the pattern of server/src/services/secrets.ts (SENSITIVE_ENV_KEY_RE): a plain value under such a key is refused at setup
+    const sensitive = /(api[-_]?key|access[-_]?token|auth(?:_?token)?|authorization|bearer|secret|passwd|password|credential|jwt|private[-_]?key|cookie|connectionstring)/i;
+    for (const key of Object.keys(env)) expect(sensitive.test(key), key).toBe(false);
+  });
+
   it.each([
     ["an agent that is paused", good({ status: "paused" }), runner(), "agent_not_runnable"],
     ["no environment on the agent (it would run in the server container)", good({ defaultEnvironmentId: null }), runner(), "agent_not_on_runner"],

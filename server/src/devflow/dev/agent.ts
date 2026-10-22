@@ -41,8 +41,10 @@ export function devAgentSpec(opts: { model?: string; maxUsdPerRun?: number; work
       timeoutSec: 3600,
       extraArgs: ["--tools", DEV_TOOLS, "--max-budget-usd", String(maxUsd)],
       // Paperclip recreates the repositories on the runner from git bundles and does not carry their local git config
-      // (spike 2026-10-22): the commit author must come from the environment. The setup script adds the Anthropic key.
-      env: { GIT_AUTHOR_NAME: DEV_GIT_NAME, GIT_AUTHOR_EMAIL: DEV_GIT_EMAIL, GIT_COMMITTER_NAME: DEV_GIT_NAME, GIT_COMMITTER_EMAIL: DEV_GIT_EMAIL },
+      // (spike 2026-10-22), so the commit author comes from the environment. Not GIT_AUTHOR_*: Paperclip's strict secret
+      // mode takes any key containing "auth" for a secret and refuses it as plain text. Git's own config-from-environment
+      // variables (git 2.31+) have the same effect. The setup script adds the Anthropic key.
+      env: { GIT_CONFIG_COUNT: "2", GIT_CONFIG_KEY_0: "user.name", GIT_CONFIG_VALUE_0: DEV_GIT_NAME, GIT_CONFIG_KEY_1: "user.email", GIT_CONFIG_VALUE_1: DEV_GIT_EMAIL },
     },
     runtimeConfig: { heartbeat: { enabled: false } },
     metadata: { devflowRole: DEV_PROMPT.role, devflowPromptVersion: DEV_PROMPT.version, devflowPromptHash: DEV_PROMPT.hash },
