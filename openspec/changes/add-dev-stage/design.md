@@ -61,6 +61,7 @@ adapterConfig: { cwd: "/work/dev", model: DEVFLOW_DEV_MODEL (mặc định claud
 ### D7. Code review
 - API `GET …/devflow/code-queue|code-count|code-metrics|code-cases/:id`, `POST …/code-cases/:id/decision`; trang `/code-review`. Không sửa nội dung (người sửa code trên GitHub); quyết định nguyên tử qua `beforeCommit`; cần vai `tech_lead` (cấu hình pipeline `code_review` approver `role`).
 - request_changes: lý do vào lượt sau, agent làm tiếp trên cùng nhánh, PR cũ được cập nhật. reject: DevFlow đóng PR (không xóa nhánh). approve: case sang `qa`; merge vẫn do người trên GitHub.
+- **Hiện thực (4.1):** `dev/review-service.ts` và `dev/routes.ts`: `code-queue`, `code-count`, `code-metrics`, `code-cases/:id` (báo cáo, các PR, kết quả kiểm tra, task của kế hoạch đã duyệt và tiêu chí BA để đối chiếu), `code-cases/:id/decision` (không có `final`: không sửa nội dung). Quyết định qua `beforeCommit`; vai `tech_lead` do cấu hình pipeline (4.2) và core kiểm. **Approve bị từ chối (422)** khi không có PR hoặc có repo mà DevFlow không đẩy (`no_pull_request`, `blocked_diff`): người duyệt chỉ có thể trả lại hoặc reject. Approve ghi `data.approved` (PR, task, kiểm tra) cho QA. Reject đóng các PR sau khi quyết định đã commit (token ghi của hệ thống); không đóng được thì quyết định vẫn giữ, ghi `code.pr_close_failed` và trả `closedPullRequests` để người đóng tay. request_changes giữ PR mở, lượt sau làm tiếp trên cùng nhánh.
 
 ## DDL đề xuất (chờ duyệt)
 

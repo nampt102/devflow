@@ -113,6 +113,7 @@ import { systemsRoutes } from "./devflow/systems/routes.js";
 import { baRoutes } from "./devflow/ba/routes.js";
 import { planRoutes } from "./devflow/plan/routes.js";
 import { devRoutes } from "./devflow/dev/routes.js";
+import { secretService } from "./services/secrets.js";
 import { memberRolesRoutes } from "./devflow/roles/routes.js";
 import { environmentRoutes } from "./routes/environments.js";
 import { executionWorkspaceRoutes } from "./routes/execution-workspaces.js";
@@ -866,7 +867,16 @@ export async function createApp(
   api.use(systemsRoutes(db));
   api.use(baRoutes(db, { reviewCase: (input) => pipelineService(db).reviewCase(input) }));
   api.use(planRoutes(db, { reviewCase: (input) => pipelineService(db).reviewCase(input) }));
-  api.use(devRoutes(db));
+  api.use(
+    devRoutes(db, {
+      reviewCase: (input) => pipelineService(db).reviewCase(input),
+      // closing a rejected pull request needs the system's write token
+      resolveToken: async (companyId, secretId) =>
+        secretService(db).resolveSecretValue(companyId, secretId, "latest", {
+          accessContext: { consumerType: "system", consumerId: "devflow-systems", actorType: "system", actorId: "devflow-dev" },
+        }),
+    }),
+  );
   api.use(memberRolesRoutes(db));
   api.use(
     environmentRoutes(db, {
