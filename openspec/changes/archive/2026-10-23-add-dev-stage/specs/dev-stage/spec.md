@@ -26,6 +26,10 @@ Khi yêu cầu ở `dev` có kế hoạch đã duyệt và ít nhất một hệ
 - **WHEN** hệ thống có `allow_unprotected` bật và nhánh mặc định không được bảo vệ
 - **THEN** DevFlow vẫn đẩy `devflow/*` và mở PR nháp, đề xuất ghi cảnh báo, và không bao giờ merge
 
+#### Scenario: Token ghi thiếu quyền
+- **WHEN** token ghi của hệ thống không đẩy được, không đọc được pull request, hoặc không thấy repo
+- **THEN** DevFlow dừng **trước khi chạy agent** với lỗi `write_token_cannot_push` hoặc `github_forbidden`, không tốn chi phí và không đẩy gì
+
 #### Scenario: Diff chạm đường dẫn cấm
 - **WHEN** commit của agent sửa `.github/workflows/deploy.yml`
 - **THEN** DevFlow không đẩy, đề xuất ghi lý do `forbidden_paths` để người duyệt thấy
@@ -39,6 +43,10 @@ Nhân viên SHALL bật hoặc tắt agent Dev cho từng hệ thống; bật De
 
 ### Requirement: Duyệt code
 Người có vai `tech_lead` (hoặc owner, instance admin) SHALL approve, request_changes hoặc reject ở `code_review`; request_changes MUST có lý do và lượt sau làm tiếp trên cùng nhánh; reject MUST đóng PR; approve chuyển sang `qa` và không merge.
+
+#### Scenario: Approve khi chưa có pull request
+- **WHEN** đề xuất không có pull request (agent không commit gì) hoặc DevFlow đã từ chối đẩy một diff
+- **THEN** approve bị từ chối (422); người duyệt chỉ có thể request_changes hoặc reject
 
 #### Scenario: Request changes
 - **WHEN** người duyệt chọn request_changes với lý do "thiếu test cho trường hợp voucher hết hạn"
