@@ -27,4 +27,4 @@
 ## 5. Hoàn tất
 
 - [ ] 5.1 Smoke thật `smoke-p4.mjs`: repo thử (RESKI) qua Dev → approve Code review → QA chạy → xem đề xuất → reject (đóng PR, xóa nhánh)
-- [ ] 5.2 KB `kb/qa-stage.md`, runbook (cài agent QA, vai `qa`, đồng bộ pipeline cho công ty đã seed), status, ADR
+- [x] 5.2 KB `kb/qa-stage.md`, runbook (cài agent QA, vai `qa`, đồng bộ pipeline cho công ty đã seed), status, ADR

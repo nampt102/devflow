@@ -107,3 +107,11 @@ Agent Dev viết code ở runner riêng và DevFlow mở PR nháp; không bao gi
 - **Kiểm nhanh runner:** `docker exec docker-devflow-runner-1 sh -c 'getent hosts db'` phải không tìm thấy; `curl -x http://devflow-proxy:3128 https://example.com` từ runner phải bị từ chối. Nhánh `devflow/*` và PR của agent nằm ở GitHub, xóa tay được; reject đóng PR nhưng giữ nhánh.
 - **Xoay khóa SSH:** xóa `docker/runner/keys/runner_key*`, chạy lại `setup-dev-runner.mjs` (khóa mới, secret được xoay). **Xoay token ghi:** dán token mới ở trang Systems; thu hồi token cũ trên GitHub.
 - **Dữ liệu:** agent Dev gửi mã nguồn và tài liệu của repo sang API Claude; áp dụng cùng chính sách dữ liệu ở mục 9. Toolchain trong image: Node, Python, .NET 8 và 10; Flutter 3.47.0 (đúng RESKI; repo khác cần bản khác thì đổi `ARG FLUTTER_VERSION` và build lại runner).
+
+## 15. Agent QA và ký duyệt QA (ADR 0025, `kb/qa-stage.md`)
+QA kiểm PR của Dev (đọc, chạy lệnh, báo cáo từng tiêu chí) và người ký quyết định; không merge, không đẩy code. Dùng lại runner và token của mục 14.
+1. **Nâng cấp image server** (có vai `qa` và migration `0362`), rồi **tạo agent QA** cho công ty: `node scripts/devflow/setup-qa-agent.mjs --company <id>`. Chạy lại khi worker báo `agent_prompt_outdated` hoặc `agent_not_on_runner`.
+2. **Đồng bộ pipeline** của công ty đã seed: `node scripts/devflow/setup-dev-request-pipeline.mjs --company <id>` (thêm route `qa_signoff → dev` và approver `qa`/`tech_lead`; chỉ thêm, không xóa).
+3. **Gán vai `qa`** cho người ký (trang `/roles` hoặc `scripts/devflow/set-member-roles.mjs`). Trước khi gán vai, chỉ owner ký được nếu stage còn `any_human`.
+4. **Theo dõi:** trang `/qa-signoff` (hàng chờ, "Recent problems", tỷ lệ ký ngược khuyến nghị); `DEVFLOW_QA_ENABLED=false` để tắt; trần 20 USD mỗi ngày mỗi công ty.
+- **Dữ liệu:** như mục 14, mã nguồn của repo đi sang API Claude.
