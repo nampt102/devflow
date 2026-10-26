@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { lookup } from "node:dns/promises";
 import { Router } from "express";
 import { and, eq } from "drizzle-orm";
@@ -13,12 +12,14 @@ import { findPlanAgent, unsafePlanAgentReason } from "../plan/agent.js";
 import { qaAgentProblem } from "../qa/agent.js";
 import { isOwnerOrAdmin } from "../roles/service.js";
 import { staffViewer } from "../staff.js";
+import pipelineDefinition from "../dev-request-pipeline.json" with { type: "json" };
 import { approverPatches, mergedTransitions, type DefinitionStage, type DefinitionTransition } from "./pipeline-sync.js";
 
 type Env = Record<string, string | undefined>;
 type AgentState = { id: string; name: string; status: string; problem: string | null } | null;
 
-const definition = JSON.parse(readFileSync(new URL("../dev-request-pipeline.json", import.meta.url), "utf8")) as {
+// imported (not read at run time): tsc copies an imported JSON file into dist, a file read by path is missing there
+const definition = pipelineDefinition as unknown as {
   key: string;
   stages: DefinitionStage[];
   transitions: DefinitionTransition[];

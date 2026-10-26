@@ -152,6 +152,7 @@ export function Setup() {
           ) : null}
         </div>
         <p className="text-xs text-muted-foreground">Sync only adds what is missing (approver roles, the QA sign-off's way back to Dev, transitions); it removes nothing.</p>
+        {s.pipeline.patches.length ? <p className="text-xs text-amber-700 dark:text-amber-300">Sync switches the review stages from "any staff" to the BA / Tech Lead / QA roles: give people their roles on Roles first, or only owners will be able to decide.</p> : null}
       </section>
 
       <section className="space-y-2 border border-border p-4">
