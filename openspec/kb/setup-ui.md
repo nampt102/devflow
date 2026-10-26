@@ -1,6 +1,6 @@
 # Trang Setup (change `add-agent-setup-ui`)
 
-Trạng thái: code + test xong; đã thử `setup-status` trên stack thật (RESKI và công ty thử); chưa xem trang trên trình duyệt (trình duyệt của công cụ chưa đăng nhập). Thay các lệnh `setup-*.mjs` bằng trang `/setup` cho owner/admin của công ty.
+Trạng thái: xong, đã archive 2026-10-26 (spec chính `openspec/specs/setup-ui`); đã thử `setup-status` trên stack thật (RESKI và công ty thử); chưa xem trang trên trình duyệt (trình duyệt của công cụ chưa đăng nhập). Thay các lệnh `setup-*.mjs` bằng trang `/setup` cho owner/admin của công ty.
 
 ## Làm gì
 - **Agent BA, Planner, Dev, QA:** mỗi hàng hiện Not created / Needs update (lý do) / Verifying / Ready và một nút Create hoặc Update. Ô khóa Anthropic: chỉ cần khi công ty chưa có secret `devflow-ba-anthropic`, hoặc để thay khóa; lưu thành secret của công ty, không hiện lại, xóa khỏi bộ nhớ trang sau khi lưu.
