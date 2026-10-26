@@ -8,7 +8,8 @@ import { BA_STAGE } from "../ba/ba-service.js";
 import { PLAN_STAGE } from "../plan/plan-service.js";
 import { reviewAccess, type Viewer } from "../review-access.js";
 import { CODE_REVIEW_STAGE, DEV_STAGE } from "./dev-service.js";
-import { githubClient, type GithubClient } from "./github.js";
+import { closePullRequests } from "./close-prs.js";
+import type { GithubClient } from "./github.js";
 
 // Review of the Dev agent's work by staff (openspec/changes/add-dev-stage, design D7). Same shape as the plan review: the
 // decision runs through the core reviewCase (which also checks the approver role, `tech_lead`) and the domain records are
@@ -44,7 +45,6 @@ export function approveBlocker(repos: readonly Row[]): "no_pull_request" | "bloc
 
 export function codeReviewService(db: Db, deps: CodeReviewDeps) {
   const rows = async (q: ReturnType<typeof sql>) => (await db.execute(q)) as unknown as Row[];
-  const github = deps.github ?? githubClient;
 
   async function loadReviewable(companyId: string, caseId: string) {
     const [row] = await rows(sql`
@@ -180,41 +180,7 @@ export function codeReviewService(db: Db, deps: CodeReviewDeps) {
     };
   }
 
-  /** After a reject: close the draft pull requests. A failure is recorded, never undoes the decision. */
-  async function closePullRequests(companyId: string, caseId: string, userId: string, repos: readonly Row[]) {
-    const results: Array<{ system: string; prNumber: number; closed: boolean }> = [];
-    for (const r of repos.filter((x) => x.prNumber)) {
-      let closed = false;
-      let kind = "close_failed";
-      try {
-        const [system] = await db
-          .select({ repoUrl: drSystems.repoUrl, secretId: drSystems.writeTokenSecretId })
-          .from(drSystems)
-          .where(and(eq(drSystems.companyId, companyId), eq(drSystems.key, r.system)));
-        const token = system?.secretId && deps.resolveToken ? await deps.resolveToken(companyId, system.secretId).catch(() => null) : null;
-        if (!system || !token) {
-          kind = "no_write_token";
-        } else {
-          await github(token).closePr(system.repoUrl, r.prNumber);
-          closed = true;
-        }
-      } catch (err) {
-        kind = (err as { kind?: string }).kind ?? "close_failed";
-        logger.warn({ kind }, "devflow code review: pull request not closed");
-      }
-      results.push({ system: r.system, prNumber: r.prNumber, closed });
-      await logActivity(db, {
-        companyId,
-        actorType: "user",
-        actorId: userId,
-        action: closed ? "code.pr_closed" : "code.pr_close_failed",
-        entityType: "pipeline_case",
-        entityId: caseId,
-        details: { system: r.system, prNumber: r.prNumber, ...(closed ? {} : { kind }) },
-      }).catch(() => undefined);
-    }
-    return results;
-  }
+  const closePrs = (companyId: string, caseId: string, userId: string, repos: readonly Row[]) => closePullRequests(db, deps, companyId, caseId, userId, repos);
 
   async function decide(input: { companyId: string; caseId: string; userId: string; instanceAdmin?: boolean; body: CodeDecisionBody }) {
     const { companyId, caseId, userId, body } = input;
@@ -271,7 +237,7 @@ export function codeReviewService(db: Db, deps: CodeReviewDeps) {
       if (!now || now.stage_key !== CODE_REVIEW_STAGE) throw conflict("This request is no longer waiting for code review");
       throw err;
     }
-    const closed = body.decision === "reject" ? await closePullRequests(companyId, caseId, userId, repos) : [];
+    const closed = body.decision === "reject" ? await closePrs(companyId, caseId, userId, repos) : [];
     return { ok: true as const, decision: body.decision, closedPullRequests: closed };
   }
 

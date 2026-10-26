@@ -65,4 +65,10 @@ services:
       DEVFLOW_DEV_MAX_USD_PER_DAY: "${DEVFLOW_DEV_MAX_USD_PER_DAY:-50}"
       DEVFLOW_DEV_MAX_DIFF_LINES: "${DEVFLOW_DEV_MAX_DIFF_LINES:-}"
       DEVFLOW_DEV_INTERVAL_MS: "${DEVFLOW_DEV_INTERVAL_MS:-}"
+      # QA worker and agent (change add-qa-stage): on by default; needs the runner and a QA agent per company (scripts/devflow/setup-qa-agent.mjs)
+      DEVFLOW_QA_ENABLED: "${DEVFLOW_QA_ENABLED:-}"
+      DEVFLOW_QA_MODEL: "${DEVFLOW_QA_MODEL:-}"
+      DEVFLOW_QA_MAX_USD_PER_RUN: "${DEVFLOW_QA_MAX_USD_PER_RUN:-}"
+      DEVFLOW_QA_MAX_USD_PER_DAY: "${DEVFLOW_QA_MAX_USD_PER_DAY:-20}"
+      DEVFLOW_QA_INTERVAL_MS: "${DEVFLOW_QA_INTERVAL_MS:-}"
       DEVFLOW_AGENT_WORKSPACE_ROOT: "${DEVFLOW_AGENT_WORKSPACE_ROOT:-}"

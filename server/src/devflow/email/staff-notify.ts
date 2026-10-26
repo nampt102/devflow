@@ -32,7 +32,7 @@ export function parseRecipients(raw: string | undefined): string[] {
   return [...new Set((raw ?? "").split(/[,;\s]+/).map((s) => s.trim().toLowerCase()).filter((s) => EMAIL.test(s)))];
 }
 
-export type DigestKind = "triage" | "ba" | "plan" | "code";
+export type DigestKind = "triage" | "ba" | "plan" | "code" | "qa";
 
 /** What each review queue is called in the mail, where its proposals live and how its digests are recorded. */
 const KINDS: Record<DigestKind, { stageKey: string; outputStage: string; path: string; notified: string; failed: string; subject: (n: number) => string; intro: (n: number) => string }> = {
@@ -71,6 +71,15 @@ const KINDS: Record<DigestKind, { stageKey: string; outputStage: string; path: s
     failed: "staff.notify_failed_code",
     subject: (n) => `[DevFlow] ${n} thay đổi code mới chờ duyệt`,
     intro: (n) => `Có ${n} thay đổi code (pull request nháp) mới đang chờ bạn duyệt:`,
+  },
+  qa: {
+    stageKey: "qa_signoff",
+    outputStage: "qa",
+    path: "qa-signoff",
+    notified: "staff.notified_qa",
+    failed: "staff.notify_failed_qa",
+    subject: (n) => `[DevFlow] ${n} báo cáo QA mới chờ ký duyệt`,
+    intro: (n) => `Có ${n} báo cáo QA mới đang chờ bạn ký duyệt:`,
   },
 };
 
@@ -176,7 +185,7 @@ export function createStaffNotifier(db: Db, send: SendMail, opts: StaffNotifyOpt
 
   /** One pass over every queue; returns how many digests were sent. */
   async function run(): Promise<number> {
-    return (await runKind("triage")) + (await runKind("ba")) + (await runKind("plan")) + (await runKind("code"));
+    return (await runKind("triage")) + (await runKind("ba")) + (await runKind("plan")) + (await runKind("code")) + (await runKind("qa"));
   }
 
   return { run };

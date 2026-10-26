@@ -15,6 +15,7 @@ import { sanitizeUntrusted } from "../triage/triage-service.js";
 import { devAgentProblem } from "./agent.js";
 import { approvedPlanText, devTaskIds } from "./input.js";
 import { loadApproved } from "../agent-stage/approved.js";
+import { qaFindingsText } from "../qa/input.js";
 import { githubClient } from "./github.js";
 import { DevPublishError, publishRepo, type PublishDeps, type PublishedRepo } from "./publish.js";
 import { devCommentMarkdown, parseDevOutput, type DevOutput, type DevRepoResult } from "./schema.js";
@@ -99,6 +100,29 @@ export function devService(db: Db, deps: DevServiceDeps) {
       .orderBy(asc(drSystems.key));
   }
 
+  /**
+   * After QA sign-off sent the work back, the reviewer's reason is joined by what QA found. Only when QA decided after the
+   * Dev proposal that was superseded: a code reviewer sending the work back later must not be told about an old QA round.
+   */
+  async function withQaFindings(companyId: string, caseId: string, feedback: { previousSummary: string; text: string } | null) {
+    if (!feedback) return feedback;
+    const [prev] = await db
+      .select({ createdAt: drAgentOutputs.createdAt })
+      .from(drAgentOutputs)
+      .where(and(eq(drAgentOutputs.companyId, companyId), eq(drAgentOutputs.caseId, caseId), eq(drAgentOutputs.stageKey, DEV_STAGE), eq(drAgentOutputs.status, "superseded")))
+      .orderBy(desc(drAgentOutputs.createdAt))
+      .limit(1);
+    const [qa] = await db
+      .select({ data: drAgentOutputs.data, decidedAt: drAgentOutputs.decidedAt })
+      .from(drAgentOutputs)
+      .where(and(eq(drAgentOutputs.companyId, companyId), eq(drAgentOutputs.caseId, caseId), eq(drAgentOutputs.stageKey, "qa"), eq(drAgentOutputs.status, "superseded"), isNotNull(drAgentOutputs.decidedAt)))
+      .orderBy(desc(drAgentOutputs.decidedAt))
+      .limit(1);
+    if (!prev || !qa?.decidedAt || qa.decidedAt < prev.createdAt) return feedback;
+    const findings = qaFindingsText(qa.data as Row);
+    return findings ? { ...feedback, text: `${feedback.text} ${findings}`.slice(0, 3000) } : feedback;
+  }
+
   /** The write token can push and read pull requests, and the default branch is protected (or the owner allowed otherwise). */
   async function preflightGithub(system: { repoUrl: string; defaultBranch: string; allowUnprotected: boolean }, token: string) {
     const github = (deps.publishDeps?.github ?? githubClient)(token);
@@ -138,7 +162,7 @@ export function devService(db: Db, deps: DevServiceDeps) {
       .where(and(eq(drAttachments.caseId, caseId), eq(drAttachments.companyId, companyId)))
       .limit(caps.files);
     const attachmentNames = files.map((f) => sanitizeUntrusted(f.name ?? "(no name)", caps.fileName));
-    const feedback = await shared.loadFeedback(companyId, caseId);
+    const feedback = await withQaFindings(companyId, caseId, await shared.loadFeedback(companyId, caseId));
     const specText = approvedSpecText(spec);
     const caseTitle = sanitizeUntrusted(row.title, caps.title);
 

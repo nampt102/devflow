@@ -19,10 +19,10 @@
 
 ## 4. Ký duyệt QA
 
-- [ ] 4.1 API hàng chờ, chi tiết, quyết định (`beforeCommit`, vai `qa` hoặc `tech_lead`, reject đóng PR dùng chung hàm với Code review, request_changes đánh dấu cả đề xuất QA và Dev `superseded`) + test
-- [ ] 4.2 Dev nhận phản hồi sau QA (lý do và tiêu chí `fail`/`not_verified` của đề xuất QA) + test vòng trọn QA → Dev → QA
-- [ ] 4.3 Trang Board UI "QA sign-off" (hàng chờ, chi tiết, quyết định), số đếm sidebar, số liệu và chi phí QA kèm tỷ lệ người ký ngược khuyến nghị, trang Roles có vai `qa`
-- [ ] 4.4 Email nhân viên cho `qa_signoff` + test; biến `DEVFLOW_QA_*` trong compose và `.env.example`
+- [x] 4.1 API hàng chờ, chi tiết, quyết định (`beforeCommit`, vai `qa` hoặc `tech_lead`, reject đóng PR dùng chung hàm với Code review, request_changes đánh dấu cả đề xuất QA và Dev `superseded`) + test
+- [x] 4.2 Dev nhận phản hồi sau QA (lý do và tiêu chí `fail`/`not_verified` của đề xuất QA) + test vòng trọn QA → Dev → QA
+- [x] 4.3 Trang Board UI "QA sign-off" (hàng chờ, chi tiết, quyết định), số đếm sidebar, số liệu và chi phí QA kèm tỷ lệ người ký ngược khuyến nghị, trang Roles có vai `qa`
+- [x] 4.4 Email nhân viên cho `qa_signoff` + test; biến `DEVFLOW_QA_*` trong compose và `.env.example`
 
 ## 5. Hoàn tất
 

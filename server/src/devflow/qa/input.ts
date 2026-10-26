@@ -37,3 +37,19 @@ export function devReportText(approvedDev: Row): string {
     .join("\n")
     .slice(0, REPORT_CAP);
 }
+
+/**
+ * What QA found, as text for the Dev agent after a sign-off sent the work back: the criteria that failed or could not be
+ * checked (with their text and the evidence) and the high and medium issues. Data written by an agent: it goes in the feedback
+ * block of request.md, between the boundary lines.
+ */
+export function qaFindingsText(qaData: Row): string {
+  const text: Row = qaData.criteriaText && typeof qaData.criteriaText === "object" ? qaData.criteriaText : {};
+  const criteria: Row[] = Array.isArray(qaData.criteria) ? qaData.criteria : [];
+  const issues: Row[] = Array.isArray(qaData.issues) ? qaData.issues : [];
+  const parts = [
+    ...criteria.filter((c) => c.verdict === "fail" || c.verdict === "not_verified").map((c) => `${str(c.id, 10)} (${str(c.verdict, 20)}) ${str(text[c.id], 300)}: ${str(c.evidence, 400)}`),
+    ...issues.filter((i) => i.severity === "high" || i.severity === "medium").map((i) => `issue [${str(i.severity, 10)}] ${str(i.title, 200)}: ${str(i.steps, 300)}`),
+  ];
+  return parts.length ? `QA found: ${parts.join(" | ")}`.slice(0, 2000) : "";
+}

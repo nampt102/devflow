@@ -878,7 +878,16 @@ export async function createApp(
         }),
     }),
   );
-  api.use(qaRoutes(db));
+  api.use(
+    qaRoutes(db, {
+      reviewCase: (input) => pipelineService(db).reviewCase(input),
+      // closing a rejected pull request needs the system's write token
+      resolveToken: async (companyId, secretId) =>
+        secretService(db).resolveSecretValue(companyId, secretId, "latest", {
+          accessContext: { consumerType: "system", consumerId: "devflow-systems", actorType: "system", actorId: "devflow-qa" },
+        }),
+    }),
+  );
   api.use(memberRolesRoutes(db));
   api.use(
     environmentRoutes(db, {

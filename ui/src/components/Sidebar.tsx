@@ -48,6 +48,7 @@ import { queryKeys } from "../lib/queryKeys";
 import { devflowBaApi } from "../api/devflowBa";
 import { devflowPlanApi } from "../api/devflowPlan";
 import { devflowCodeApi } from "../api/devflowCode";
+import { devflowQaApi } from "../api/devflowQa";
 import { devflowTriageApi } from "../api/devflowTriage";
 import { attentionBadgeCount } from "../lib/attention";
 import { useInboxBadge } from "../hooks/useInboxBadge";
@@ -135,6 +136,13 @@ export function Sidebar({ children }: { children?: ReactNode }) {
   const { data: codeCount } = useQuery({
     queryKey: queryKeys.devflowCode.count(selectedCompanyId!),
     queryFn: () => devflowCodeApi.count(selectedCompanyId!),
+    enabled: !!selectedCompanyId && showPipelines,
+    refetchInterval: 30_000,
+    retry: false,
+  });
+  const { data: qaCount } = useQuery({
+    queryKey: queryKeys.devflowQa.count(selectedCompanyId!),
+    queryFn: () => devflowQaApi.count(selectedCompanyId!),
     enabled: !!selectedCompanyId && showPipelines,
     refetchInterval: 30_000,
     retry: false,
@@ -299,6 +307,9 @@ export function Sidebar({ children }: { children?: ReactNode }) {
           ) : null}
           {showPipelines ? (
             <SidebarNavItem to="/code-review" label="Code review" icon={GitPullRequestDraft} badge={codeCount?.waiting || undefined} badgeLabel="waiting for review" />
+          ) : null}
+          {showPipelines ? (
+            <SidebarNavItem to="/qa-signoff" label="QA sign-off" icon={ClipboardCheck} badge={qaCount?.waiting || undefined} badgeLabel="waiting for sign-off" />
           ) : null}
           {showGoalsLink ? (
             <SidebarNavItem to="/goals" label="Goals" icon={Target} />
