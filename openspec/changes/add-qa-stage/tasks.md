@@ -11,8 +11,8 @@
 
 ## 3. Agent QA
 
-- [ ] 3.1 Prompt `qa.v1` (hash ghim), schema báo cáo strict (đủ mã AC đúng một lần, hệ thống đúng), dựng `request.md` (tiêu chí đánh mã AC, kế hoạch test, báo cáo Dev như dữ liệu chưa kiểm chứng) + test
-- [ ] 3.2 Role `qa` trong `agent-stage` (`StageRole`, thư mục `/paperclip/devflow/ws/qa`), tham số hóa kiểm agent trên runner theo role, cấu hình chuẩn và `setup-qa-agent.mjs` + test
+- [x] 3.1 Prompt `qa.v1` (hash ghim), schema báo cáo strict (đủ mã AC đúng một lần, hệ thống đúng), dựng `request.md` (tiêu chí đánh mã AC, kế hoạch test, báo cáo Dev như dữ liệu chưa kiểm chứng) + test
+- [x] 3.2 Role `qa` trong `agent-stage` (`StageRole`, thư mục `/paperclip/devflow/ws/qa`), tham số hóa kiểm agent trên runner theo role, cấu hình chuẩn và `setup-qa-agent.mjs` + test
 - [ ] 3.3 Workspace QA: `prepareDevRepo` chế độ `existingOnly` (nhánh phải có trên GitHub, lỗi `branch_missing`), đọc SHA đã duyệt và SHA đã kiểm + test với git cục bộ
 - [ ] 3.4 Khuyến nghị do DevFlow tính, cảnh báo `qa_modified_branch` (HEAD sau lượt chạy khác lúc đầu) và khác SHA + test
 - [ ] 3.5 QA worker trên khung `agent-stage` (khóa chung, backoff, sổ `agent.qa_run`, trần ngày, `no_qa_target`) + test với runner giả và git thật + đột biến

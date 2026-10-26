@@ -14,6 +14,8 @@ export type StageFailureKind =
   | "no_approved_spec"
   | "no_approved_plan"
   | "no_dev_system"
+  | "no_qa_target"
+  | "branch_missing"
   | "agent_not_on_runner"
   | "agent_tools_changed"
   | "runner_environment_invalid"
@@ -62,6 +64,8 @@ export const CONFIG_KINDS: ReadonlySet<StageFailureKind> = new Set<StageFailureK
   "no_approved_spec",
   "no_approved_plan",
   "no_dev_system",
+  "no_qa_target",
+  "branch_missing",
   "agent_not_on_runner",
   "agent_tools_changed",
   "runner_environment_invalid",

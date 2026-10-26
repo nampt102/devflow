@@ -8,7 +8,7 @@ import { agents, type Db } from "@paperclipai/db";
 // someone changed (a shell tool, another folder, no budget, outdated instructions).
 
 /** "dev" shares the run loop and the ledger names, but works elsewhere (the runner) and is not part of the read-only agents' deny rules. */
-export type StageRole = "ba" | "plan" | "dev";
+export type StageRole = "ba" | "plan" | "dev" | "qa";
 export const STAGE_ROLES: readonly StageRole[] = ["ba", "plan"];
 export const STAGE_TOOLS = "Read,Grep,Glob";
 export const DEFAULT_WORKSPACE_ROOT = "/paperclip/devflow/ws";
