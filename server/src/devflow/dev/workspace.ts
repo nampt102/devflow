@@ -5,7 +5,8 @@ import { promisify } from "node:util";
 import { StageFailure } from "../agent-stage/failure.js";
 import { authHeaderArgs, BRANCH, gitRunEnv } from "../systems/workspace.js";
 import { GITHUB_REPO } from "../systems/service.js";
-import { DEV_GIT_EMAIL, DEV_GIT_NAME, devWorkspaceDir } from "./agent.js";
+import { DEV_GIT_EMAIL, DEV_GIT_NAME } from "./agent.js";
+import { runnerWorkspaceDir, type RunnerRole } from "./runner-agent.js";
 
 const run = promisify(execFile);
 
@@ -32,6 +33,8 @@ export type DevRepoInput = {
   repoUrl: string;
   defaultBranch: string;
   devBranch: string;
+  /** QA checks the branch of a pull request: when GitHub does not have it the clone stops with `branch_missing`, no new branch is made */
+  existingOnly?: boolean;
   dest: string;
   /** read-only token; omitted for a public repository */
   token?: string | null;
@@ -62,6 +65,7 @@ export async function prepareDevRepo(input: DevRepoInput): Promise<DevRepoResult
     // `--` ends the options, so no field can be read as one
     const { stdout: remote } = await run(git, [...hardened, "ls-remote", "--heads", "--", input.repoUrl, `refs/heads/${input.devBranch}`], opts);
     const resumed = remote.trim() !== "";
+    if (input.existingOnly && !resumed) throw new Error("branch_missing");
     await run(git, [...hardened, "clone", "--no-tags", "--branch", resumed ? input.devBranch : input.defaultBranch, "--", input.repoUrl, input.dest], opts);
     if (!resumed) await run(git, ["-C", input.dest, "checkout", "-q", "-b", input.devBranch], opts);
     const { stdout } = await run(git, ["-C", input.dest, "rev-parse", "HEAD"], opts);
@@ -71,8 +75,9 @@ export async function prepareDevRepo(input: DevRepoInput): Promise<DevRepoResult
   } catch (error) {
     // git's message can echo the URL and headers; keep only that it failed
     const timedOut = (error as { killed?: boolean }).killed === true;
+    const missing = (error as Error).message === "branch_missing";
     await fs.rm(input.dest, { recursive: true, force: true }).catch(() => undefined);
-    throw new Error(timedOut ? "clone_timeout" : "clone_failed");
+    throw new Error(missing ? "branch_missing" : timedOut ? "clone_timeout" : "clone_failed");
   }
 }
 
@@ -86,8 +91,11 @@ export function devWorkspace(opts: {
   prepare?: typeof prepareDevRepo;
   gitBin?: string;
   env?: Record<string, string>;
+  /** the folder and the clone mode differ: QA checks branches that exist, Dev starts or continues them */
+  role?: RunnerRole;
 }) {
-  const dir = devWorkspaceDir(opts.root);
+  const role = opts.role ?? "dev";
+  const dir = runnerWorkspaceDir(role, opts.root);
   const prepare = opts.prepare ?? prepareDevRepo;
   const git = opts.gitBin ?? "git";
 
@@ -120,6 +128,7 @@ export function devWorkspace(opts: {
           repoUrl: s.repoUrl,
           defaultBranch: s.defaultBranch,
           devBranch: branch,
+          existingOnly: role === "qa",
           dest: path.join(dir, REPOS_DIR, s.key),
           token,
           gitBin: opts.gitBin,
@@ -127,7 +136,8 @@ export function devWorkspace(opts: {
         });
         out.push({ key: s.key, branch, baseBranch: s.defaultBranch, sha, resumed });
       } catch (err) {
-        throw new StageFailure((err as Error).message === "clone_timeout" ? "clone_timeout" : "clone_failed");
+        const m = (err as Error).message;
+        throw new StageFailure(m === "clone_timeout" ? "clone_timeout" : m === "branch_missing" ? "branch_missing" : "clone_failed");
       }
     }
     return out;

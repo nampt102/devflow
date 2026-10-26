@@ -14,6 +14,7 @@ import { newBoundary } from "../prompts/ba.v1.js";
 import { sanitizeUntrusted } from "../triage/triage-service.js";
 import { devAgentProblem } from "./agent.js";
 import { approvedPlanText, devTaskIds } from "./input.js";
+import { loadApproved } from "../agent-stage/approved.js";
 import { githubClient } from "./github.js";
 import { DevPublishError, publishRepo, type PublishDeps, type PublishedRepo } from "./publish.js";
 import { devCommentMarkdown, parseDevOutput, type DevOutput, type DevRepoResult } from "./schema.js";
@@ -77,25 +78,7 @@ export function devService(db: Db, deps: DevServiceDeps) {
     { ...deps, clone: cloneSystem },
   );
 
-  /** What a reviewer approved at a stage: `data.approved` of the newest accepted or overridden proposal. */
-  async function approved(companyId: string, caseId: string, stageKey: string): Promise<Row | null> {
-    const [found] = await db
-      .select({ data: drAgentOutputs.data })
-      .from(drAgentOutputs)
-      .where(
-        and(
-          eq(drAgentOutputs.companyId, companyId),
-          eq(drAgentOutputs.caseId, caseId),
-          eq(drAgentOutputs.stageKey, stageKey),
-          inArray(drAgentOutputs.status, ["accepted", "overridden"]),
-          isNotNull(drAgentOutputs.decidedAt),
-        ),
-      )
-      .orderBy(desc(drAgentOutputs.decidedAt))
-      .limit(1);
-    const a = (found?.data as Row | undefined)?.approved;
-    return a && typeof a === "object" ? (a as Row) : null;
-  }
+  const approved = (companyId: string, caseId: string, stageKey: string): Promise<Row | null> => loadApproved(db, companyId, caseId, stageKey);
 
   /** The systems of the request that may be coded: Dev switched on, with their write token. */
   async function devSystems(companyId: string, caseId: string) {

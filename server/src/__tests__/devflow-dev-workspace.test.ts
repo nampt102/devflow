@@ -83,6 +83,19 @@ describe("Dev workspace", () => {
     expect(fs.readFileSync(path.join(dest, "src", "earlier.txt"), "utf8")).toBe("earlier run\n");
   });
 
+  it("for QA, checks the pull request's branch as GitHub has it and refuses to make one", async () => {
+    const dest = path.join(tmp, "qa-existing");
+    const result = await prepareDevRepo(input("qa-existing", { devBranch: "devflow/REQ-7", existingOnly: true }));
+    expect(result).toEqual({ sha: resumedSha, resumed: true });
+    expect(git(dest, "branch", "--show-current")).toBe("devflow/REQ-7");
+    expect(git(dest, "remote")).toBe("");
+    // no such branch on GitHub (deleted, or never pushed): no new branch from the base branch, and nothing left on disk
+    const gone = path.join(tmp, "qa-missing");
+    const err = await prepareDevRepo(input("qa-missing", { devBranch: "devflow/REQ-99", existingOnly: true })).catch((e) => e as Error);
+    expect(err.message).toBe("branch_missing");
+    expect(fs.existsSync(gone)).toBe(false);
+  });
+
   it("works for a public repository without a token", async () => {
     expect((await prepareDevRepo(input("public", { token: null }))).resumed).toBe(false);
   });
@@ -147,6 +160,19 @@ describe("Dev workspace", () => {
       expect(fs.existsSync(w.dir)).toBe(false);
       await w.reset(); // a second case starts from nothing
       expect(fs.readdirSync(w.dir).sort()).toEqual([".devflow", ".git"]);
+    });
+
+    it("keeps QA in its own folder, on the branch of the pull request, and stops with branch_missing when it is gone", async () => {
+      const qa = devWorkspace({ root: path.join(tmp, "ws"), resolveToken: async () => TOKEN, env: via(), role: "qa" });
+      await qa.reset();
+      expect(qa.dir).toBe(path.join(tmp, "ws", "qa"));
+      const prepared = await qa.prepareAll("c", "REQ-7", [system]);
+      expect(prepared).toEqual([{ key: "portal", branch: "devflow/REQ-7", baseBranch: "main", sha: resumedSha, resumed: true }]);
+      expect(git(path.join(qa.dir, REPOS_DIR, "portal"), "branch", "--show-current")).toBe("devflow/REQ-7");
+      await qa.clear();
+      await qa.reset();
+      await expect(qa.prepareAll("c", "REQ-99", [system])).rejects.toMatchObject({ kind: "branch_missing" });
+      expect(fs.existsSync(path.join(qa.dir, REPOS_DIR, "portal"))).toBe(false);
     });
 
     it("stops with system_missing_token when the secret is gone, and with clone_failed when git fails", async () => {

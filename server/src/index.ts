@@ -82,6 +82,7 @@ import { startDevflowTriageFromEnv } from "./devflow/triage/start.js";
 import { startDevflowBaFromEnv } from "./devflow/ba/start.js";
 import { startDevflowPlanFromEnv } from "./devflow/plan/start.js";
 import { startDevflowDevFromEnv } from "./devflow/dev/start.js";
+import { startDevflowQaFromEnv } from "./devflow/qa/start.js";
 import {
   feedbackService,
   applyManagedEnvironments,
@@ -1243,6 +1244,7 @@ async function startServerWithDatabaseTeardown(
   // DevFlow Tech Plan worker: runs the company's Planner (scripts/devflow/setup-plan-agent.mjs); shares one run at a time with BA.
   const devflowPlan = startDevflowPlanFromEnv(db as any, process.env, heartbeat ? (agentId, opts) => heartbeat.wakeup(agentId, opts) : null, () => !isIdleTaskDrainActive() && !heartbeatSchedulerStopped && !isWarmStandby());
   const devflowDev = startDevflowDevFromEnv(db as any, process.env, heartbeat ? (agentId, opts) => heartbeat.wakeup(agentId, opts) : null, () => !isIdleTaskDrainActive() && !heartbeatSchedulerStopped && !isWarmStandby());
+  const devflowQa = startDevflowQaFromEnv(db as any, process.env, heartbeat ? (agentId, opts) => heartbeat.wakeup(agentId, opts) : null, () => !isIdleTaskDrainActive() && !heartbeatSchedulerStopped && !isWarmStandby());
   // DevFlow status emails to requesters: runs only when DEVFLOW_SMTP_HOST and DEVFLOW_SMTP_FROM are set.
   const devflowEmail = startDevflowEmailFromEnv(db as any, process.env, () => !isIdleTaskDrainActive() && !heartbeatSchedulerStopped && !isWarmStandby());
   // Materialized skill versions are disk caches of version rows. The sweep is
@@ -2031,6 +2033,7 @@ async function startServerWithDatabaseTeardown(
     devflowBa?.stop();
     devflowPlan?.stop();
     devflowDev?.stop();
+    devflowQa?.stop();
     devflowEmail?.stop();
     clearInterval(skillSourceSyncInterval);
     clearInterval(skillVersionRetentionInterval);
