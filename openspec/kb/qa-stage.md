@@ -23,7 +23,7 @@ Như Dev (`kb/dev-stage.md`), thêm: `no_qa_target` (không hệ thống nào c�
 `DEVFLOW_QA_ENABLED`, `DEVFLOW_QA_MODEL`, `DEVFLOW_QA_MAX_USD_PER_RUN` (3), `DEVFLOW_QA_MAX_USD_PER_DAY` (20), `DEVFLOW_QA_INTERVAL_MS`; dùng chung `DEVFLOW_AGENT_WORKSPACE_ROOT`, `DEVFLOW_WORKERS_ENABLED`.
 
 ## Kiểm chứng
-Test tự động (container Linux): `devflow-qa-unit` (15), `devflow-qa` (11: toàn luồng với runner giả, git thật), `devflow-qa-review` (10: hàng chờ, quyền, approve/request_changes/reject, vòng QA→Dev), workspace, staff-notify, migration vai, approver sync; UI `qa-review`. Đột biến bị bắt: không phát hiện sửa nhánh, bỏ qua lệnh kiểm, QA tạo nhánh, chấp nhận thiếu tiêu chí, chỉ gộp hệ thống đầu. **Chưa:** chạy thật trên RESKI, xem trang trên trình duyệt.
+Test tự động (container Linux): `devflow-qa-unit` (15), `devflow-qa` (11: toàn luồng với runner giả, git thật), `devflow-qa-review` (10: hàng chờ, quyền, approve/request_changes/reject, vòng QA→Dev), workspace, staff-notify, migration vai, approver sync; UI `qa-review`. Đột biến bị bắt: không phát hiện sửa nhánh, bỏ qua lệnh kiểm, QA tạo nhánh, chấp nhận thiếu tiêu chí, chỉ gộp hệ thống đầu. Chạy sơ qua (2026-10-26, không chạy lượt agent tốn tiền): image mới, đồng bộ pipeline `qa_signoff` và tạo agent QA trên công ty thử đều xong, agent "QA agent ready". Lưu ý vận hành: sau khi `compose up` tạo lại container server phải chạy lại `setup-dev-runner.mjs` (nối lại `runner_net`), nếu không agent kẹt "verifying" với `test_environment_unavailable`. **Chưa:** một lượt QA thật trên RESKI, xem trang trên trình duyệt.
 
 ## Giới hạn đã biết
 - Nối tiếp Dev: dùng chung khóa `dr-agent-stage-worker`, một lượt QA (≤ 40 phút) chặn các worker khác.
