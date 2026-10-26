@@ -10,6 +10,10 @@ services:
   server:
     image: devflow-paperclip:local
     pull_policy: never
+    # Always on the runner network, so recreating the server with only these two files keeps its link to the runner
+    # (docker-compose.runner.yml declares the same network; the definitions merge). Without this, a recreated server loses the
+    # runner and Dev/QA agents stay "verifying".
+    networks: [default, runner_net]
     build: !reset null
     volumes:
       # Extra root CAs for networks that inspect TLS (kb/tech-stack.md); docker/certs is gitignored
@@ -72,3 +76,7 @@ services:
       DEVFLOW_QA_MAX_USD_PER_DAY: "${DEVFLOW_QA_MAX_USD_PER_DAY:-20}"
       DEVFLOW_QA_INTERVAL_MS: "${DEVFLOW_QA_INTERVAL_MS:-}"
       DEVFLOW_AGENT_WORKSPACE_ROOT: "${DEVFLOW_AGENT_WORKSPACE_ROOT:-}"
+
+networks:
+  runner_net:
+    internal: true
