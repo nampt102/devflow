@@ -6,11 +6,12 @@
 //
 // Env: PAPERCLIP_URL (default http://localhost:3100), DEVFLOW_TEST_ADMIN_EMAIL, DEVFLOW_TEST_ADMIN_PASSWORD
 // (board user; local test accounts only). Idempotent: an existing `dev-request` pipeline is kept, and only the
-// review stages' `approver` is brought in line with the definition (roles; add-approver-roles). `--any-human`
+// review stages' `approver` is brought in line with the definition (roles; add-approver-roles), the QA sign-off's
+// request-changes target and any transition the definition has and the company lacks are added (add-qa-stage). `--any-human`
 // rolls every review stage back to any_human. With --verify the account must be allowed to decide (company owner
 // or hold the roles), because the walk approves through the core API.
 import { readFileSync } from "node:fs";
-import { approverPatches } from "./lib/approver-sync.mjs";
+import { approverPatches, mergedTransitions } from "./lib/approver-sync.mjs";
 
 const base = process.env.PAPERCLIP_URL ?? "http://localhost:3100";
 const args = process.argv.slice(2);
@@ -73,6 +74,15 @@ if (pipelineId) {
     console.log(`stage ${p.key}: approver set to ${JSON.stringify(p.body.config.approver)}`);
   }
   if (!patches.length) console.log("review approvers already up to date");
+  // the transitions the definition has and the company lacks (add-qa-stage: qa_signoff -> dev); nothing is removed
+  const merged = anyHuman ? null : mergedTransitions(definition.transitions, live.body.transitions ?? [], live.body.stages ?? []);
+  if (merged) {
+    const put = await call("PUT", `/api/pipelines/${pipelineId}/transitions`, { transitions: merged, enforceTransitions: live.body.enforceTransitions !== false });
+    if (put.status !== 200) throw new Error(`transitions update failed: ${put.status} ${JSON.stringify(put.body)}`);
+    console.log(`transitions: added ${merged.length - (live.body.transitions ?? []).length} missing`);
+  } else {
+    console.log("transitions already up to date");
+  }
 }
 if (!verify) process.exit(0);
 

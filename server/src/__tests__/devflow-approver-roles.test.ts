@@ -10,7 +10,7 @@ import { getEmbeddedPostgresTestSupport, startEmbeddedPostgresTestDatabase } fro
 import { errorHandler } from "../middleware/error-handler.js";
 import { pipelineService, type PipelineActor } from "../services/pipelines.js";
 import { memberRolesRoutes } from "../devflow/roles/routes.js";
-import { approverPatches } from "../../../scripts/devflow/lib/approver-sync.mjs";
+import { approverPatches, mergedTransitions } from "../../../scripts/devflow/lib/approver-sync.mjs";
 
 // Role approvers (openspec change add-approver-roles): the core check for each approver kind, the role branch,
 // and the Roles API. The review services' use of the same check is covered in the three devflow-*-review tests.
@@ -19,6 +19,9 @@ describe("approver schema", () => {
   it("accepts role approvers with distinct known roles", () => {
     expect(pipelineStageApproverSchema.safeParse({ kind: "role", roles: ["ba", "tech_lead"] }).success).toBe(true);
     expect(pipelineStageApproverSchema.safeParse({ kind: "role", roles: ["tech_lead"] }).success).toBe(true);
+    // the QA sign-off asks for the qa role (change add-qa-stage)
+    expect(pipelineStageApproverSchema.safeParse({ kind: "role", roles: ["qa", "tech_lead"] }).success).toBe(true);
+    expect(pipelineStageApproverSchema.safeParse({ kind: "role", roles: ["tester"] }).success).toBe(false);
   });
 
   it("refuses a role approver with no roles, unknown roles or repeated roles", () => {
@@ -81,6 +84,72 @@ describe("approverPatches (seed script)", () => {
     expect(patches[0]!.body.config.approveToStageKey).toBe("x"); // the rest of the live config is kept
     // and a second run changes nothing
     expect(approverPatches(real, seeded.map((s) => (s.key === "code_review" ? { ...s, config: { ...s.config, approver: { kind: "role", roles: ["tech_lead"] } } } : s)))).toEqual([]);
+  });
+
+  it("moves the QA sign-off's request-changes target to dev and touches no other route", () => {
+    const def = [
+      { key: "code_review", kind: "review", config: { approver: { kind: "role", roles: ["tech_lead"] }, requestChangesToStageKey: "dev" } },
+      { key: "qa_signoff", kind: "review", config: { approver: { kind: "role", roles: ["qa", "tech_lead"] }, requestChangesToStageKey: "dev" } },
+    ];
+    const live = [
+      // a company that routed code review differently on purpose keeps it
+      { id: "c", key: "code_review", kind: "review", config: { approver: { kind: "role", roles: ["tech_lead"] }, requestChangesToStageKey: "tech_plan", requireRejectReason: true } },
+      { id: "q", key: "qa_signoff", kind: "review", config: { approver: { kind: "any_human" }, requestChangesToStageKey: "qa", requireRejectReason: true } },
+    ];
+    const patches = approverPatches(def, live);
+    expect(patches).toEqual([
+      { stageId: "q", key: "qa_signoff", body: { config: { approver: { kind: "role", roles: ["qa", "tech_lead"] }, requestChangesToStageKey: "dev", requireRejectReason: true } } },
+    ]);
+    // the approver already right but the route not: still one patch, route only
+    const routeOnly = approverPatches(def, [live[0]!, { ...live[1]!, config: { ...live[1]!.config, approver: { kind: "role", roles: ["qa", "tech_lead"] } } }]);
+    expect(routeOnly).toHaveLength(1);
+    expect(routeOnly[0]!.body.config.requestChangesToStageKey).toBe("dev");
+    // the roll-back to any_human leaves routes alone
+    const rolled = approverPatches(def, [live[0]!, { ...live[1]!, config: { ...live[1]!.config, approver: { kind: "role", roles: ["qa"] } } }], { anyHuman: true });
+    expect(rolled.find((p) => p.key === "qa_signoff")!.body.config).toMatchObject({ approver: { kind: "any_human" }, requestChangesToStageKey: "qa" });
+  });
+
+  it("adds the transitions the company lacks, keeps the ones it has, and sends nothing when it is complete", () => {
+    const stages = [
+      { id: "1", key: "dev" },
+      { id: "2", key: "qa_signoff" },
+      { id: "3", key: "qa" },
+    ];
+    const definition = [
+      { fromStageKey: "qa_signoff", toStageKey: "dev", label: "Request changes" },
+      { fromStageKey: "qa_signoff", toStageKey: "qa", label: "Re-run" },
+    ];
+    const live = [{ fromStageId: "2", toStageId: "3", label: "Request changes" }];
+    expect(mergedTransitions(definition, live, stages)).toEqual([
+      { fromStageKey: "qa_signoff", toStageKey: "qa", label: "Request changes" },
+      { fromStageKey: "qa_signoff", toStageKey: "dev", label: "Request changes" },
+    ]);
+    expect(mergedTransitions(definition, [...live, { fromStageId: "2", toStageId: "1", label: "x" }], stages)).toBeNull();
+    // an edge to a stage the company does not have is not invented
+    expect(mergedTransitions([{ fromStageKey: "qa_signoff", toStageKey: "nowhere" }], live, stages)).toBeNull();
+  });
+
+  it("brings a company seeded before the QA stage in line from the real definition, and a second run changes nothing", () => {
+    const real = JSON.parse(readFileSync(new URL("../devflow/dev-request-pipeline.json", import.meta.url), "utf8")) as {
+      stages: Array<{ key: string; kind: string; config?: Record<string, unknown> }>;
+      transitions: Array<{ fromStageKey: string; toStageKey: string; label?: string }>;
+    };
+    const ids = new Map(real.stages.map((s, i) => [s.key, `s${i}`]));
+    const oldTransitions = real.transitions.map((t) => (t.fromStageKey === "qa_signoff" && t.toStageKey === "dev" ? { ...t, toStageKey: "qa" } : t));
+    const live = (qaConfig: Record<string, unknown>, transitions: typeof oldTransitions) => ({
+      stages: real.stages.map((s) => ({ id: ids.get(s.key)!, key: s.key, kind: s.kind, config: s.key === "qa_signoff" ? qaConfig : s.kind === "review" ? { ...s.config } : {} })),
+      transitions: transitions.map((t) => ({ fromStageId: ids.get(t.fromStageKey)!, toStageId: ids.get(t.toStageKey)!, label: t.label })),
+    });
+    const before = live({ ...real.stages.find((s) => s.key === "qa_signoff")!.config, approver: { kind: "any_human" }, requestChangesToStageKey: "qa" }, oldTransitions);
+    const patches = approverPatches(real.stages, before.stages);
+    expect(patches.map((p) => p.key)).toEqual(["qa_signoff"]);
+    expect(patches[0]!.body.config).toMatchObject({ approver: { kind: "role", roles: ["qa", "tech_lead"] }, requestChangesToStageKey: "dev", approveToStageKey: "done" });
+    const merged = mergedTransitions(real.transitions, before.transitions, before.stages)!;
+    expect(merged.some((t) => t.fromStageKey === "qa_signoff" && t.toStageKey === "dev")).toBe(true);
+    expect(merged.some((t) => t.fromStageKey === "qa_signoff" && t.toStageKey === "qa")).toBe(true); // nothing is removed
+    const after = live(patches[0]!.body.config, merged as typeof oldTransitions);
+    expect(approverPatches(real.stages, after.stages)).toEqual([]);
+    expect(mergedTransitions(real.transitions, after.transitions, after.stages)).toBeNull();
   });
 
   it("ignores stages the company does not have", () => {
@@ -358,12 +427,22 @@ describeEmbeddedPostgres("member roles API", () => {
     expect(res.body).toMatchObject({ userId: ctx.target, roles: ["ba", "tech_lead"], changed: true });
     const list = await request(app(board(ctx.staff, ctx.companyId, "member"))).get(base(ctx));
     expect(list.status).toBe(200);
-    expect(list.body.availableRoles).toEqual(["ba", "tech_lead"]);
+    expect(list.body.availableRoles).toEqual(["ba", "tech_lead", "qa"]);
     expect(list.body.canManage).toBe(false);
     const row = list.body.items.find((i: any) => i.userId === ctx.target);
     expect(row).toMatchObject({ name: "Người target", roles: ["ba", "tech_lead"], membershipRole: "member", alwaysApproves: false });
     expect(list.body.items.find((i: any) => i.userId === ctx.owner)).toMatchObject({ alwaysApproves: true, roles: [] });
     expect(list.body.items.map((i: any) => i.userId)).not.toContain(ctx.gone); // removed members are not staff
+  });
+
+  it("gives the qa role (the QA sign-off asks for it) and keeps refusing roles that are not in the list", async () => {
+    const ctx = await seed();
+    const res = await put(ctx, board(ctx.owner, ctx.companyId, "owner"), ctx.target, { roles: ["qa"] });
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ userId: ctx.target, roles: ["qa"], changed: true });
+    const both = await put(ctx, board(ctx.owner, ctx.companyId, "owner"), ctx.target, { roles: ["qa", "tech_lead"] });
+    expect(both.body.roles).toEqual(["tech_lead", "qa"]);
+    expect((await put(ctx, board(ctx.owner, ctx.companyId, "owner"), ctx.target, { roles: ["tester"] })).status).toBe(422);
   });
 
   it("tells the owner and an instance admin they can manage, other staff they cannot", async () => {

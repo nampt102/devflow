@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Sets the business roles (ba, tech_lead) of one staff member of a company. A person can have both.
+// Sets the business roles (ba, tech_lead, qa) of one staff member of a company. A person can have both.
 // The list you pass REPLACES the person's roles, so `--roles ba` removes tech_lead if they had it.
 //
 //   node scripts/devflow/set-member-roles.mjs --company <companyId> --email <email> --roles ba,tech_lead
@@ -19,7 +19,7 @@ const email = arg("--email");
 const rolesArg = arg("--roles");
 const listOnly = args.includes("--list");
 if (!companyId || companyId.startsWith("--") || (!listOnly && (!email || rolesArg === undefined))) {
-  console.error("Usage: set-member-roles.mjs --company <companyId> (--list | --email <email> --roles ba,tech_lead|none)");
+  console.error("Usage: set-member-roles.mjs --company <companyId> (--list | --email <email> --roles ba,tech_lead,qa|none)");
   process.exit(2);
 }
 

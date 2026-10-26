@@ -116,11 +116,15 @@
       "config": {
         "requireApproval": true,
         "approver": {
-          "kind": "any_human"
+          "kind": "role",
+          "roles": [
+            "qa",
+            "tech_lead"
+          ]
         },
         "approveToStageKey": "done",
         "rejectToStageKey": "cancelled",
-        "requestChangesToStageKey": "qa",
+        "requestChangesToStageKey": "dev",
         "requireRejectReason": true,
         "requireRequestChangesReason": true
       }
@@ -231,7 +235,7 @@
     },
     {
       "fromStageKey": "qa_signoff",
-      "toStageKey": "qa",
+      "toStageKey": "dev",
       "label": "Request changes"
     },
     {

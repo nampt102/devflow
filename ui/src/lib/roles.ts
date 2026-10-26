@@ -1,10 +1,11 @@
 // Pure helpers for DevFlow business roles (openspec change add-approver-roles): the "Roles" page and the
 // "you cannot decide" notice on the three review pages. The server decides; these only explain.
 
-export const ROLE_LABELS: Record<string, string> = { ba: "BA", tech_lead: "Tech Lead" };
+export const ROLE_LABELS: Record<string, string> = { ba: "BA", tech_lead: "Tech Lead", qa: "QA" };
 export const ROLE_HINTS: Record<string, string> = {
   ba: "Reviews triage proposals and BA specs.",
-  tech_lead: "Reviews triage proposals, BA specs and technical plans.",
+  tech_lead: "Reviews triage proposals, BA specs, technical plans, code and QA results.",
+  qa: "Signs off QA results.",
 };
 
 export const roleLabel = (role: string): string => ROLE_LABELS[role] ?? role;

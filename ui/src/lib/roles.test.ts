@@ -5,6 +5,7 @@ describe("roles", () => {
   it("names roles in a sentence", () => {
     expect(rolesSentence(["tech_lead"])).toBe("Tech Lead");
     expect(rolesSentence(["ba", "tech_lead"])).toBe("BA or Tech Lead");
+    expect(rolesSentence(["qa", "tech_lead"])).toBe("QA or Tech Lead");
     expect(rolesSentence([])).toBe("");
   });
 

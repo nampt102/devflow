@@ -19,6 +19,6 @@ export const drMemberRoles = pgTable(
   (table) => ({
     companyUserRoleUq: uniqueIndex("dr_member_roles_company_user_role_uq").on(table.companyId, table.userId, table.role),
     companyUserIdx: index("dr_member_roles_company_user_idx").on(table.companyId, table.userId),
-    roleCheck: check("dr_member_roles_role_check", sql`${table.role} in ('ba', 'tech_lead')`),
+    roleCheck: check("dr_member_roles_role_check", sql`${table.role} in ('ba', 'tech_lead', 'qa')`),
   }),
 );

@@ -11,7 +11,7 @@ export const legacyPipelineStageKindSchema = z.enum(["open", "working", "review"
 
 // DevFlow (openspec change add-approver-roles): business roles a review stage can require. A person may hold
 // several; the closed list matches the CHECK on dr_member_roles.
-export const PIPELINE_APPROVER_ROLES = ["ba", "tech_lead"] as const;
+export const PIPELINE_APPROVER_ROLES = ["ba", "tech_lead", "qa"] as const;
 export const pipelineApproverRoleSchema = z.enum(PIPELINE_APPROVER_ROLES);
 
 export const pipelineStageApproverSchema = z.object({

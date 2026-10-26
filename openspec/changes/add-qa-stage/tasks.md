@@ -1,13 +1,13 @@
 ## 1. Duyệt
 
-- [ ] 1.1 Chủ dự án duyệt proposal, design và DDL (thêm vai `qa`), hoặc chọn mặc định ở "Open Questions"
+- [x] 1.1 Chủ dự án duyệt proposal, design và DDL (thêm vai `qa`), hoặc chọn mặc định ở "Open Questions"
 
 ## 2. Vai `qa` và pipeline
 
-- [ ] 2.1 Migration đổi CHECK `dr_member_roles` thêm `qa` + schema Drizzle + test (vai `qa` ghi được, vai lạ bị từ chối, dữ liệu cũ nguyên)
-- [ ] 2.2 `PIPELINE_APPROVER_ROLES` thêm `qa`; dịch vụ vai, trang Roles, `set-member-roles.mjs` nhận vai mới + test
-- [ ] 2.3 `dev-request-pipeline.json`: `qa_signoff` approver `["qa", "tech_lead"]`, `requestChangesToStageKey: dev`, bước chuyển `qa_signoff → dev` (bỏ `qa_signoff → qa`); sửa test pin định nghĩa
-- [ ] 2.4 `setup-dev-request-pipeline.mjs` + `lib/approver-sync.mjs`: đồng bộ thêm `requestChangesToStageKey` của `qa_signoff` và thêm bước chuyển còn thiếu (chỉ thêm); test trên định nghĩa thật, chạy lại không đổi gì
+- [x] 2.1 Migration đổi CHECK `dr_member_roles` thêm `qa` + schema Drizzle + test (vai `qa` ghi được, vai lạ bị từ chối, dữ liệu cũ nguyên)
+- [x] 2.2 `PIPELINE_APPROVER_ROLES` thêm `qa`; dịch vụ vai, trang Roles, `set-member-roles.mjs` nhận vai mới + test
+- [x] 2.3 `dev-request-pipeline.json`: `qa_signoff` approver `["qa", "tech_lead"]`, `requestChangesToStageKey: dev`, bước chuyển `qa_signoff → dev` (bỏ `qa_signoff → qa`); sửa test pin định nghĩa
+- [x] 2.4 `setup-dev-request-pipeline.mjs` + `lib/approver-sync.mjs`: đồng bộ thêm `requestChangesToStageKey` của `qa_signoff` và thêm bước chuyển còn thiếu (chỉ thêm); test trên định nghĩa thật, chạy lại không đổi gì
 
 ## 3. Agent QA
 

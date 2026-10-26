@@ -13,13 +13,13 @@ const definition = JSON.parse(
   transitions: Array<{ fromStageKey: string; toStageKey: string }>;
 };
 
-// add-approver-roles and add-dev-stage: the stages that have an agent need a role (code review: Tech Lead); QA sign-off stays open to any human until QA has an agent.
+// add-approver-roles and add-dev-stage: the stages that have an agent need a role (code review: Tech Lead; QA sign-off: QA or Tech Lead).
 const EXPECTED_APPROVER: Record<string, unknown> = {
   triage_review: { kind: "role", roles: ["ba", "tech_lead"] },
   ba_review: { kind: "role", roles: ["ba", "tech_lead"] },
   plan_review: { kind: "role", roles: ["tech_lead"] },
   code_review: { kind: "role", roles: ["tech_lead"] },
-  qa_signoff: { kind: "any_human" },
+  qa_signoff: { kind: "role", roles: ["qa", "tech_lead"] },
 };
 
 const stages = definition.stages;

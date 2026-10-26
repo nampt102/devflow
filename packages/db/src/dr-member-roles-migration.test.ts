@@ -78,3 +78,42 @@ describeEmbeddedPostgres("dr_member_roles", () => {
     expect(await sql`SELECT 1 FROM dr_member_roles WHERE company_id = ${c}`).toHaveLength(0);
   });
 });
+
+/**
+ * Migration 0362 (change add-qa-stage): the closed role list gains `qa`, and nothing else about the table moves.
+ */
+const qaMigrationSql = fs.readFileSync(new URL("./migrations/0362_devflow_qa_role.sql", import.meta.url), "utf8");
+
+describe("migration 0362 file", () => {
+  it("only replaces the role check on dr_member_roles", () => {
+    expect(qaMigrationSql).toMatch(/DROP CONSTRAINT "dr_member_roles_role_check"/);
+    expect(qaMigrationSql).toMatch(/'ba', 'tech_lead', 'qa'/);
+    expect(qaMigrationSql).not.toMatch(/CREATE TABLE|DROP TABLE|DROP COLUMN|DELETE |UPDATE /);
+    expect([...qaMigrationSql.matchAll(/ALTER TABLE "([a-z_]+)"/g)].every((m) => m[1] === "dr_member_roles")).toBe(true);
+  });
+});
+
+describeEmbeddedPostgres("dr_member_roles with the qa role", () => {
+  let cleanup: () => Promise<void>;
+  let sql: postgres.Sql;
+  beforeAll(async () => {
+    const db = await startEmbeddedPostgresTestDatabase("devflow-member-roles-qa-");
+    cleanup = db.cleanup;
+    sql = postgres(db.connectionString, { max: 2 });
+  }, 120_000);
+  afterAll(async () => {
+    await sql?.end();
+    await cleanup?.();
+  });
+  const prefix = () => randomUUID().replace(/[^a-z]/g, "").slice(0, 6).toUpperCase().padEnd(6, "X");
+
+  it("accepts qa next to the other roles and still refuses anything else", async () => {
+    const [c] = await sql`INSERT INTO companies (name, issue_prefix) VALUES ('Roles QA', ${prefix()}) RETURNING id`;
+    for (const role of ["ba", "tech_lead", "qa"]) await sql`INSERT INTO dr_member_roles (company_id, user_id, role) VALUES (${c.id}, 'user-q', ${role})`;
+    const rows = await sql`SELECT role FROM dr_member_roles WHERE company_id = ${c.id} ORDER BY role`;
+    expect(rows.map((r) => r.role)).toEqual(["ba", "qa", "tech_lead"]);
+    for (const role of ["QA", "qa ", "tester", "qa,ba", ""]) {
+      await expect(sql`INSERT INTO dr_member_roles (company_id, user_id, role) VALUES (${c.id}, 'user-q2', ${role})`).rejects.toThrow(/dr_member_roles_role_check/);
+    }
+  });
+});
