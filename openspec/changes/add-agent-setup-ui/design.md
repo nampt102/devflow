@@ -12,7 +12,7 @@ Các script `setup-*-agent.mjs` (qua `lib/setup-stage-agent.mjs`), `setup-dev-re
 
 **D1. Trình duyệt điều phối, dùng đúng các API đã có.** Giao diện thực hiện cùng chuỗi bước như script bằng API client, với phiên của người đang đăng nhập. Mọi kiểm tra quyền, mediated secret, phê duyệt agent mới (`requireBoardApprovalForNewAgents`), chuẩn hóa adapter config vẫn do core xử lý. Lý do: viết lại việc tạo agent phía server (`routes/agents.ts` ~100 dòng kiểm tra riêng cho tạo agent) là rủi ro lớn và dễ lệch core khi gộp bản Paperclip mới (B-27). Đánh đổi: các bước không nguyên tử (tạo xong mà bật lỗi); chấp nhận vì chạy lại an toàn (idempotent) và trang hiện đúng bước đang dở.
 
-**D2. Một module dùng chung cho script và giao diện.** Phần thuần (so khớp approver, hợp nhất bước chuyển, quyết định cần tạo hay cập nhật, kiểm instructions) chuyển thành TypeScript trong `packages/shared` (có test); `ui/src/lib/agentSetup.ts` gọi API; script `.mjs` import bản biên dịch hoặc giữ vỏ mỏng. Nếu không import được từ script một cách gọn, giữ bản `.mjs` hiện có và thêm test đối chiếu kết quả hai bên trên cùng đầu vào, để không lệch.
+**D2 (đã chốt khi làm). Phần thuần nằm ở server, giao diện chỉ áp kết quả.** `server/src/devflow/setup/pipeline-sync.ts` là bản TypeScript của `approver-sync.mjs` (test chạy cả hai trên cùng đầu vào); `setup-status` trả sẵn thân PATCH/PUT cần gửi, giao diện chỉ gửi lại, nên không có logic so khớp ở trình duyệt. Ý định ban đầu (bên dưới) không còn dùng. Bản gốc: Phần thuần (so khớp approver, hợp nhất bước chuyển, quyết định cần tạo hay cập nhật, kiểm instructions) chuyển thành TypeScript trong `packages/shared` (có test); `ui/src/lib/agentSetup.ts` gọi API; script `.mjs` import bản biên dịch hoặc giữ vỏ mỏng. Nếu không import được từ script một cách gọn, giữ bản `.mjs` hiện có và thêm test đối chiếu kết quả hai bên trên cùng đầu vào, để không lệch.
 
 **D3. Một endpoint đọc `GET /companies/:id/devflow/setup-status`.** Gom: với từng vai (`ba`, `plan`, `dev`, `qa`) `{ spec hash, agent: {id, status, problem}|null, lastLifecycleFailure|null }`, pipeline `{ exists, missingApprovers[], missingTransitions[] }`, runner `{ environment: bool, reachable: bool }` (phân giải tên máy chủ runner từ tiến trình server). Chỉ đọc, cùng kiểm quyền staff + owner/admin. `lastLifecycleFailure` lấy từ log vòng đời nếu có sẵn để đọc; nếu không có chỗ lưu thì chỉ hiện trạng thái `verifying` và hướng dẫn xem log (ghi rõ "chưa xác nhận" cho tới khi đọc code; xem Open Questions).
 
@@ -32,7 +32,7 @@ Các script `setup-*-agent.mjs` (qua `lib/setup-stage-agent.mjs`), `setup-dev-re
 
 ## Open Questions (mặc định nếu duyệt không trả lời)
 
-1. Log vòng đời xác minh agent có đọc được qua API/DB không (để hiện `test_environment_unavailable`)? Mặc định: kiểm khi làm; nếu không, chỉ hiện trạng thái và gợi ý chạy lại `setup-dev-runner.mjs`.
+1. (Đã kiểm: **không**, lỗi vòng đời chỉ ghi log server qua `logger.warn`, không lưu; trang chỉ hiện trạng thái `verifying` và gợi ý chạy lại `setup-dev-runner.mjs`.) Log vòng đời xác minh agent có đọc được qua API/DB không (để hiện `test_environment_unavailable`)? Mặc định: kiểm khi làm; nếu không, chỉ hiện trạng thái và gợi ý chạy lại `setup-dev-runner.mjs`.
 2. Ai được dùng trang: mặc định owner, admin công ty và instance admin (cùng quy tắc `allow_unprotected`).
 3. Tự cài lại khi khởi động (B-40): mặc định **hoãn**, ghi backlog.
 4. CI: mặc định **tách** thành `add-devflow-ci`, đề xuất sau.

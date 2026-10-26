@@ -114,6 +114,7 @@ import { baRoutes } from "./devflow/ba/routes.js";
 import { planRoutes } from "./devflow/plan/routes.js";
 import { devRoutes } from "./devflow/dev/routes.js";
 import { qaRoutes } from "./devflow/qa/routes.js";
+import { setupRoutes } from "./devflow/setup/routes.js";
 import { secretService } from "./services/secrets.js";
 import { memberRolesRoutes } from "./devflow/roles/routes.js";
 import { environmentRoutes } from "./routes/environments.js";
@@ -888,6 +889,7 @@ export async function createApp(
         }),
     }),
   );
+  api.use(setupRoutes(db));
   api.use(memberRolesRoutes(db));
   api.use(
     environmentRoutes(db, {

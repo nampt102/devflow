@@ -4,12 +4,12 @@
 
 ## 2. Logic dùng chung
 
-- [ ] 2.1 Đọc code để chốt Open Question 1 (log xác minh agent) và quy tắc quyền owner/admin hiện có; ghi kết quả vào design
-- [ ] 2.2 Module thuần (so khớp approver, hợp nhất bước chuyển, quyết định create/update, so instructions) trong `packages/shared` + test; script dùng lại hoặc test đối chiếu hai bản trên cùng đầu vào
+- [x] 2.1 Đọc code để chốt Open Question 1 (log xác minh agent) và quy tắc quyền owner/admin hiện có; ghi kết quả vào design
+- [x] 2.2 Module thuần (so khớp approver, hợp nhất bước chuyển, quyết định create/update, so instructions) trong `packages/shared` + test; script dùng lại hoặc test đối chiếu hai bản trên cùng đầu vào
 
 ## 3. Server
 
-- [ ] 3.1 `GET …/devflow/setup-status` (agent theo vai, pipeline, runner) + test: quyền (403 người thường), từng trạng thái, công ty mới, runner không thấy
+- [x] 3.1 `GET …/devflow/setup-status` (agent theo vai, pipeline, runner) + test: quyền (403 người thường), từng trạng thái, công ty mới, runner không thấy
 
 ## 4. Giao diện
 
