@@ -108,6 +108,7 @@ describeDb("GET devflow/setup-status", () => {
     expect(res.status).toBe(200);
     expect(res.body.agents).toEqual({ ba: null, plan: null, dev: null, qa: null });
     expect(res.body.pipeline).toMatchObject({ exists: false, id: null, patches: [], transitions: null });
+    expect(res.body.pipeline.definition.key).toBe("dev-request");
     expect(res.body.runner.environment).toBe(false);
     expect(res.body.needsAttention).toBe(false);
   });

@@ -52,9 +52,9 @@ export function setupRoutes(db: Db, env: Env = process.env, resolveHost: (host: 
     };
 
     const [pipeline] = await db.select().from(pipelines).where(and(eq(pipelines.companyId, companyId), eq(pipelines.key, definition.key)));
-    let pipelineState: { exists: boolean; id: string | null; patches: unknown[]; transitions: unknown[] | null; transitionsMissing: number };
+    let pipelineState: { exists: boolean; id: string | null; patches: unknown[]; transitions: unknown[] | null; transitionsMissing: number; definition?: unknown };
     if (!pipeline) {
-      pipelineState = { exists: false, id: null, patches: [], transitions: null, transitionsMissing: 0 };
+      pipelineState = { exists: false, id: null, patches: [], transitions: null, transitionsMissing: 0, definition };
     } else {
       const stages = await db.select().from(pipelineStages).where(eq(pipelineStages.pipelineId, pipeline.id));
       const live = await db.select().from(pipelineTransitions).where(eq(pipelineTransitions.pipelineId, pipeline.id));

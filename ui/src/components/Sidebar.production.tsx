@@ -21,6 +21,7 @@ import {
   GitBranch,
   Package,
   Settings,
+  Settings2,
   FolderOpen,
   Unplug,
   MessagesSquare,
@@ -45,6 +46,7 @@ import { devflowBaApi } from "../api/devflowBa";
 import { devflowPlanApi } from "../api/devflowPlan";
 import { devflowCodeApi } from "../api/devflowCode";
 import { devflowQaApi } from "../api/devflowQa";
+import { devflowSetupApi } from "../api/devflowSetup";
 import { devflowTriageApi } from "../api/devflowTriage";
 import { attentionBadgeCount } from "../lib/attention";
 import { useInboxBadge } from "../hooks/useInboxBadge";
@@ -126,6 +128,14 @@ export function Sidebar() {
     queryFn: () => devflowQaApi.count(selectedCompanyId!),
     enabled: !!selectedCompanyId && showPipelines,
     refetchInterval: 30_000,
+    retry: false,
+  });
+  // only owners and admins may read it (403 for others): no item, no error
+  const { data: setupStatus } = useQuery({
+    queryKey: queryKeys.devflowSetup.status(selectedCompanyId!),
+    queryFn: () => devflowSetupApi.status(selectedCompanyId!),
+    enabled: !!selectedCompanyId && showPipelines,
+    refetchInterval: 60_000,
     retry: false,
   });
   const showStatusCards = experimentalSettings?.enableStatusCards === true;
@@ -243,6 +253,9 @@ export function Sidebar() {
           ) : null}
           {showPipelines ? (
             <SidebarNavItem to="/roles" label="Roles" icon={ShieldCheck} />
+          ) : null}
+          {showPipelines && setupStatus ? (
+            <SidebarNavItem to="/setup" label="Setup" icon={Settings2} badge={setupStatus.needsAttention ? 1 : undefined} badgeLabel="needs attention" />
           ) : null}
           {showPipelines ? (
             <SidebarNavItem to="/triage" label="Triage review" icon={ClipboardCheck} badge={triageCount?.waiting || undefined} badgeLabel="waiting for review" />

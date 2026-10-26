@@ -13,9 +13,9 @@
 
 ## 4. Giao diện
 
-- [ ] 4.1 `ui/src/lib/agentSetup.ts`: chuỗi tạo/cập nhật agent qua API client (secret, môi trường runner, tạo, thăm dò `verifying`, bật, hướng dẫn, liên kết tệp) + test với API giả
-- [ ] 4.2 Đồng bộ pipeline qua API client (create/sync, chỉ thêm) + test
-- [ ] 4.3 Trang `/setup` (agent ×4, pipeline, runner, liên kết Systems và Roles), route, sidebar có cảnh báo cho owner/admin
+- [x] 4.1 `ui/src/lib/agentSetup.ts`: chuỗi tạo/cập nhật agent qua API client (secret, môi trường runner, tạo, thăm dò `verifying`, bật, hướng dẫn, liên kết tệp) + test với API giả
+- [x] 4.2 Đồng bộ pipeline qua API client (create/sync, chỉ thêm) + test
+- [x] 4.3 Trang `/setup` (agent ×4, pipeline, runner, liên kết Systems và Roles), route, sidebar có cảnh báo cho owner/admin
 - [ ] 4.4 Xem trang trên trình duyệt với công ty thử: công ty mới, agent lỗi thời, mất mạng runner
 
 ## 5. Tài liệu

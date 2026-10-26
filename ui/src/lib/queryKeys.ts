@@ -491,6 +491,10 @@ export const queryKeys = {
     queue: (companyId: string) => ["devflow-qa", companyId, "queue"] as const,
     detail: (companyId: string, caseId: string) => ["devflow-qa", companyId, "detail", caseId] as const,
   },
+  devflowSetup: {
+    status: (companyId: string) => ["devflow-setup", companyId, "status"] as const,
+    secrets: (companyId: string) => ["devflow-setup", companyId, "secrets"] as const,
+  },
   devflowRoles: {
     list: (companyId: string) => ["devflow-roles", companyId] as const,
   },
