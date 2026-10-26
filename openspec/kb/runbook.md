@@ -96,6 +96,7 @@ Ai được duyệt ở Triage review, BA review (cần `ba` hoặc `tech_lead`)
 - Người rời công ty giữ dòng vai nhưng không duyệt được (mất quyền truy cập công ty); chưa tự dọn.
 
 ## 14. Agent Dev, runner và PR nháp (ADR 0024, `kb/dev-stage.md`)
+> Bước tạo agent và đồng bộ pipeline làm được ở trang **Setup** trên Board UI (owner/admin, `kb/setup-ui.md`) thay cho `setup-*-agent.mjs`; dựng runner (bước 2) vẫn là lệnh.
 Agent Dev viết code ở runner riêng và DevFlow mở PR nháp; không bao giờ merge. Mọi bước dưới đây làm **một lần cho instance**, trừ bước 3 đến 5 làm cho từng công ty và từng hệ thống.
 1. **Mạng và CA:** build runner cần ra internet (apt, npm, `dot.net`). Mạng công ty ký lại TLS thì đặt CA gốc vào `docker/certs/*.pem` (như image server); gói `.deb` bị chặn qua http thì bỏ gói đó (vì thế image không có `python3-venv`).
 2. **Dựng runner:** `node scripts/devflow/setup-dev-runner.mjs --company <id>` (cần `DEVFLOW_TEST_ADMIN_EMAIL/PASSWORD` là instance admin). Script sinh cặp khóa SSH ở `docker/runner/keys/` (gitignored; **sao lưu khóa riêng**, mất thì chạy lại để sinh khóa mới), build và bật `devflow-runner`, `devflow-proxy`, nối server vào `runner_net`, ghim host key, lưu khóa riêng thành secret công ty `devflow-runner-ssh-key`, tạo môi trường Paperclip `devflow-runner` và probe. Chạy lại an toàn. Squid đôi khi khởi động trước DNS của Docker: script tự khởi động lại proxy một lần và kiểm `api.github.com` đi được còn `example.com` bị chặn. Thêm host cho phép (kho gói của hệ thống mới) trong `docker/runner/squid.conf` rồi khởi động lại `devflow-proxy`.
@@ -109,6 +110,7 @@ Agent Dev viết code ở runner riêng và DevFlow mở PR nháp; không bao gi
 - **Dữ liệu:** agent Dev gửi mã nguồn và tài liệu của repo sang API Claude; áp dụng cùng chính sách dữ liệu ở mục 9. Toolchain trong image: Node, Python, .NET 8 và 10; Flutter 3.47.0 (đúng RESKI; repo khác cần bản khác thì đổi `ARG FLUTTER_VERSION` và build lại runner).
 
 ## 15. Agent QA và ký duyệt QA (ADR 0025, `kb/qa-stage.md`)
+> Bước 1 (tạo agent) và 2 (đồng bộ pipeline) làm được ở trang **Setup** (`kb/setup-ui.md`).
 QA kiểm PR của Dev (đọc, chạy lệnh, báo cáo từng tiêu chí) và người ký quyết định; không merge, không đẩy code. Dùng lại runner và token của mục 14.
 1. **Nâng cấp image server** (có vai `qa` và migration `0362`), rồi **tạo agent QA** cho công ty: `node scripts/devflow/setup-qa-agent.mjs --company <id>`. Chạy lại khi worker báo `agent_prompt_outdated` hoặc `agent_not_on_runner`.
 2. **Đồng bộ pipeline** của công ty đã seed: `node scripts/devflow/setup-dev-request-pipeline.mjs --company <id>` (thêm route `qa_signoff → dev` và approver `qa`/`tech_lead`; chỉ thêm, không xóa).

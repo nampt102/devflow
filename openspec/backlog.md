@@ -48,7 +48,7 @@ Mức ưu tiên: **A** cần trước pilot, **B** nên làm sớm trong pilot, 
 |---|---|---|---|
 | A-24 | **Đã xác nhận (2026-10-18)**: sao lưu mỗi 60 phút, giữ 7 ngày, trong volume `docker_paperclip-data`, khôi phục thử thành công. Còn lại: sao chép ra ngoài máy (cùng ổ đĩa với dữ liệu thật), kể cả tệp đính kèm | done (xác nhận) | `kb/runbook.md` mục 6 |
 | A-25 | **Bỏ qua lúc này (chủ dự án, 2026-10-18)**.  Đánh giá AGPL (phần port từ Plane) trước khi triển khai ngoài thử nghiệm | A | ADR 0002 |
-| B-26 | Chưa có CI chạy test DevFlow (hiện chạy tay trong container); build image thủ công (`git archive` + `docker build`) | B | `kb/tech-stack.md` |
+| B-26 | **Tách thành change `add-devflow-ci` (chưa đề xuất)**. Gốc: Chưa có CI chạy test DevFlow (hiện chạy tay trong container); build image thủ công (`git archive` + `docker build`) | B | `kb/tech-stack.md` |
 | B-27 | Core `pipelines.ts` có thêm 4 dòng (hook `beforeCommit`), `app.ts` và `index.ts` có thêm mount worker/route: ghi nhớ khi gộp bản Paperclip mới | C | ADR 0017 |
 | C-28 | Chưa quan sát lưu lượng ra ngoài để xác nhận Telemetry đã tắt | C | ADR 0019 |
 | B-29 | Quét bí mật lịch sử upstream của Paperclip chưa làm; kho `nampt102/devflow` công khai | C | `kb/runbook.md` mục 11 |
@@ -70,7 +70,7 @@ Mức ưu tiên: **A** cần trước pilot, **B** nên làm sớm trong pilot, 
 | C-39 | **Xong 2026-10-20**: case `verify 1792397041188` của RESKI đã chuyển `cancelled` bằng transition `force` của board (pipeline không có đường `ba_spec → cancelled`; có lý do trong activity log). Lưu ý còn hiệu lực: `--verify` nên chạy trên công ty thử, không phải công ty pilot | done | RESKI, 2026-10-19 |
 | C-35 | Số liệu BA theo hệ thống (override và chi phí mỗi hệ thống) | C | 2026-10-19 |
 | C-36 | Xóa được agent "Spike BA …" (API trả 409 vì có run); nút "Set up BA agent" trong UI thay cho script | C | spike |
-| B-40 | Tự chạy setup agent BA và Planner khi tạo công ty, và tự đồng bộ lại khi cấu hình chuẩn đổi (hiện phải chạy tay `setup-ba-agent.mjs`, `setup-plan-agent.mjs` cho từng công ty, ví dụ khi thêm luật chặn chéo của `add-tech-plan-stage`) | B | chủ dự án, 2026-10-20 |
+| B-40 | **Hoãn (2026-10-26)**: trang Setup (`add-agent-setup-ui`) giảm việc xuống một cú bấm; tự cài lại khi khởi động cần tạo agent bằng tiến trình server (tái hiện logic của core), làm sau nếu cần. Gốc: Tự chạy setup agent BA và Planner khi tạo công ty, và tự đồng bộ lại khi cấu hình chuẩn đổi (hiện phải chạy tay `setup-ba-agent.mjs`, `setup-plan-agent.mjs` cho từng công ty, ví dụ khi thêm luật chặn chéo của `add-tech-plan-stage`) | B | chủ dự án, 2026-10-20 |
 
 ## Giao diện portal (theo dõi)
 | Mã | Nội dung | Ưu tiên | Nguồn |

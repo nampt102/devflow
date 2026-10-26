@@ -20,4 +20,4 @@
 
 ## 5. Tài liệu
 
-- [ ] 5.1 Runbook mục 14, 15 ("hoặc ở trang Setup"), KB `setup-ui.md`, status, backlog (B-40 hoãn, CI tách), ADR nếu cần
+- [x] 5.1 Runbook mục 14, 15 ("hoặc ở trang Setup"), KB `setup-ui.md`, status, backlog (B-40 hoãn, CI tách), ADR nếu cần
