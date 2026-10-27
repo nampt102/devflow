@@ -4,8 +4,8 @@
 
 ## 2. Server
 
-- [ ] 2.1 Đọc code để chốt các stage nào ghi `dr_overrides` và chi phí lưu ở đâu cho từng vai; ghi vào design
-- [ ] 2.2 `GET …/devflow/requests/:caseId/history` gộp sự kiện, overrides, đề xuất, sổ hoạt động, email; chuẩn hóa mục; tổng chi phí; thời gian từng stage; test (cách ly công ty 404, từng loại mục, ẩn email và token, phân trang)
+- [x] 2.1 Đọc code để chốt các stage nào ghi `dr_overrides` và chi phí lưu ở đâu cho từng vai; ghi vào design
+- [x] 2.2 `GET …/devflow/requests/:caseId/history` gộp sự kiện, overrides, đề xuất, sổ hoạt động, email; chuẩn hóa mục; tổng chi phí; thời gian từng stage; test (cách ly công ty 404, từng loại mục, ẩn email và token, phân trang)
 
 ## 3. Giao diện
 
