@@ -17,6 +17,8 @@ export interface DecisionBarProps {
   onDecide: (decision: ReviewDecision, reason: string) => void;
   /** a line above the buttons, for example the access notice */
   notice?: string | null;
+  /** the Approve button text when it says more than "Approve" (e.g. "Approve with 2 corrections") */
+  approveLabel?: string;
 }
 
 const LABEL: Record<ReviewDecision, string> = { approve: "Approve", request_changes: "Request changes", reject: "Reject" };
@@ -25,7 +27,7 @@ const PLACEHOLDER: Record<"request_changes" | "reject", string> = {
   reject: "Why is this being rejected?",
 };
 
-export function DecisionBar({ stage, pending, blocker, onDecide, notice }: DecisionBarProps) {
+export function DecisionBar({ stage, pending, blocker, onDecide, notice, approveLabel }: DecisionBarProps) {
   // which decision the reason box is open for; Approve needs no reason
   const [open, setOpen] = useState<"request_changes" | "reject" | null>(null);
   const [reason, setReason] = useState("");
@@ -92,7 +94,7 @@ export function DecisionBar({ stage, pending, blocker, onDecide, notice }: Decis
           ) : null}
         </div>
         <Button type="button" disabled={pending || !!blocker("approve", reason)} title={blocker("approve", reason) ?? undefined} onClick={() => choose("approve")} aria-keyshortcuts="a">
-          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Approve
+          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} {approveLabel ?? "Approve"}
           <kbd className="ml-1 text-xs opacity-70">a</kbd>
         </Button>
       </div>

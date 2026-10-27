@@ -11,7 +11,7 @@
 ## 3. Chuyển từng trang (mỗi trang một commit, giữ test hành vi)
 
 - [x] 3.1 QA sign-off
-- [ ] 3.2 Code review
+- [x] 3.2 Code review
 - [ ] 3.3 Plan review
 - [ ] 3.4 BA review
 - [ ] 3.5 Triage review (sửa trường, bản trùng, hệ thống)
