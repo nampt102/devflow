@@ -10,7 +10,7 @@
 
 - [x] 3.1 Hàng chờ, số đếm, số liệu Triage lọc yêu cầu đang hoãn; mốc "mới" = `greatest(proposed_at, snoozed_until)`; quyết định xóa trạng thái hoãn
 - [x] 3.2 `POST …/triage-cases/:id/snooze` (ngày, ghi chú, `expectedVersion`), `DELETE …/snooze`, `GET …/triage-snoozed`; sổ hoạt động; test (422 ngày sai, 409 phiên bản, tự quay lại theo giờ, quyền)
-- [ ] 3.3 Email nhân viên bỏ yêu cầu đang hoãn và tính lại một lần khi quay lại + test
+- [x] 3.3 Email nhân viên bỏ yêu cầu đang hoãn và tính lại một lần khi quay lại + test
 
 ## 4. Giao diện
 

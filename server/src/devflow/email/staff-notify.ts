@@ -119,14 +119,16 @@ export function createStaffNotifier(db: Db, send: SendMail, opts: StaffNotifyOpt
   async function runKind(kindName: DigestKind): Promise<number> {
     const queue = KINDS[kindName];
     const waiting = await rows<Waiting>(sql`
-      select o.id as output_id, o.created_at as at, c.company_id, c.case_key, c.title, co.issue_prefix as prefix
+      select o.id as output_id, greatest(o.created_at, coalesce(r.snoozed_until, o.created_at)) as at, c.company_id, c.case_key, c.title, co.issue_prefix as prefix
       from dr_agent_outputs o
       join pipeline_cases c on c.id = o.case_id and c.company_id = o.company_id
+      join dr_requests r on r.case_id = c.id and r.company_id = c.company_id
       join pipelines p on p.id = c.pipeline_id and p.key = 'dev-request'
       join pipeline_stages st on st.id = c.stage_id and st.key = ${queue.stageKey}
       join companies co on co.id = c.company_id
       where o.status = 'proposed' and o.stage_key = ${queue.outputStage} and c.terminal_kind is null
-        and o.created_at > now() - make_interval(hours => ${maxAge})
+        and (r.snoozed_until is null or r.snoozed_until <= now())
+        and greatest(o.created_at, coalesce(r.snoozed_until, o.created_at)) > now() - make_interval(hours => ${maxAge})
       order by c.company_id, o.created_at`);
     const byCompany = new Map<string, Waiting[]>();
     for (const w of waiting) byCompany.set(w.company_id, [...(byCompany.get(w.company_id) ?? []), w]);

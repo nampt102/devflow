@@ -246,6 +246,26 @@ describeEmbeddedPostgres("devflow staff digest", () => {
     expect(await n.run()).toBe(0);
   });
 
+  it("leaves a snoozed request out of the digest and announces it once more when it returns", async () => {
+    const ctx = await seedCompany();
+    const visible = await waitingBa(ctx, 1, "Công nợ", "ba");
+    const hidden = await waitingBa(ctx, 1, "Báo cáo kho", "ba");
+    void visible;
+    await db.update(drRequests).set({ snoozedUntil: new Date(Date.now() + 3 * 86_400_000) }).where(eq(drRequests.caseId, hidden.id));
+    const n = notifier({ recipients: ["x@staff.test"] });
+    expect(await n.run()).toBe(1);
+    expect(smtp.messages[0]!.text).not.toContain(hidden.key);
+    // the day comes: it is back and counts as new, in a digest of its own, once
+    await db.update(drRequests).set({ snoozedUntil: new Date(Date.now() - 1000) }).where(eq(drRequests.caseId, hidden.id));
+    await db.delete(activityLog).where(and(eq(activityLog.companyId, ctx.company.id), eq(activityLog.action, "staff.notified_ba")));
+    await db.insert(activityLog).values({ companyId: ctx.company.id, actorType: "system", actorId: "devflow-email", action: "staff.notified_ba", entityType: "company", entityId: ctx.company.id, details: { count: 1, upTo: new Date(Date.now() - 60_000).toISOString() }, createdAt: ago(30) });
+    smtp.messages.length = 0;
+    expect(await n.run()).toBe(1);
+    expect(smtp.messages[0]!.text).toContain(hidden.key);
+    expect(smtp.messages[0]!.text).not.toContain(visible.key);
+    expect(await n.run()).toBe(0);
+  });
+
   it("a failed BA digest is recorded on its own and does not hold back the triage digest", async () => {
     const ctx = await seedCompany();
     const n = notifier({ recipients: ["x@staff.test"], intervalMinutes: 60 });
