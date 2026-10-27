@@ -19,6 +19,8 @@ export interface DecisionBarProps {
   notice?: string | null;
   /** the Approve button text when it says more than "Approve" (e.g. "Approve with 2 corrections") */
   approveLabel?: string;
+  /** one more secondary action, placed after Reject (Triage: Snooze) */
+  extra?: React.ReactNode;
 }
 
 const LABEL: Record<ReviewDecision, string> = { approve: "Approve", request_changes: "Request changes", reject: "Reject" };
@@ -27,7 +29,7 @@ const PLACEHOLDER: Record<"request_changes" | "reject", string> = {
   reject: "Why is this being rejected?",
 };
 
-export function DecisionBar({ stage, pending, blocker, onDecide, notice, approveLabel }: DecisionBarProps) {
+export function DecisionBar({ stage, pending, blocker, onDecide, notice, approveLabel, extra }: DecisionBarProps) {
   // which decision the reason box is open for; Approve needs no reason
   const [open, setOpen] = useState<"request_changes" | "reject" | null>(null);
   const [reason, setReason] = useState("");
@@ -87,6 +89,7 @@ export function DecisionBar({ stage, pending, blocker, onDecide, notice, approve
             <X className="h-4 w-4" /> {open === "reject" ? "Reject…" : "Reject"}
             <kbd className="ml-1 text-xs text-muted-foreground">x</kbd>
           </Button>
+          {extra}
           {open ? (
             <Button type="button" variant="ghost" onClick={() => setOpen(null)}>
               Cancel

@@ -115,7 +115,23 @@ export interface TriageMetrics {
   agent: { proposed: number; failed: number; gaveUp: number; embedFailed: number; emailFailed: number; budgetPaused: number; calls: number; inputTokens: number; outputTokens: number };
 }
 
+export interface SnoozedItem {
+  caseId: string;
+  caseKey: string;
+  title: string;
+  version: number;
+  createdAt: string;
+  requesterName: string;
+  snoozedUntil: string;
+  snoozedByName: string | null;
+  note: string | null;
+}
+
 export const devflowTriageApi = {
+  snoozed: (companyId: string) => api.get<{ items: SnoozedItem[] }>(`/companies/${companyId}/devflow/triage-snoozed`),
+  snooze: (companyId: string, caseId: string, body: { until: string; note?: string; expectedVersion: number }) =>
+    api.post<{ ok: true; until: string }>(`/companies/${companyId}/devflow/triage-cases/${caseId}/snooze`, body),
+  unsnooze: (companyId: string, caseId: string) => api.delete<{ ok: true; changed: boolean }>(`/companies/${companyId}/devflow/triage-cases/${caseId}/snooze`),
   count: (companyId: string) => api.get<{ waiting: number; newest: string | null }>(`/companies/${companyId}/devflow/triage-count`),
   metrics: (companyId: string, days = 30) => api.get<TriageMetrics>(`/companies/${companyId}/devflow/triage-metrics?days=${days}`),
   queue: (companyId: string) => api.get<{ items: TriageQueueItem[] }>(`/companies/${companyId}/devflow/triage-queue`),

@@ -14,8 +14,8 @@
 
 ## 4. Giao diện
 
-- [ ] 4.1 Nút Snooze và hộp chọn ngày (1 ngày, 1 tuần, 1 tháng, ngày cụ thể; ghi chú), mục Snoozed với Unsnooze; test helper
+- [x] 4.1 Nút Snooze và hộp chọn ngày (1 ngày, 1 tuần, 1 tháng, ngày cụ thể; ghi chú), mục Snoozed với Unsnooze; test helper
 
 ## 5. Tài liệu
 
-- [ ] 5.1 KB `triage-review.md`, status, ADR nếu cần
+- [x] 5.1 KB `triage-review.md`, status, ADR nếu cần

@@ -512,6 +512,7 @@ export const queryKeys = {
     count: (companyId: string) => ["devflow-triage", companyId, "count"] as const,
     metrics: (companyId: string) => ["devflow-triage", companyId, "metrics"] as const,
     detail: (companyId: string, caseId: string) => ["devflow-triage", companyId, "detail", caseId] as const,
+    snoozed: (companyId: string) => ["devflow-triage", companyId, "snoozed"] as const,
   },
   pipelines: {
     list: (companyId: string) => ["pipelines", companyId] as const,

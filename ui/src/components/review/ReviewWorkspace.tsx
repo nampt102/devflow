@@ -43,6 +43,8 @@ export interface ReviewWorkspaceProps<T extends WorkspaceItem> {
   renderDetail: (item: T, ctx: { onDecided: (decidedId: string) => void }) => ReactNode;
   metrics?: ReactNode;
   invalidateOnDecided?: () => Promise<unknown> | void;
+  /** a block under the header (Triage: the snoozed requests) */
+  headerExtra?: ReactNode;
 }
 
 const TONE_ICON: Record<StatusLine["icon"], LucideIcon> = { "alert-triangle": AlertTriangle, rotate: RotateCcw, check: Check, clock: Clock };
@@ -165,6 +167,7 @@ export function ReviewWorkspace<T extends WorkspaceItem>(props: ReviewWorkspaceP
           <kbd>j</kbd>/<kbd>k</kbd> next and previous · <kbd>a</kbd> approve · <kbd>r</kbd> request changes · <kbd>x</kbd> reject · <kbd>?</kbd> this help. Keys do nothing while you type.
         </p>
       ) : null}
+      {props.headerExtra}
       {showMetrics && metrics ? <div className="border border-border">{metrics}</div> : null}
       {queue.error ? <p className="text-sm text-amber-700 dark:text-amber-300">The queue could not be loaded. Try again in a moment.</p> : null}
 

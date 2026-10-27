@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { EmptyState } from "@/components/EmptyState";
 import { PageSkeleton } from "@/components/PageSkeleton";
 import { DecisionBar } from "../components/review/DecisionBar";
+import { SnoozeButton, SnoozedList } from "../components/review/SnoozeControl";
 import { ReviewDetailFrame } from "../components/review/ReviewDetailFrame";
 import { ReviewWorkspace } from "../components/review/ReviewWorkspace";
 import { ApiError } from "../api/client";
@@ -101,6 +102,7 @@ export function TriageReview() {
       initialSort={readOrder()}
       onSortChange={writeOrder}
       seenAt={seenAt}
+      headerExtra={<SnoozedList companyId={companyId} />}
       metrics={<MetricsLoader companyId={companyId} />}
       invalidateOnDecided={() => queryClient.invalidateQueries({ queryKey: queryKeys.devflowTriage.queue(companyId) })}
       renderDetail={(item, ctx) => <DetailPanel key={item.caseId} companyId={companyId} caseId={item.caseId} onDecided={ctx.onDecided} />}
@@ -327,6 +329,7 @@ function ReviewForm({ companyId, detail, onDecided }: { companyId: string; detai
         <DecisionBar
           stage="triage"
           pending={decide.isPending}
+          extra={<SnoozeButton companyId={companyId} caseId={detail.caseId} caseKey={detail.caseKey} version={detail.version} disabledReason={noAccess} onSnoozed={onDecided} />}
           notice={noAccess}
           approveLabel={corrections ? `Approve with ${corrections} correction${corrections === 1 ? "" : "s"}` : undefined}
           blocker={(decision, reason) => noAccess ?? decisionBlocker(decision, draft, reason)}
