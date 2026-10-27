@@ -1,10 +1,10 @@
 ## 1. Duyệt
 
-- [ ] 1.1 Chủ dự án duyệt proposal và design (không có DDL), hoặc chọn mặc định ở "Open Questions"
+- [x] 1.1 Chủ dự án duyệt proposal và design (không có DDL), hoặc chọn mặc định ở "Open Questions"
 
 ## 2. Server
 
-- [ ] 2.1 `GET …/devflow/requests-board`: case kèm trường DevFlow, stage theo `position`, `stageEnteredAt`, `waitingFor`, `lastFailure`, `canDecide`, giới hạn Done/Cancelled; test (cách ly công ty, 403, từng loại stage, lỗi agent sau/ trước lần chạy thành công, giới hạn)
+- [x] 2.1 `GET …/devflow/requests-board`: case kèm trường DevFlow, stage theo `position`, `stageEnteredAt`, `waitingFor`, `lastFailure`, `canDecide`, giới hạn Done/Cancelled; test (cách ly công ty, 403, từng loại stage, lỗi agent sau/ trước lần chạy thành công, giới hạn)
 
 ## 3. Giao diện
 
