@@ -13,8 +13,8 @@
 - [x] 3.1 QA sign-off
 - [x] 3.2 Code review
 - [x] 3.3 Plan review
-- [ ] 3.4 BA review
-- [ ] 3.5 Triage review (sửa trường, bản trùng, hệ thống)
+- [x] 3.4 BA review
+- [x] 3.5 Triage review (sửa trường, bản trùng, hệ thống)
 - [ ] 3.6 Email nhắc nhân viên dùng link `?case=`
 
 ## 4. Kiểm chứng

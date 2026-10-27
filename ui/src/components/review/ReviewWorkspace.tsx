@@ -34,6 +34,11 @@ export interface ReviewWorkspaceProps<T extends WorkspaceItem> {
   /** the viewer's own queue: only when the page can tell from the item; hides the "Mine" filter otherwise */
   canDecide?: (item: T) => boolean;
   seenAt: number | null;
+  /** extra named filters the page offers beside the queue (Triage: needs a developer, possible duplicate); the first is "all" */
+  filters?: Array<{ key: string; label: string; match: (item: T) => boolean }>;
+  /** a remembered sort order, and the call that remembers it */
+  initialSort?: QueueSort;
+  onSortChange?: (sort: QueueSort) => void;
   /** the page's detail for the open item; it owns the decision bar and calls `onDecided` after a decision */
   renderDetail: (item: T, ctx: { onDecided: (decidedId: string) => void }) => ReactNode;
   metrics?: ReactNode;
@@ -49,17 +54,22 @@ const TONE_CLASS: Record<StatusLine["tone"], string> = {
 };
 
 export function ReviewWorkspace<T extends WorkspaceItem>(props: ReviewWorkspaceProps<T>) {
-  const { title, noun, emptyHint, emptyIcon, queueKey, loadQueue, statusLine, subLine, canDecide, seenAt, renderDetail, metrics } = props;
+  const { title, noun, emptyHint, emptyIcon, queueKey, loadQueue, statusLine, subLine, canDecide, seenAt, renderDetail, metrics, filters, onSortChange } = props;
   const [params, setParams] = useSearchParams();
   const wanted = params.get("case");
-  const [sort, setSort] = useState<QueueSort>("oldest");
+  const [sort, setSort] = useState<QueueSort>(props.initialSort ?? "oldest");
+  const [filterKey, setFilterKey] = useState<string>(filters?.[0]?.key ?? "");
   const [mine, setMine] = useState(false);
   const [showMetrics, setShowMetrics] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
 
   const queue = useQuery({ queryKey: queueKey, queryFn: loadQueue, refetchInterval: 30_000 });
   const all = queue.data?.items ?? [];
-  const items = useMemo(() => sortQueue(filterQueue(all, mine, canDecide ?? (() => true)), sort), [all, mine, sort, canDecide]);
+  const items = useMemo(() => {
+    const named = filters?.find((f) => f.key === filterKey);
+    const narrowed = named ? all.filter(named.match) : all;
+    return sortQueue(filterQueue(narrowed, mine, canDecide ?? (() => true)), sort);
+  }, [all, mine, sort, canDecide, filters, filterKey]);
   const active = pickActive(items, wanted);
   const newCount = all.filter((i) => isNewSince(i.proposedAt, seenAt)).length;
   const oldest = all.length ? ageLabel(all.reduce((a, b) => (new Date(a.createdAt) < new Date(b.createdAt) ? a : b)).createdAt) : null;
@@ -121,7 +131,25 @@ export function ReviewWorkspace<T extends WorkspaceItem>(props: ReviewWorkspaceP
             <Button type="button" size="sm" variant={mine ? "ghost" : "outline"} aria-pressed={!mine} onClick={() => setMine(false)}>All</Button>
           </span>
         ) : null}
-        <Button type="button" size="sm" variant="ghost" onClick={() => setSort(sort === "oldest" ? "newest" : "oldest")}>
+        {filters ? (
+          <span role="group" aria-label="Queue filter" className="flex gap-1">
+            {filters.map((f) => (
+              <Button key={f.key} type="button" size="sm" variant={filterKey === f.key ? "outline" : "ghost"} aria-pressed={filterKey === f.key} onClick={() => setFilterKey(f.key)}>
+                {f.label}
+              </Button>
+            ))}
+          </span>
+        ) : null}
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          onClick={() => {
+            const next: QueueSort = sort === "oldest" ? "newest" : "oldest";
+            onSortChange?.(next);
+            setSort(next);
+          }}
+        >
           {sort === "oldest" ? "Oldest first" : "Newest first"}
         </Button>
         {metrics ? (
