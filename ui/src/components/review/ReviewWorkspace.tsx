@@ -143,8 +143,8 @@ export function ReviewWorkspace<T extends WorkspaceItem>(props: ReviewWorkspaceP
       {items.length === 0 ? (
         <EmptyState icon={emptyIcon} message={mine && all.length ? `Nothing here is yours to decide.` : `No ${noun} waiting.`} description={emptyHint} />
       ) : (
-        <div className="grid gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
-          <ul className={`space-y-1 ${detailOnly ? "hidden lg:block" : ""}`} aria-label={`${noun} waiting`}>
+        <div className="grid gap-4 lg:grid-cols-3">
+          <ul className={`space-y-1 lg:col-span-1 ${detailOnly ? "hidden lg:block" : ""}`} aria-label={`${noun} waiting`}>
             {items.map((item) => {
               const line = statusLine(item);
               const Icon = TONE_ICON[line.icon];
@@ -175,7 +175,7 @@ export function ReviewWorkspace<T extends WorkspaceItem>(props: ReviewWorkspaceP
               );
             })}
           </ul>
-          <div className={`min-w-0 ${detailOnly ? "" : "hidden lg:block"}`}>
+          <div className={`min-w-0 lg:col-span-2 ${detailOnly ? "" : "hidden lg:block"}`}>
             {detailOnly ? (
               <Button type="button" variant="ghost" size="sm" className="mb-2 lg:hidden" onClick={() => select(null)}>
                 <ArrowLeft className="h-4 w-4" /> Back to the list

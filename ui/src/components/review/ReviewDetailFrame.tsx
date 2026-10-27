@@ -16,7 +16,7 @@ export function ReviewDetailFrame({ header, sections, bar }: { header: ReactNode
   const [openId, setOpenId] = useState(sections[0]?.id ?? "");
   const current = sections.find((s) => s.id === openId) ?? sections[0];
   return (
-    <div className="flex min-h-0 flex-col border border-border">
+    <div className="flex min-h-0 flex-col border border-border lg:sticky lg:top-0 lg:max-h-dvh">
       <div className="space-y-2 border-b border-border p-3">
         {header}
         <nav className="flex flex-wrap gap-4" aria-label="Sections">
@@ -38,7 +38,7 @@ export function ReviewDetailFrame({ header, sections, bar }: { header: ReactNode
           })}
         </nav>
       </div>
-      <div className="max-h-[calc(100vh-18rem)] min-h-40 overflow-y-auto p-3">{current?.content}</div>
+      <div className="min-h-40 flex-1 overflow-y-auto p-3">{current?.content}</div>
       <div className="sticky bottom-0">{bar}</div>
     </div>
   );
