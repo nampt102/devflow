@@ -32,6 +32,14 @@ export const decisionSchema = z.strictObject({
 });
 export type DecisionBody = z.infer<typeof decisionSchema>;
 
+// Hide a request from the queue until a day (YYYY-MM-DD, 00:00 in Vietnam); `expectedVersion` guards against deciding over someone else.
+export const snoozeSchema = z.strictObject({
+  until: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  note: z.string().trim().max(500).optional(),
+  expectedVersion: z.number().int().min(1),
+});
+export type SnoozeBody = z.infer<typeof snoozeSchema>;
+
 type Row = Record<string, any>;
 type ReviewCase = (input: any) => Promise<unknown>;
 
@@ -80,7 +88,7 @@ export function triageReviewService(db: Db, deps: { reviewCase: ReviewCase }) {
     const list = await rows(sql`
       select c.id as case_id, c.case_key, c.title, c.version, c.created_at, r.request_number, u.name as requester_name,
              (select count(*)::int from dr_attachments a where a.case_id = c.id and a.company_id = c.company_id) as attachments,
-             o.id as output_id, o.prompt_version, o.created_at as proposed_at, o.data
+             o.id as output_id, o.prompt_version, greatest(o.created_at, coalesce(r.snoozed_until, o.created_at)) as proposed_at, o.data
       from pipeline_cases c
       join pipelines p on p.id = c.pipeline_id and p.key = 'dev-request'
       join pipeline_stages st on st.id = c.stage_id and st.key = 'triage_review'
@@ -88,7 +96,7 @@ export function triageReviewService(db: Db, deps: { reviewCase: ReviewCase }) {
       join dr_requesters rq on rq.id = r.requester_id and rq.company_id = r.company_id
       join "user" u on u.id = rq.user_id
       join dr_agent_outputs o on o.case_id = c.id and o.company_id = c.company_id and o.stage_key = 'triage' and o.status = 'proposed'
-      where c.company_id = ${companyId} and c.terminal_kind is null
+      where c.company_id = ${companyId} and c.terminal_kind is null and (r.snoozed_until is null or r.snoozed_until <= now())
       order by c.created_at, c.id
       limit 200`);
     return {
@@ -112,12 +120,13 @@ export function triageReviewService(db: Db, deps: { reviewCase: ReviewCase }) {
   /** Cheap count for the sidebar badge: proposals waiting for review and when the newest one arrived. */
   async function count(companyId: string) {
     const [r] = await rows(sql`
-      select count(*)::int as waiting, max(o.created_at) as newest
+      select count(*)::int as waiting, max(greatest(o.created_at, coalesce(r.snoozed_until, o.created_at))) as newest
       from pipeline_cases c
       join pipelines p on p.id = c.pipeline_id and p.key = 'dev-request'
       join pipeline_stages st on st.id = c.stage_id and st.key = 'triage_review'
+      join dr_requests r on r.case_id = c.id and r.company_id = c.company_id
       join dr_agent_outputs o on o.case_id = c.id and o.company_id = c.company_id and o.stage_key = 'triage' and o.status = 'proposed'
-      where c.company_id = ${companyId} and c.terminal_kind is null`);
+      where c.company_id = ${companyId} and c.terminal_kind is null and (r.snoozed_until is null or r.snoozed_until <= now())`);
     return { waiting: r?.waiting ?? 0, newest: r?.newest ? new Date(r.newest).toISOString() : null };
   }
 
@@ -336,6 +345,11 @@ export function triageReviewService(db: Db, deps: { reviewCase: ReviewCase }) {
             entityId: caseId,
             details: { decision: body.decision, outputId: output.id, overriddenFields: overridden },
           });
+          // a decision ends any snooze (change add-triage-snooze)
+          await tx
+            .update(drRequests)
+            .set({ snoozedUntil: null, snoozedBy: null, snoozeNote: null })
+            .where(and(eq(drRequests.caseId, caseId), eq(drRequests.companyId, companyId)));
         },
       });
     } catch (err) {
@@ -348,5 +362,77 @@ export function triageReviewService(db: Db, deps: { reviewCase: ReviewCase }) {
     return { ok: true as const, decision: body.decision, overriddenFields: overridden };
   }
 
-  return { queue, count, detail, decide };
+  /** 00:00 in Vietnam (UTC+7) of the given day: the moment a snoozed request returns. */
+  const startOfDayVn = (day: string) => new Date(`${day}T00:00:00+07:00`);
+  const MAX_SNOOZE_DAYS = 90;
+
+  async function assertMayDecide(companyId: string, caseId: string, viewer: Viewer) {
+    if (!(await reviewAccess(db, companyId, caseId, viewer)).canDecide) throw forbidden("You may not decide on this request");
+  }
+
+  /** Hide a request waiting for triage review until `until` (change add-triage-snooze). The stage and the requester are untouched. */
+  async function snooze(input: { companyId: string; caseId: string; viewer: Viewer; body: SnoozeBody }) {
+    const { companyId, caseId, viewer, body } = input;
+    const c = await loadReviewable(companyId, caseId);
+    if (!c) throw notFound("Request not found");
+    if (c.stage_key !== "triage_review") throw conflict("This request is no longer waiting for triage review");
+    if (c.requester_user_id === viewer.userId) throw forbidden("You cannot review your own request");
+    await assertMayDecide(companyId, caseId, viewer);
+    if (c.version !== body.expectedVersion) throw conflict("The request changed; reload and try again");
+    if (!(await proposedOutput(companyId, caseId))) throw conflict("There is no proposal to review");
+    const until = startOfDayVn(body.until);
+    const now = Date.now();
+    if (Number.isNaN(until.getTime()) || until.getTime() <= now) throw unprocessable("Pick a day after today", { code: "validation" });
+    if (until.getTime() > now + MAX_SNOOZE_DAYS * 86_400_000) throw unprocessable(`A request can be snoozed for at most ${MAX_SNOOZE_DAYS} days`, { code: "validation" });
+    await db
+      .update(drRequests)
+      .set({ snoozedUntil: until, snoozedBy: viewer.userId, snoozeNote: body.note?.trim() || null })
+      .where(and(eq(drRequests.caseId, caseId), eq(drRequests.companyId, companyId)));
+    await logActivity(db, { companyId, actorType: "user", actorId: viewer.userId, action: "triage.snoozed", entityType: "pipeline_case", entityId: caseId, details: { until: until.toISOString(), hasNote: !!body.note?.trim() } });
+    return { ok: true as const, until: until.toISOString() };
+  }
+
+  /** Bring a snoozed request back now. A request that is not snoozed is left as it is. */
+  async function unsnooze(input: { companyId: string; caseId: string; viewer: Viewer }) {
+    const { companyId, caseId, viewer } = input;
+    const c = await loadReviewable(companyId, caseId);
+    if (!c) throw notFound("Request not found");
+    await assertMayDecide(companyId, caseId, viewer);
+    const [was] = await rows(sql`select snoozed_until from dr_requests where case_id = ${caseId} and company_id = ${companyId}`);
+    if (!was?.snoozed_until) return { ok: true as const, changed: false };
+    await db.update(drRequests).set({ snoozedUntil: null, snoozedBy: null, snoozeNote: null }).where(and(eq(drRequests.caseId, caseId), eq(drRequests.companyId, companyId)));
+    await logActivity(db, { companyId, actorType: "user", actorId: viewer.userId, action: "triage.unsnoozed", entityType: "pipeline_case", entityId: caseId, details: {} });
+    return { ok: true as const, changed: true };
+  }
+
+  /** The requests hidden for now (a snooze that has run out is back in the queue, not here). */
+  async function snoozed(companyId: string) {
+    const list = await rows(sql`
+      select c.id as case_id, c.case_key, c.title, c.version, c.created_at, r.snoozed_until, r.snooze_note, sb.name as snoozed_by_name, u.name as requester_name
+      from pipeline_cases c
+      join pipelines p on p.id = c.pipeline_id and p.key = 'dev-request'
+      join pipeline_stages st on st.id = c.stage_id and st.key = 'triage_review'
+      join dr_requests r on r.case_id = c.id and r.company_id = c.company_id
+      join dr_requesters rq on rq.id = r.requester_id and rq.company_id = r.company_id
+      join "user" u on u.id = rq.user_id
+      left join "user" sb on sb.id = r.snoozed_by
+      where c.company_id = ${companyId} and c.terminal_kind is null and r.snoozed_until > now()
+      order by r.snoozed_until, c.id
+      limit 200`);
+    return {
+      items: list.map((r) => ({
+        caseId: r.case_id,
+        caseKey: r.case_key,
+        title: r.title,
+        version: r.version,
+        createdAt: r.created_at,
+        requesterName: r.requester_name,
+        snoozedUntil: new Date(r.snoozed_until).toISOString(),
+        snoozedByName: r.snoozed_by_name ?? null,
+        note: r.snooze_note ?? null,
+      })),
+    };
+  }
+
+  return { queue, count, detail, decide, snooze, unsnooze, snoozed };
 }

@@ -82,8 +82,9 @@ export function triageMetricsService(db: Db) {
       from pipeline_cases c
       join pipelines p on p.id = c.pipeline_id and p.key = 'dev-request'
       join pipeline_stages st on st.id = c.stage_id and st.key = 'triage_review'
+      join dr_requests r on r.case_id = c.id and r.company_id = c.company_id
       join dr_agent_outputs o on o.case_id = c.id and o.company_id = c.company_id and o.stage_key = 'triage' and o.status = 'proposed'
-      where c.company_id = ${companyId} and c.terminal_kind is null`);
+      where c.company_id = ${companyId} and c.terminal_kind is null and (r.snoozed_until is null or r.snoozed_until <= now())`);
 
     // Agent health: failures from the activity log, tokens from the cost events (no prices exist for them yet).
     const health = await rows(sql`

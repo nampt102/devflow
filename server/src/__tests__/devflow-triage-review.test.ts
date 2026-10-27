@@ -561,4 +561,91 @@ describeEmbeddedPostgres("devflow triage review", () => {
     expect((await request(app(outsider)).get(`/api/companies/${b.company.id}/devflow/triage-cases/${r.id}`)).status).toBe(404);
     expect(await stageOf(r.id)).toBe("triage_review");
   });
+
+  describe("snooze (change add-triage-snooze)", () => {
+    const day = (offsetDays: number) => new Date(Date.now() + offsetDays * 86_400_000 + 7 * 3_600_000).toISOString().slice(0, 10); // a day in Vietnam
+    const url = (ctx: Awaited<ReturnType<typeof seedCompany>>, r: Awaited<ReturnType<typeof seedRequest>>) => `/api/companies/${ctx.company.id}/devflow/triage-cases/${r.id}/snooze`;
+    const snooze = async (ctx: Awaited<ReturnType<typeof seedCompany>>, r: Awaited<ReturnType<typeof seedRequest>>, body: Record<string, unknown>, actor?: Express.Request["actor"]) =>
+      request(app(actor ?? staff(ctx.reviewer, ctx.company.id))).post(url(ctx, r)).send({ expectedVersion: await versionOf(r.id), until: day(7), ...body });
+    const queueKeys = async (ctx: Awaited<ReturnType<typeof seedCompany>>) =>
+      (await request(app(staff(ctx.reviewer, ctx.company.id))).get(`/api/companies/${ctx.company.id}/devflow/triage-queue`)).body.items.map((i: any) => i.caseKey);
+    const count = async (ctx: Awaited<ReturnType<typeof seedCompany>>) =>
+      (await request(app(staff(ctx.reviewer, ctx.company.id))).get(`/api/companies/${ctx.company.id}/devflow/triage-count`)).body.waiting;
+
+    it("hides a snoozed request from the queue and the count without moving it, and lists it as snoozed", async () => {
+      const ctx = await seedCompany();
+      const r = await seedRequest(ctx);
+      const other = await seedRequest(ctx);
+      const res = await snooze(ctx, r, { note: "Chờ ngân sách" });
+      expect(res.status).toBe(200);
+      expect(await queueKeys(ctx)).toEqual([other.key]);
+      expect(await count(ctx)).toBe(1);
+      expect(await stageOf(r.id)).toBe("triage_review");
+      const list = await request(app(staff(ctx.reviewer, ctx.company.id))).get(`/api/companies/${ctx.company.id}/devflow/triage-snoozed`);
+      expect(list.body.items).toHaveLength(1);
+      expect(list.body.items[0]).toMatchObject({ caseKey: r.key, note: "Chờ ngân sách" });
+      expect(Date.parse(list.body.items[0].snoozedUntil)).toBeGreaterThan(Date.now());
+    });
+
+    it("brings the request back by itself when the day comes, labelled as new", async () => {
+      const ctx = await seedCompany();
+      const r = await seedRequest(ctx);
+      await snooze(ctx, r, {});
+      expect(await queueKeys(ctx)).toEqual([]);
+      const back = new Date(Date.now() - 1000);
+      await db.update(drRequests).set({ snoozedUntil: back }).where(eq(drRequests.caseId, r.id));
+      expect(await queueKeys(ctx)).toEqual([r.key]);
+      expect(await count(ctx)).toBe(1);
+      const item = (await request(app(staff(ctx.reviewer, ctx.company.id))).get(`/api/companies/${ctx.company.id}/devflow/triage-queue`)).body.items[0];
+      expect(Date.parse(item.proposedAt)).toBeGreaterThanOrEqual(back.getTime());
+      const list = await request(app(staff(ctx.reviewer, ctx.company.id))).get(`/api/companies/${ctx.company.id}/devflow/triage-snoozed`);
+      expect(list.body.items).toEqual([]);
+    });
+
+    it("refuses a day that is today, past, malformed or more than 90 days away", async () => {
+      const ctx = await seedCompany();
+      const r = await seedRequest(ctx);
+      for (const until of [day(0), day(-3), "soon", "2026-13-40"]) expect((await snooze(ctx, r, { until })).status, until).toBeGreaterThanOrEqual(400);
+      expect((await snooze(ctx, r, { until: day(91) })).status).toBe(422);
+      expect((await snooze(ctx, r, { until: day(90) })).status).toBe(200);
+    });
+
+    it("refuses when the request changed, is not in review, or is the viewer's own; needs the role the stage asks for", async () => {
+      const ctx = await seedCompany();
+      const r = await seedRequest(ctx);
+      expect((await snooze(ctx, r, { expectedVersion: (await versionOf(r.id)) + 5 })).status).toBe(409);
+      const inTriage = await seedRequest(ctx, { stage: "triage" });
+      expect((await snooze(ctx, inTriage, {})).status).toBe(409);
+      expect((await snooze(ctx, r, {}, staff(ctx.requesterUser, ctx.company.id))).status).toBe(403);
+      expect((await snooze(ctx, r, {}, staff(ctx.reviewer, ctx.company.id, "viewer"))).status).toBe(403);
+      expect(await queueKeys(ctx)).toContain(r.key);
+    });
+
+    it("lets a reviewer bring it back early, and a decision ends the snooze", async () => {
+      const ctx = await seedCompany();
+      const r = await seedRequest(ctx);
+      await snooze(ctx, r, {});
+      const early = await request(app(staff(ctx.reviewer, ctx.company.id))).delete(url(ctx, r));
+      expect(early.body).toMatchObject({ ok: true, changed: true });
+      expect(await queueKeys(ctx)).toEqual([r.key]);
+      expect((await request(app(staff(ctx.reviewer, ctx.company.id))).delete(url(ctx, r))).body.changed).toBe(false);
+
+      const d = await seedRequest(ctx);
+      await snooze(ctx, d, {});
+      // a person who reviews it anyway (from a link): the decision clears the snooze
+      expect((await decide(ctx, d, { decision: "approve" })).status).toBe(200);
+      const row = await requestRow(d.id);
+      expect([row.snoozedUntil, row.snoozedBy, row.snoozeNote]).toEqual([null, null, null]);
+    });
+
+    it("keeps one company's snoozed list to itself", async () => {
+      const a = await seedCompany();
+      const b = await seedCompany();
+      const r = await seedRequest(a);
+      await snooze(a, r, {});
+      const res = await request(app(staff(b.reviewer, b.company.id))).get(`/api/companies/${b.company.id}/devflow/triage-snoozed`);
+      expect(res.body.items).toEqual([]);
+      expect((await snooze(a, r, {}, staff(b.reviewer, b.company.id))).status).toBe(404);
+    });
+  });
 });

@@ -4,7 +4,7 @@ import { notFound } from "../../errors.js";
 import { validate } from "../../middleware/validate.js";
 import { staffUser, staffViewer } from "../staff.js";
 import { triageMetricsService } from "./metrics.js";
-import { decisionSchema, triageReviewService } from "./service.js";
+import { decisionSchema, snoozeSchema, triageReviewService } from "./service.js";
 
 type ReviewCase = (input: any) => Promise<unknown>;
 
@@ -44,6 +44,24 @@ export function triageReviewRoutes(db: Db, deps: { reviewCase: ReviewCase }) {
     const companyId = req.params.companyId as string;
     const { userId, instanceAdmin } = staffViewer(req, companyId);
     res.json(await svc.decide({ companyId, caseId: req.params.caseId as string, userId, instanceAdmin, body: req.body }));
+  });
+
+  router.get("/companies/:companyId/devflow/triage-snoozed", async (req, res) => {
+    const companyId = req.params.companyId as string;
+    staffUser(req, companyId);
+    res.json(await svc.snoozed(companyId));
+  });
+
+  router.post("/companies/:companyId/devflow/triage-cases/:caseId/snooze", validate(snoozeSchema), async (req, res) => {
+    const companyId = req.params.companyId as string;
+    const viewer = staffViewer(req, companyId);
+    res.json(await svc.snooze({ companyId, caseId: req.params.caseId as string, viewer, body: req.body }));
+  });
+
+  router.delete("/companies/:companyId/devflow/triage-cases/:caseId/snooze", async (req, res) => {
+    const companyId = req.params.companyId as string;
+    const viewer = staffViewer(req, companyId);
+    res.json(await svc.unsnooze({ companyId, caseId: req.params.caseId as string, viewer }));
   });
 
   return router;
