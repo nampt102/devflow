@@ -1,6 +1,6 @@
 ## 1. Duyệt
 
-- [ ] 1.1 Chủ dự án duyệt proposal và design (không có DDL), hoặc chọn mặc định ở "Open Questions"
+- [x] 1.1 Chủ dự án duyệt proposal và design (không có DDL), hoặc chọn mặc định ở "Open Questions"
 
 ## 2. Server
 
@@ -9,8 +9,8 @@
 
 ## 3. Giao diện
 
-- [ ] 3.1 Helper thuần (chữ cho từng loại mục, diff trường cũ → mới, thời gian ở stage) + test
-- [ ] 3.2 Trang `/requests/:caseKey` (thông tin, dòng thời gian, chi phí, thời gian từng stage); link History ở 5 trang duyệt; route
+- [x] 3.1 Helper thuần (chữ cho từng loại mục, diff trường cũ → mới, thời gian ở stage) + test
+- [x] 3.2 Trang `/requests/:caseKey` (thông tin, dòng thời gian, chi phí, thời gian từng stage); link History ở 5 trang duyệt; route
 - [ ] 3.3 Xem trên trình duyệt với REQ-1 của RESKI (đã đi hết Triage → QA)
 
 ## 4. Tài liệu

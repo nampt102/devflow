@@ -173,6 +173,8 @@ function ReviewForm({ companyId, detail, onDecided }: { companyId: string; detai
     <div className="space-y-1">
       <p className="text-xs text-muted-foreground">
         <span className="font-mono">{detail.caseKey}</span> · from {detail.requesterName}, {agoLabel(detail.createdAt)}
+        {" · "}
+        <Link to={`/requests/${detail.caseKey}`} className="underline underline-offset-2">History</Link>
       </p>
       <h2 className="text-base font-semibold text-foreground">{detail.title}</h2>
     </div>

@@ -4,6 +4,7 @@ import { AlertTriangle, Check, ExternalLink, ListChecks } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Link } from "@/lib/router";
 import { EmptyState } from "@/components/EmptyState";
 import { PageSkeleton } from "@/components/PageSkeleton";
 import { DecisionBar } from "../components/review/DecisionBar";
@@ -151,6 +152,8 @@ function ReviewForm({ companyId, detail, onDecided }: { companyId: string; detai
     <div className="space-y-1">
       <p className="text-xs text-muted-foreground">
         <span className="font-mono">{detail.caseKey}</span> · from {detail.requesterName}, {agoLabel(detail.createdAt)}
+        {" · "}
+        <Link to={`/requests/${detail.caseKey}`} className="underline underline-offset-2">History</Link>
         {[detail.triage.classification, detail.triage.priority, detail.triage.difficulty].filter(Boolean).map((t) => ` · ${t}`)}
       </p>
       <h2 className="text-base font-semibold text-foreground">{detail.title}</h2>
