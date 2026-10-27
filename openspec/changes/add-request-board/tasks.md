@@ -8,8 +8,8 @@
 
 ## 3. Giao diện
 
-- [ ] 3.1 Helper thuần (lọc, sắp xếp, nhóm theo cột, lưu/đọc view trong localStorage có try/catch) + test
-- [ ] 3.2 Trang `/requests`: Kanban (cột cuộn ngang, Done/Cancelled thu gọn), danh sách, thẻ dẫn tới trang duyệt đang chờ; route, sidebar
+- [x] 3.1 Helper thuần (lọc, sắp xếp, nhóm theo cột, lưu/đọc view trong localStorage có try/catch) + test
+- [x] 3.2 Trang `/requests`: Kanban (cột cuộn ngang, Done/Cancelled thu gọn), danh sách, thẻ dẫn tới trang duyệt đang chờ; route, sidebar
 - [ ] 3.3 Xem trên trình duyệt với dữ liệu RESKI và công ty thử, kể cả màn hình hẹp
 
 ## 4. Tài liệu

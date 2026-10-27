@@ -21,6 +21,7 @@ import {
   GitBranch,
   Package,
   Settings,
+  KanbanSquare,
   Settings2,
   FolderOpen,
   Unplug,
@@ -256,6 +257,9 @@ export function Sidebar() {
           ) : null}
           {showPipelines && setupStatus ? (
             <SidebarNavItem to="/setup" label="Setup" icon={Settings2} badge={setupStatus.needsAttention ? 1 : undefined} badgeLabel="needs attention" />
+          ) : null}
+          {showPipelines ? (
+            <SidebarNavItem to="/requests" label="Requests" icon={KanbanSquare} />
           ) : null}
           {showPipelines ? (
             <SidebarNavItem to="/triage" label="Triage review" icon={ClipboardCheck} badge={triageCount?.waiting || undefined} badgeLabel="waiting for review" />
