@@ -1,10 +1,10 @@
 ## 1. Duyệt
 
-- [ ] 1.1 Chủ dự án duyệt proposal, design và DDL (3 cột + chỉ mục trên `dr_requests`), hoặc chọn mặc định ở "Open Questions"
+- [x] 1.1 Chủ dự án duyệt proposal, design và DDL (3 cột + chỉ mục trên `dr_requests`), hoặc chọn mặc định ở "Open Questions"
 
 ## 2. Dữ liệu
 
-- [ ] 2.1 Migration thêm `snoozed_until`, `snoozed_by`, `snooze_note` + chỉ mục; schema Drizzle; test migration (dữ liệu cũ nguyên, cột null)
+- [x] 2.1 Migration thêm `snoozed_until`, `snoozed_by`, `snooze_note` + chỉ mục; schema Drizzle; test migration (dữ liệu cũ nguyên, cột null)
 
 ## 3. Server
 

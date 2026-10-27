@@ -61,6 +61,11 @@ export const drRequests = pgTable(
     requiresHuman: boolean("requires_human").notNull().default(false),
     requiresHumanReasons: text("requires_human_reasons").array().notNull().default(sql`'{}'::text[]`),
     duplicateOfCaseId: uuid("duplicate_of_case_id"),
+    // Triage snooze (change add-triage-snooze): the request leaves the review queue until this moment, then returns by itself.
+    // A decision clears all three. The stage does not change and the requester is not told.
+    snoozedUntil: timestamp("snoozed_until", { withTimezone: true }),
+    snoozedBy: text("snoozed_by"),
+    snoozeNote: text("snooze_note"),
     source: text("source").notNull().default("portal"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -84,6 +89,7 @@ export const drRequests = pgTable(
     companyNumberUq: uniqueIndex("dr_requests_company_number_uq").on(table.companyId, table.requestNumber),
     companyRequesterIdx: index("dr_requests_company_requester_idx").on(table.companyId, table.requesterId),
     companyCreatedIdx: index("dr_requests_company_created_idx").on(table.companyId, table.createdAt),
+    snoozedIdx: index("dr_requests_snoozed_idx").on(table.companyId, table.snoozedUntil).where(sql`${table.snoozedUntil} is not null`),
     classificationCheck: check(
       "dr_requests_classification_check",
       sql`${table.classification} is null or ${table.classification} in ('bug', 'feature', 'request')`,
