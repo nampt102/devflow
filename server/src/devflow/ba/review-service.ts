@@ -3,6 +3,7 @@ import { z } from "zod";
 import { drAgentOutputs, drOverrides, drRequestSystems, drSystems, type Db } from "@paperclipai/db";
 import { conflict, forbidden, notFound, unprocessable } from "../../errors.js";
 import { logActivity } from "../../services/activity-log.js";
+import { loadPreviousRound } from "../previous-round.js";
 import { reviewAccess, type Viewer } from "../review-access.js";
 import { BA_REVIEW_STAGE, BA_STAGE } from "./ba-service.js";
 import { baCommentMarkdown, baOutputSchema, type BaOutput } from "./schema.js";
@@ -159,6 +160,7 @@ export function baReviewService(db: Db, deps: { reviewCase: ReviewCase }) {
       spec: Object.fromEntries([...EDITABLE, "affectedAreas", "confidence"].map((k) => [k, data[k]])),
       repos: (data.repos ?? []).map((r: Row) => ({ system: r.system, sha: r.sha, name: repoRows.find((x) => x.key === r.system)?.name ?? r.system, repoUrl: repoRows.find((x) => x.key === r.system)?.repoUrl ?? null })),
       systems: await systemsFor(companyId, caseId),
+      previousRound: await loadPreviousRound(db, companyId, caseId, BA_STAGE, data),
     };
   }
 

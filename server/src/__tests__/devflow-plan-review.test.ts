@@ -16,6 +16,7 @@ import { planAgentSpec, planWorkspaceDir } from "../devflow/plan/agent.js";
 import { planService } from "../devflow/plan/plan-service.js";
 import { planRoutes } from "../devflow/plan/routes.js";
 import { applyTaskEdits } from "../devflow/plan/review-service.js";
+import { roundChanges } from "../devflow/previous-round.js";
 
 // Staff review of technical plans (openspec/changes/add-tech-plan-stage, task 5.1): queue, detail, decisions,
 // overrides, task edits, access, and the round trip back to the agent.
@@ -37,6 +38,20 @@ describe("task edits", () => {
     expect(applyTaskEdits(tasks, edit().slice(0, 1))).toBeNull();
     expect(applyTaskEdits(tasks, [...edit()].reverse())).toBeNull();
     expect(applyTaskEdits(tasks, [...edit(), { id: "T3", title: "x", description: "y", size: "S" }])).toBeNull();
+  });
+});
+
+describe("previous round changes", () => {
+  it("lists only the fields that differ, old to new, per criterion for QA", () => {
+    expect(roundChanges("triage", { classification: "bug", priority: "medium", difficulty: "easy" }, { classification: "bug", priority: "high", difficulty: "easy" })).toEqual([
+      { field: "Priority", before: "medium", after: "high" },
+    ]);
+    const qa = (verdict: string, rec: string) => ({ recommendation: { value: rec }, issues: [], checks: [], criteria: [{ id: "AC1", verdict: "pass" }, { id: "AC2", verdict }] });
+    expect(roundChanges("qa", qa("fail", "changes"), qa("pass", "approve"))).toEqual([
+      { field: "Recommendation", before: "changes", after: "approve" },
+      { field: "AC2", before: "fail", after: "pass" },
+    ]);
+    expect(roundChanges("unknown", { a: 1 }, { a: 2 })).toEqual([]);
   });
 });
 
@@ -191,6 +206,7 @@ describeEmbeddedPostgres("devflow Plan review", () => {
     expect(res.body.repos).toEqual([{ system: "portal", sha: SHA, name: "Cổng requester", repoUrl: "https://github.com/acme/portal" }]);
     expect(res.body.baSpec.acceptanceCriteria).toEqual(APPROVED_BA_SPEC.acceptanceCriteria);
     expect(res.body).toMatchObject({ model: "claude-sonnet-5-5", costUsd: 0.42, outputId: r.outputId });
+    expect(res.body.previousRound).toBeNull();
   });
 
   it("keeps companies apart: another company's staff cannot read or decide", async () => {
@@ -294,7 +310,7 @@ describeEmbeddedPostgres("devflow Plan review", () => {
       runner: {
         async run() {
           seen.push(fs.readFileSync(path.join(planWorkspaceDir(root), ".devflow", "request.md"), "utf8"));
-          return { runId: null, ok: true, text: JSON.stringify({ ...VALID_PLAN_OUTPUT, tasks: VALID_PLAN_OUTPUT.tasks.map((t) => ({ ...t, system: null, files: [] })) }), subtype: "success", errorCode: null, costUsd: 0.3, inputTokens: 1, outputTokens: 1, model: null };
+          return { runId: null, ok: true, text: JSON.stringify({ ...VALID_PLAN_OUTPUT, confidence: "high", tasks: VALID_PLAN_OUTPUT.tasks.map((t) => ({ ...t, system: null, files: [] })) }), subtype: "success", errorCode: null, costUsd: 0.3, inputTokens: 1, outputTokens: 1, model: null };
         },
       },
       clone: (async () => ({ sha: SHA })) as any,
@@ -305,6 +321,10 @@ describeEmbeddedPostgres("devflow Plan review", () => {
     expect(await service.runCase(ctx.company.id, r.id)).toBe("proposed");
     expect(seen[0]).toContain("Thiếu bước migration dữ liệu cũ");
     expect(await stageOf(r.id)).toBe("plan_review");
+    // the returned plan shows why it was sent back and what changed since
+    const back = (await get(ctx, `plan-cases/${r.id}`)).body.previousRound;
+    expect(back).toMatchObject({ reason: "Thiếu bước migration dữ liệu cũ", decidedBy: "Tech Lead", fromStage: "plan_review", previousSummary: VALID_PLAN_OUTPUT.summary });
+    expect(back.changes).toEqual([{ field: "Confidence", before: "medium", after: "high" }]);
   });
 
   // ---- setup and numbers -------------------------------------------------------------------------------------------

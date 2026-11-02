@@ -6,6 +6,7 @@ import { logger } from "../../middleware/logger.js";
 import { logActivity } from "../../services/activity-log.js";
 import { BA_STAGE } from "../ba/ba-service.js";
 import { PLAN_STAGE } from "../plan/plan-service.js";
+import { loadPreviousRound } from "../previous-round.js";
 import { reviewAccess, type Viewer } from "../review-access.js";
 import { CODE_REVIEW_STAGE, DEV_STAGE } from "./dev-service.js";
 import { closePullRequests } from "./close-prs.js";
@@ -177,6 +178,7 @@ export function codeReviewService(db: Db, deps: CodeReviewDeps) {
       // the approved plan's tasks, to check against what the agent says it did
       planTasks: Array.isArray(plan?.tasks) ? plan.tasks.map((t: Row) => ({ id: t.id, title: t.title, system: t.system, size: t.size })) : [],
       baSpec: spec ? { summary: spec.summary ?? null, acceptanceCriteria: spec.acceptanceCriteria ?? [] } : null,
+      previousRound: await loadPreviousRound(db, companyId, caseId, DEV_STAGE, data),
     };
   }
 

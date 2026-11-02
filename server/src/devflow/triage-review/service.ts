@@ -4,6 +4,7 @@ import { drAgentOutputs, drOverrides, drRequestSystems, drRequests, drSystems, t
 import { conflict, forbidden, notFound, unprocessable } from "../../errors.js";
 import { logActivity } from "../../services/activity-log.js";
 import { statusLabelVi } from "../portal/status-labels.js";
+import { loadPreviousRound } from "../previous-round.js";
 import { reviewAccess, type Viewer } from "../review-access.js";
 import { REQUIRES_HUMAN_REASONS, triageOutputSchema } from "../triage/schema.js";
 
@@ -212,6 +213,7 @@ export function triageReviewService(db: Db, deps: { reviewCase: ReviewCase }) {
       },
       candidates: await candidatesFor(companyId, data),
       systems: await systemsFor(companyId, caseId, data),
+      previousRound: await loadPreviousRound(db, companyId, caseId, "triage", data),
     };
   }
 

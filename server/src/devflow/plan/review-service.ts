@@ -4,6 +4,7 @@ import { drAgentOutputs, drOverrides, drSystems, type Db } from "@paperclipai/db
 import { conflict, forbidden, notFound, unprocessable } from "../../errors.js";
 import { logActivity } from "../../services/activity-log.js";
 import { BA_STAGE } from "../ba/ba-service.js";
+import { loadPreviousRound } from "../previous-round.js";
 import { reviewAccess, type Viewer } from "../review-access.js";
 import { PLAN_REVIEW_STAGE, PLAN_STAGE } from "./plan-service.js";
 import { planCommentMarkdown, planOutputSchema, planTaskSchema, type PlanOutput, type PlanTask } from "./schema.js";
@@ -168,6 +169,7 @@ export function planReviewService(db: Db, deps: { reviewCase: ReviewCase }) {
       plan: Object.fromEntries([...EDITABLE, "tasks", "confidence"].map((k) => [k, data[k]])),
       repos: (data.repos ?? []).map((r: Row) => ({ system: r.system, sha: r.sha, name: repoRows.find((x) => x.key === r.system)?.name ?? r.system, repoUrl: repoRows.find((x) => x.key === r.system)?.repoUrl ?? null })),
       baSpec: await approvedSpec(companyId, caseId),
+      previousRound: await loadPreviousRound(db, companyId, caseId, PLAN_STAGE, data),
     };
   }
 

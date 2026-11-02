@@ -5,6 +5,7 @@ import { conflict, forbidden, notFound } from "../../errors.js";
 import { logActivity } from "../../services/activity-log.js";
 import { DEV_STAGE } from "../dev/dev-service.js";
 import { closePullRequests, type PrCloseDeps } from "../dev/close-prs.js";
+import { loadPreviousRound } from "../previous-round.js";
 import { reviewAccess, type Viewer } from "../review-access.js";
 import { QA_SIGNOFF_STAGE, QA_STAGE } from "./qa-service.js";
 
@@ -153,6 +154,7 @@ export function qaReviewService(db: Db, deps: QaReviewDeps) {
       recommendation: data.recommendation ?? { value: "changes", reasons: [] },
       warnings: data.warnings ?? [],
       repos: repos.map((r) => ({ ...r, name: systemRows.find((x) => x.key === r.system)?.name ?? r.system, repoUrl: systemRows.find((x) => x.key === r.system)?.repoUrl ?? null })),
+      previousRound: await loadPreviousRound(db, companyId, caseId, QA_STAGE, data),
     };
   }
 
