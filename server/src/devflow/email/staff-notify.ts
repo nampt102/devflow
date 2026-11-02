@@ -83,14 +83,14 @@ const KINDS: Record<DigestKind, { stageKey: string; outputStage: string; path: s
   },
 };
 
-export function composeStaffDigest(input: { count: number; items: Array<{ key: string; title: string }>; link: string; more: number; kind?: DigestKind }): { subject: string; body: string } {
+export function composeStaffDigest(input: { count: number; items: Array<{ key: string; title: string; link?: string }>; link: string; more: number; kind?: DigestKind }): { subject: string; body: string } {
   const kind = KINDS[input.kind ?? "triage"];
   return {
     subject: kind.subject(input.count),
     body: [
       kind.intro(input.count),
       "",
-      ...input.items.map((i) => `- ${i.key}: ${i.title}`),
+      ...input.items.flatMap((i) => [`- ${i.key}: ${i.title}`, ...(i.link ? [`  ${i.link}`] : [])]),
       ...(input.more > 0 ? [`- ... và ${input.more} yêu cầu khác`] : []),
       "",
       `Mở màn hình duyệt: ${input.link}`,
@@ -153,11 +153,12 @@ export function createStaffNotifier(db: Db, send: SendMail, opts: StaffNotifyOpt
         continue;
       }
       const shown = fresh.slice(-maxListed).reverse(); // newest first
+      const queueLink = `${opts.portalBaseUrl}/${encodeURIComponent(items[0].prefix)}/${queue.path}`;
       const mail = composeStaffDigest({
         count: fresh.length,
-        items: shown.map((i) => ({ key: i.case_key, title: oneLine(i.title, 120) })),
+        items: shown.map((i) => ({ key: i.case_key, title: oneLine(i.title, 120), link: `${queueLink}?case=${encodeURIComponent(i.case_key)}` })),
         more: fresh.length - shown.length,
-        link: `${opts.portalBaseUrl}/${items[0].prefix}/${queue.path}`,
+        link: queueLink,
         kind: kindName,
       });
       let delivered = 0;

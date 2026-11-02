@@ -36,6 +36,11 @@ describe("staff digest helpers", () => {
     expect(m.body).toContain("- ... và 1 yêu cầu khác");
     expect(m.body).toContain("https://devflow.example/DEV/triage");
   });
+
+  it("puts a deep link under a request when one is given", () => {
+    const m = composeStaffDigest({ count: 1, items: [{ key: "REQ-3", title: "C", link: "https://devflow.example/DEV/triage?case=REQ-3" }], more: 0, link: "https://devflow.example/DEV/triage" });
+    expect(m.body).toContain("- REQ-3: C\n  https://devflow.example/DEV/triage?case=REQ-3");
+  });
 });
 
 const embeddedPostgresSupport = await getEmbeddedPostgresTestSupport();
@@ -141,6 +146,8 @@ describeEmbeddedPostgres("devflow staff digest", () => {
     expect(m.text).toContain(`- ${a.key}: Báo cáo kho`);
     expect(m.text.indexOf(b.key)).toBeLessThan(m.text.indexOf(a.key)); // newest first
     expect(m.text).toContain(`https://devflow.example/${ctx.prefix}/triage`);
+    expect(m.text).toContain(`https://devflow.example/${ctx.prefix}/triage?case=${b.key}`);
+    expect(m.text).toContain(`https://devflow.example/${ctx.prefix}/triage?case=${a.key}`);
     expect(m.text).not.toContain("MÔ TẢ-BÍ-MẬT");
     expect(m.text).not.toContain("ĐỀ-XUẤT-BÍ-MẬT");
     const rows = await ledger(ctx.company.id);
