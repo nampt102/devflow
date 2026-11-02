@@ -14,6 +14,10 @@ Yêu cầu là `pipeline_cases` của pipeline `dev-request` nối `dr_requests`
 
 **D5. "Chờ tôi".** Dùng `canDecide` hiện có của từng trang duyệt (vai và owner) để đánh dấu thẻ người xem quyết định được.
 
+**D6. Giao diện theo kiểu Plane (2026-11-02, chủ dự án duyệt).** Đọc Kanban của Plane (`../_ref/plane`, `apps/web/components/issues/issue-layouts/kanban/`) và viết lại theo token của DevFlow, không chép code (AGPL, ADR 0002). Board trên nền xám nhạt, cột không nền rộng 320px cách 16px, mỗi cột tự cuộn; header cột có icon theo loại stage, tên, số mờ, nút thu gọn; cột thu gọn thành dải 44px chữ dọc (Done/Cancelled mặc định thu gọn, lưu trên trình duyệt). Thẻ bo góc có bóng nhẹ: mã REQ, tiêu đề tối đa 2 dòng, hàng chip 20px (trạng thái chờ, lỗi agent, ưu tiên, loại, hệ thống, tuổi ở stage, requester); cả thẻ là link tới trang duyệt, menu "···" có Open review và History. Vẫn chỉ xem (D1).
+
+**D7. Bộ lọc và hiển thị.** Một popover Filters chọn nhiều giá trị cho: chờ ai (tôi, người, agent), ưu tiên, loại, hệ thống, requester, stage, kèm số lượng và ô tìm; thêm tuổi ở stage (1/3/7 ngày), có lỗi agent, ẩn Done/Cancelled. Bộ lọc đang bật hiện thành chip có nút bỏ. Popover Display chọn chip trên thẻ, thứ tự trong cột (cũ nhất ở stage, mới nhất, theo ưu tiên) và hiện cột rỗng; lưu theo công ty trên trình duyệt. Bộ lọc và dạng xem ghi lên URL (`?priority=high&priority=urgent&layout=list`) để gửi link. View cũ (giá trị đơn, `mine`) được đọc lại thành dạng mới.
+
 ## Risks / Trade-offs
 
 - Truy vấn gom nhiều bảng: giới hạn Done/Cancelled và chỉ mục hiện có trên `pipeline_cases(company_id, stage_id)`; đo khi làm.

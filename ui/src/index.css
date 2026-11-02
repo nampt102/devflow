@@ -3344,6 +3344,12 @@ span.paperclip-mention-chip[data-mention-kind="external-object"] {
 /* DevFlow review detail: viewport minus the breadcrumb bar, the main padding and the workspace header, so the pinned decision bar stays inside the screen. */
 :root {
   --review-detail-max-h: calc(100dvh - var(--sz-60px) - 10rem);
+  /* Requests board: viewport minus the breadcrumb bar, the main padding, the toolbar and the filter chips */
+  --requests-board-h: calc(100dvh - var(--sz-60px) - 11rem);
+}
+/* a collapsed board column shows its name top to bottom */
+.devflow-vertical-text {
+  writing-mode: vertical-rl;
 }
 
 /* Agent setup handoff: the same logo stack travels from trigger to prompt. */
