@@ -240,6 +240,7 @@ function Review({ companyId, detail, onDecided }: { companyId: string; detail: C
   return (
     <ReviewDetailFrame
       header={header}
+      previousRound={detail.previousRound}
       sections={[
         { id: "summary", label: "Summary", attention: blockedRepos > 0 || !!detail.approveBlocker, content: summary },
         { id: "tasks", label: "Tasks", count: rows.length, attention: openTasks > 0, content: tasks },

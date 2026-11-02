@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { BaConfidence, BaDecision, BaMetrics } from "./devflowBa";
+import type { BaConfidence, BaDecision, BaMetrics, PreviousRound } from "./devflowBa";
 
 // Staff review of technical plans (openspec change add-tech-plan-stage).
 
@@ -51,6 +51,7 @@ export interface PlanQueueItem {
 }
 
 export interface PlanDetail {
+  previousRound: PreviousRound | null;
   /** false when the viewer lacks the role the stage asks for (add-approver-roles) */
   canDecide: boolean;
   requiredRoles: string[];

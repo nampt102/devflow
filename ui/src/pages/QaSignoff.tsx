@@ -233,6 +233,7 @@ function Review({ companyId, detail, onDecided }: { companyId: string; detail: Q
   return (
     <ReviewDetailFrame
       header={header}
+      previousRound={detail.previousRound}
       sections={[
         { id: "summary", label: "Summary", content: summary },
         { id: "criteria", label: "Criteria", count: report.criteria.length, attention: openCriteria > 0, content: criteria },

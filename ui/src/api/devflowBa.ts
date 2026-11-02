@@ -5,6 +5,17 @@ import { api } from "./client";
 export type BaDecision = "approve" | "reject" | "request_changes";
 export type BaConfidence = "low" | "medium" | "high";
 
+/** Why the proposal before this one was sent back, and what changed since; shared by the five review screens. */
+export interface PreviousRound {
+  reason: string;
+  decidedAt: string;
+  decidedBy: string | null;
+  /** the review stage that sent it back (qa_signoff for Dev work QA returned) */
+  fromStage: string | null;
+  previousSummary: string | null;
+  changes: Array<{ field: string; before: string; after: string }>;
+}
+
 export interface BaStory {
   asA: string;
   iWant: string;
@@ -51,6 +62,7 @@ export interface BaSystems {
 }
 
 export interface BaDetail {
+  previousRound: PreviousRound | null;
   /** false when the viewer lacks the role the stage asks for (add-approver-roles) */
   canDecide: boolean;
   requiredRoles: string[];

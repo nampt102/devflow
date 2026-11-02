@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { BaConfidence, BaDecision, BaMetrics } from "./devflowBa";
+import type { BaConfidence, BaDecision, BaMetrics, PreviousRound } from "./devflowBa";
 import type { CodeDecisionResult } from "./devflowCode";
 
 // Staff sign-off of the QA agent's report (openspec change add-qa-stage): per-criterion verdicts with evidence, the commands
@@ -42,6 +42,7 @@ export interface QaQueueItem {
 }
 
 export interface QaDetail {
+  previousRound: PreviousRound | null;
   /** false when the viewer lacks the role the stage asks for (add-approver-roles) */
   canDecide: boolean;
   requiredRoles: string[];

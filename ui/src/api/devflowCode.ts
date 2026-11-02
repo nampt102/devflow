@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { BaConfidence, BaDecision, BaMetrics } from "./devflowBa";
+import type { BaConfidence, BaDecision, BaMetrics, PreviousRound } from "./devflowBa";
 
 // Staff review of the Dev agent's work (openspec change add-dev-stage): draft pull requests, the agent's report and checks.
 
@@ -54,6 +54,7 @@ export interface CodeQueueItem {
 export type ApproveBlocker = "no_pull_request" | "blocked_diff" | null;
 
 export interface CodeDetail {
+  previousRound: PreviousRound | null;
   /** false when the viewer lacks the role the stage asks for (add-approver-roles) */
   canDecide: boolean;
   requiredRoles: string[];

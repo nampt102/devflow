@@ -242,6 +242,7 @@ function ReviewForm({ companyId, detail, onDecided }: { companyId: string; detai
   return (
     <ReviewDetailFrame
       header={header}
+      previousRound={detail.previousRound}
       sections={[
         { id: "request", label: "Request", count: detail.attachments.length || undefined, content: request },
         { id: "spec", label: changed.length ? `Spec (${changed.length} edited)` : "Spec", content: specForm },

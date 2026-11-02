@@ -257,6 +257,7 @@ function ReviewForm({ companyId, detail, onDecided }: { companyId: string; detai
   return (
     <ReviewDetailFrame
       header={header}
+      previousRound={detail.previousRound}
       sections={[
         { id: "summary", label: "Summary", content: summary },
         { id: "tasks", label: "Tasks", count: plan.tasks.length, content: tasks },

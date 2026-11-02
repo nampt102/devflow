@@ -1,4 +1,5 @@
 import { api } from "./client";
+import type { PreviousRound } from "./devflowBa";
 
 // Staff review of Triage proposals (DevFlow step 8, openspec/decisions/0017).
 
@@ -47,6 +48,7 @@ export interface TriageCandidate {
 }
 
 export interface TriageDetail {
+  previousRound: PreviousRound | null;
   /** false when the viewer lacks the role the stage asks for (add-approver-roles) */
   canDecide: boolean;
   requiredRoles: string[];
