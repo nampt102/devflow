@@ -3341,6 +3341,11 @@ span.paperclip-mention-chip[data-mention-kind="external-object"] {
   .skill-import-progress::-webkit-progress-value { transition: none; }
 }
 
+/* DevFlow review detail: viewport minus the breadcrumb bar, the main padding and the workspace header, so the pinned decision bar stays inside the screen. */
+:root {
+  --review-detail-max-h: calc(100dvh - var(--sz-60px) - 10rem);
+}
+
 /* Agent setup handoff: the same logo stack travels from trigger to prompt. */
 :root {
   --agent-setup-flight-duration: var(--motion-duration-deliberate);

@@ -31,6 +31,17 @@ const BOARD_ROUTE_ROOTS = new Set([
   "search",
   "settings",
   "timeline",
+  // DevFlow pages (without these the sidebar links skip the prefix and go through a redirect that remounts the layout)
+  "triage",
+  "portal-access",
+  "systems",
+  "roles",
+  "setup",
+  "requests",
+  "ba-review",
+  "plan-review",
+  "code-review",
+  "qa-signoff",
 ]);
 
 const GLOBAL_ROUTE_ROOTS = new Set(["auth", "invite", "board-claim", "cli-auth", "mcp-connect", "dot-connect", "assistant-connections", "docs", "instance"]);

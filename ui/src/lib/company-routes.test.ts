@@ -39,6 +39,16 @@ describe("company routes", () => {
     );
   });
 
+  it("prefixes the DevFlow pages so sidebar links do not go through the unprefixed redirect", () => {
+    for (const root of ["triage", "portal-access", "systems", "roles", "setup", "requests", "ba-review", "plan-review", "code-review", "qa-signoff"]) {
+      expect(extractCompanyPrefixFromPath(`/${root}`)).toBeNull();
+      expect(applyCompanyPrefix(`/${root}`, "DEV")).toBe(`/DEV/${root}`);
+    }
+    expect(applyCompanyPrefix("/requests/REQ-1", "DEV")).toBe("/DEV/requests/REQ-1");
+    expect(applyCompanyPrefix("/ba-review?case=REQ-8", "DEV")).toBe("/DEV/ba-review?case=REQ-8");
+    expect(extractCompanyPrefixFromPath("/DEV/ba-review")).toBe("DEV");
+  });
+
   it("treats /search as a board route that needs a company prefix", () => {
     expect(isBoardPathWithoutPrefix("/search")).toBe(true);
     expect(extractCompanyPrefixFromPath("/search")).toBeNull();

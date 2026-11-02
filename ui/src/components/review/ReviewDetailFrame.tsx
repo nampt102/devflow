@@ -44,7 +44,7 @@ export function ReviewDetailFrame({ header, sections, bar, previousRound }: { he
   const [openId, setOpenId] = useState(sections[0]?.id ?? "");
   const current = sections.find((s) => s.id === openId) ?? sections[0];
   return (
-    <div className="flex min-h-0 flex-col border border-border lg:sticky lg:top-0 lg:max-h-dvh">
+    <div className="flex min-h-0 flex-col border border-border lg:sticky lg:top-0 lg:max-h-(--review-detail-max-h)">
       <div className="space-y-2 border-b border-border p-3">
         {header}
         {previousRound ? <SinceLastRound round={previousRound} /> : null}
@@ -68,7 +68,7 @@ export function ReviewDetailFrame({ header, sections, bar, previousRound }: { he
         </nav>
       </div>
       <div className="min-h-40 flex-1 overflow-y-auto p-3">{current?.content}</div>
-      <div className="sticky bottom-0">{bar}</div>
+      <div className="sticky bottom-0 shrink-0 lg:static">{bar}</div>
     </div>
   );
 }
