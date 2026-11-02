@@ -6,7 +6,7 @@
 
 - [x] 2.1 `ui/src/components/review/ReviewWorkspace.tsx`: thanh trên, hàng chờ gọn, chi tiết có điều hướng mục, thanh quyết định ghim, xác nhận Reject, lọc/sắp xếp, ngăn Metrics, màn hình hẹp
 - [x] 2.2 Hook `useReviewHotkeys`, đồng bộ `?case=`, tự sang mục kế + test (bỏ qua khi gõ, chọn mục kế/trước, link sâu, xác nhận Reject)
-- [ ] 2.3 Kiểm chứng dữ liệu "vòng trước" ở năm API chi tiết; thêm `previousRound` (chỉ đọc) nếu thiếu + test server
+- [x] 2.3 Kiểm chứng dữ liệu "vòng trước" ở năm API chi tiết; thêm `previousRound` (chỉ đọc) nếu thiếu + test server
 
 ## 3. Chuyển từng trang (mỗi trang một commit, giữ test hành vi)
 
@@ -15,7 +15,7 @@
 - [x] 3.3 Plan review
 - [x] 3.4 BA review
 - [x] 3.5 Triage review (sửa trường, bản trùng, hệ thống)
-- [ ] 3.6 Email nhắc nhân viên dùng link `?case=`
+- [x] 3.6 Email nhắc nhân viên dùng link `?case=`
 
 ## 4. Kiểm chứng
 
@@ -23,4 +23,4 @@
 
 ## 5. Tài liệu
 
-- [ ] 5.1 KB `review-workspace.md` (thay mô tả UI trong các KB stage), status
+- [x] 5.1 KB `review-workspace.md` (thay mô tả UI trong các KB stage), status
