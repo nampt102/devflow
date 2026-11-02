@@ -298,7 +298,7 @@ export function ActiveFilters({ filter, columns, onChange }: { filter: BoardFilt
   if (filter.hideClosed) chips.push({ key: "closed", label: "Done and cancelled", values: "hidden", clear: { hideClosed: false } });
   if (chips.length === 0) return null;
   return (
-    <div className="flex flex-wrap items-center gap-1.5" aria-label="Active filters">
+    <div className="flex shrink-0 flex-wrap items-center gap-1.5" aria-label="Active filters">
       {chips.map((c) => (
         <ActiveChip key={c.key} label={c.label} values={c.values} onRemove={() => onChange({ ...filter, ...c.clear })} />
       ))}

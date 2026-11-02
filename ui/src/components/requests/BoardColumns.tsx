@@ -63,7 +63,7 @@ function OpenColumn({ group, props, onToggle }: { group: Group; props: readonly 
 
 export function BoardColumns({ groups, props, onToggle }: { groups: Group[]; props: readonly CardProp[]; onToggle: (key: string) => void }) {
   return (
-    <div className="-mx-1 h-(--requests-board-h) min-h-96 overflow-x-auto rounded-xl bg-muted/50 p-3" aria-label="Requests by stage">
+    <div className="min-h-96 flex-1 overflow-x-auto rounded-xl bg-muted/50 p-3" aria-label="Requests by stage">
       <div className="flex h-full w-max min-w-full gap-4">
         {groups.map((g) =>
           g.collapsed ? (

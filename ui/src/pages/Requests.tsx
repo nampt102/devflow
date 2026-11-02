@@ -81,8 +81,8 @@ export function Requests() {
   const open = cards.filter((c) => !c.terminal).length;
   const mine = cards.filter((c) => c.waitingFor === "person" && c.canDecide).length;
   return (
-    <div className="space-y-3">
-      <header className="flex flex-wrap items-center gap-x-3 gap-y-2">
+    <div className={layout === "kanban" ? "flex flex-col gap-3 md:h-(--requests-page-h)" : "space-y-3"}>
+      <header className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2">
         <h1 className="text-xl font-semibold tracking-normal text-foreground">Requests</h1>
         <p className="text-sm text-muted-foreground">
           {open} open
